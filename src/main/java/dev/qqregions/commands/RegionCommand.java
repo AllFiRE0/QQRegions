@@ -1,5 +1,6 @@
 package dev.qqregions.commands;
 
+import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.protection.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Lang;
@@ -211,11 +212,12 @@ public class RegionCommand {
         boolean owner = plugin.wg().owns(region, p);
 
         p.sendMessage(plugin.lang().comp("info.title", "region", region.getId()));
-        p.sendMessage(plugin.lang().comp("info.world", "world", region.getWorld().getName()));
+        p.sendMessage(plugin.lang().comp("info.world", "world", p.getWorld().getName()));
         p.sendMessage(plugin.lang().comp("info.type", "type", regionType(region)));
         p.sendMessage(plugin.lang().comp("info.owners", "owners", plugin.wg().owners(region)));
         p.sendMessage(plugin.lang().comp("info.members", "members", plugin.wg().members(region)));
-        p.sendMessage(plugin.lang().comp("info.area", "area", fmt(region.getArea()), "volume", fmt(region.getVolume())));
+        long area = regionArea(region);
+        p.sendMessage(plugin.lang().comp("info.area", "area", fmt(area), "volume", fmt(region.volume())));
         long priority = safePriority(region);
         p.sendMessage(plugin.lang().comp("info.priority", "priority", String.valueOf(priority)));
 
@@ -254,7 +256,17 @@ public class RegionCommand {
     }
 
     private String regionType(ProtectedRegion region) {
-        return region.getTypeName() != null ? region.getTypeName() : "cuboid";
+        return region.getType().getName();
+    }
+
+    private long regionArea(ProtectedRegion region) {
+        try {
+            BlockVector3 min = region.getMinimumPoint();
+            BlockVector3 max = region.getMaximumPoint();
+            return (long) (max.x() - min.x() + 1) * (max.z() - min.z() + 1);
+        } catch (Throwable t) {
+            return 0;
+        }
     }
 
     // ---------- add / remove ----------
@@ -320,7 +332,7 @@ public class RegionCommand {
                 lang(p, "add.already", "target", nick, "role", plugin.lang().get("members." + (owner ? "owner" : "member")));
                 return;
             }
-            plugin.wg().addPlayer(region, uuid, owner);
+            plugin.wg().addPlayer(p.getWorld(), region, uuid, owner);
             lang(p, owner ? "add.ok-owner" : "add.ok-member", "target", nick, "region", region.getId());
         } else {
             if (owner ? !isOwner : !isMember) {
@@ -331,14 +343,14 @@ public class RegionCommand {
                 lang(p, "remove.last-owner");
                 return;
             }
-            plugin.wg().removePlayer(region, uuid, owner);
+            plugin.wg().removePlayer(p.getWorld(), region, uuid, owner);
             lang(p, owner ? "remove.ok-owner" : "remove.ok-member", "target", nick, "region", region.getId());
         }
     }
 
     private boolean lastOwner(ProtectedRegion region) {
         try {
-            return region.getOwners().getAll().size() <= 1;
+            return region.getOwners().getUniqueIds().size() <= 1;
         } catch (Throwable t) {
             return false;
         }
@@ -368,7 +380,7 @@ public class RegionCommand {
             lang(p, "flags.not-owner");
             return;
         }
-        boolean opened = plugin.menus().openFlags(p, region);
+        boolean opened = plugin.menus().openFlags(p, p.getWorld(), region);
         if (!opened) {
             lang(p, "flags.menu-disabled");
         }

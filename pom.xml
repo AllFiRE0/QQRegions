@@ -20,7 +20,7 @@
         <!-- API ядра Leaf 26.2 (форк Paper). https://github.com/Winds-Studio/Leaf -->
         <leaf.version>26.2.local-SNAPSHOT</leaf.version>
 
-        <!-- WorldGuard для MC 26.2. Если существует более свежая версия — обнови. -->
+        <!-- WorldGuard для MC 26.2 (7.0.18). Если появится новее — обнови. -->
         <worldguard.version>7.0.18</worldguard.version>
 
         <placeholderapi.version>2.11.6</placeholderapi.version>
@@ -88,6 +88,9 @@
                 <configuration>
                     <release>25</release>
                     <encoding>UTF-8</encoding>
+                    <!-- Обход бага javac-in-process на JDK 25
+                         ("Fatal error compiling: Cannot load from object array
+                          because this.hashes is null") — CMOPL-404 -->
                     <fork>true</fork>
                     <forceLegacyJavacApi>true</forceLegacyJavacApi>
                 </configuration>

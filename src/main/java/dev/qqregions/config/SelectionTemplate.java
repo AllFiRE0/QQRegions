@@ -3,6 +3,7 @@ package dev.qqregions.config;
 import dev.qqregions.util.Expressions;
 import dev.qqregions.util.Papi;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 
 import java.util.Map;
 
@@ -42,7 +43,8 @@ public class SelectionTemplate {
     }
 
     public boolean matches(OfflinePlayer player) {
-        boolean permOk = permission == null || permission.isEmpty() || player.hasPermission(permission);
+        boolean permOk = permission == null || permission.isEmpty()
+                || (player instanceof Player p && p.hasPermission(permission));
         if (!permOk) {
             return false;
         }

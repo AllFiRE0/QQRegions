@@ -3,7 +3,7 @@ package dev.qqregions.wg;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
-import com.sk89q.worldguard.domains.DomainSet;
+import com.sk89q.worldguard.domains.DefaultDomain;
 import com.sk89q.worldguard.internal.platform.WorldGuardPlatform;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
 import com.sk89q.worldguard.protection.ProtectedRegion;
@@ -69,12 +69,12 @@ public class Wg {
             return null;
         }
         BlockVector3 v = BukkitAdapter.asBlockVector(player.getLocation());
-        ApplicableRegionSet set = rm.getApplicableRegionsSet(v);
+        ApplicableRegionSet set = rm.getApplicableRegions(v);
         ProtectedRegion best = null;
         long bestVolume = Long.MAX_VALUE;
         for (ProtectedRegion r : set.getRegions()) {
             if (r.contains(v)) {
-                long vol = r.getVolume();
+                long vol = r.volume();
                 if (vol < bestVolume) {
                     bestVolume = vol;
                     best = r;
@@ -102,7 +102,7 @@ public class Wg {
         return region != null && (contains(region.getOwners(), uuid) || contains(region.getMembers(), uuid));
     }
 
-    private boolean contains(DomainSet set, Player player) {
+    private boolean contains(DefaultDomain set, Player player) {
         try {
             return set.contains(player.getUniqueId());
         } catch (Throwable t) {
@@ -110,7 +110,7 @@ public class Wg {
         }
     }
 
-    private boolean contains(DomainSet set, UUID uuid) {
+    private boolean contains(DefaultDomain set, UUID uuid) {
         try {
             return set.contains(uuid);
         } catch (Throwable t) {
@@ -163,26 +163,25 @@ public class Wg {
         }
     }
 
-    public void addPlayer(ProtectedRegion region, UUID uuid, boolean owner) {
+    public void addPlayer(World world, ProtectedRegion region, UUID uuid, boolean owner) {
         if (owner) {
             region.getOwners().addPlayer(uuid);
         } else {
             region.getMembers().addPlayer(uuid);
         }
-        saveQuiet(region);
+        saveQuiet(world, region);
     }
 
-    public void removePlayer(ProtectedRegion region, UUID uuid, boolean owner) {
+    public void removePlayer(World world, ProtectedRegion region, UUID uuid, boolean owner) {
         if (owner) {
             region.getOwners().removePlayer(uuid);
         } else {
             region.getMembers().removePlayer(uuid);
         }
-        saveQuiet(region);
+        saveQuiet(world, region);
     }
 
-    private void saveQuiet(ProtectedRegion region) {
-        World world = Bukkit.getWorld(region.getWorld().getName());
+    private void saveQuiet(World world, ProtectedRegion region) {
         RegionManager rm = manager(world);
         if (rm == null) {
             return;
@@ -217,13 +216,6 @@ public class Wg {
      */
     public String flagValue(World world, ProtectedRegion region, Flag<?> flag) {
         Object value = region == null ? null : region.getFlag(flag);
-        if (value == null && world != null) {
-            try {
-                value = WorldGuard.getInstance().getPlatform().getGlobalStateManager()
-                        .get(BukkitAdapter.adapt(world)).getDefault(flag);
-            } catch (Throwable ignored) {
-            }
-        }
         return value == null ? "" : value.toString().toLowerCase(java.util.Locale.ROOT);
     }
 
@@ -260,20 +252,16 @@ public class Wg {
 
     // ---------- отображение доменов ----------
 
-    private String names(DomainSet set) {
+    private String names(DefaultDomain set) {
         StringBuilder sb = new StringBuilder();
         try {
-            for (Object o : set.getAll()) {
+            for (UUID uuid : set.getUniqueIds()) {
                 if (sb.length() > 0) {
                     sb.append(", ");
                 }
-                if (o instanceof UUID) {
-                    org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer((UUID) o);
-                    String n = op.getName();
-                    sb.append(n != null ? n : ((UUID) o).toString().substring(0, 8));
-                } else {
-                    sb.append(o);
-                }
+                org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+                String n = op.getName();
+                sb.append(n != null ? n : uuid.toString().substring(0, 8));
             }
         } catch (Throwable ignored) {
         }

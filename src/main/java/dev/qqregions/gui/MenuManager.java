@@ -11,6 +11,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,11 +51,11 @@ public class MenuManager implements Listener {
     }
 
     /** Открыть лучшее подходящее меню flags для владельца региона. */
-    public boolean openFlags(Player player, ProtectedRegion region) {
-        String world = region.getWorld().getName();
+    public boolean openFlags(Player player, org.bukkit.World world, ProtectedRegion region) {
+        String w = world.getName();
         Map<String, String> ctx = new HashMap<>();
         ctx.put("region", region.getId());
-        ctx.put("world", world);
+        ctx.put("world", w);
         ctx.put("player", player.getName());
         return open(player, "flags", ctx);
     }

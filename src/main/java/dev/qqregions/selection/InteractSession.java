@@ -7,6 +7,7 @@ import dev.qqregions.config.SelectionTemplate;
 import dev.qqregions.util.Msg;
 import dev.qqregions.wg.RegionException;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -49,6 +50,7 @@ public class InteractSession {
     private boolean namePrompt = false;
 
     private BossBar bar;
+    private NamespacedKey barKey;
     private int particleTimer = 0;
     private int barTimer = 0;
 
@@ -412,11 +414,12 @@ public class InteractSession {
         }
 
         if (bar == null) {
+            barKey = new NamespacedKey(plugin, "selection_" + player.getUniqueId());
             bar = Bukkit.createBossBar(
-                    new NamespacedKey(plugin, "selection_" + player.getUniqueId()),
-                    comp, color, bo.style);
+                    barKey,
+                    PlainTextComponentSerializer.plainText().serialize(comp), color, bo.style);
         } else {
-            bar.setTitle(comp);
+            bar.setTitle(PlainTextComponentSerializer.plainText().serialize(comp));
             bar.setColor(color);
         }
         double progress = max <= 0 ? 1.0 : Math.min(1.0, (double) cur / max);
@@ -427,8 +430,11 @@ public class InteractSession {
     private void hideBar() {
         if (bar != null) {
             bar.removePlayer(player);
-            Bukkit.removeBossBar(bar.getKey());
+            if (barKey != null) {
+                Bukkit.removeBossBar(barKey);
+            }
             bar = null;
+            barKey = null;
         }
     }
 
