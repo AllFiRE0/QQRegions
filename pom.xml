@@ -21,7 +21,7 @@
         <leaf.version>26.2.local-SNAPSHOT</leaf.version>
 
         <!-- WorldGuard для MC 26.2. Если существует более свежая версия — обнови. -->
-        <worldguard.version>7.0.3</worldguard.version>
+        <worldguard.version>7.0.18</worldguard.version>
 
         <placeholderapi.version>2.11.6</placeholderapi.version>
     </properties>
