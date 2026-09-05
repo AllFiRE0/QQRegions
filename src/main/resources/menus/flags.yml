@@ -1,0 +1,100 @@
+# ============================================================
+#  QQRegions — пример меню флагов
+#  Динамические кнопки строятся из реестра флагов WorldGuard
+#  (все флаги WG + WorldGuardExtraFlagsPlus + других плагинов).
+#
+#  Внутри каждого меню можно сделать несколько шаблонов для
+#  разных групп игроков (по правам или заполнителям) — выберется
+#  шаблон с наибольшим приоритетом, которому игрок подходит.
+#
+#  Временные переменные внутри меню:
+#    {region}, {world}, {player}
+#    {page}, {pages} — для title
+#    а в dynamic-flags: {flag}, {group}, {flag-with-group},
+#    {flag-value}, {next-state}
+#
+#  {next-state} подставляется при клике: текущее значение берётся
+#  из заполнителя WorldGuard, затем берётся следующее значение из
+#  списка states (или allow -> deny для StateFlag, если states пуст).
+#
+#  Пагинация: слоты из dynamic-flags.slots заполняются по странице,
+#  навигация через блок navigation (псевдокоманды @page:prev/@page:next).
+# ============================================================
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 1
+    permission-group: ""          # право для доступа к этому шаблону
+    placeholder-group: ""         # условие из заполнителей, напр. "%vault_rank%==VIP"
+    title: "&#000000Меню флагов ({page}/{pages})"
+    size: 6                       # 1-6 линий
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+    dynamic-flags:
+      enabled: true
+      slots:
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 26
+        - 30
+        - 31
+        - 32
+        - 33
+        - 34
+        - 35
+        - 36
+        - 40
+        - 41
+        - 42
+        - 43
+        - 44
+      groups:
+        - all
+      ignore-flags: []            # какие флаги не показывать (по имени)
+      material: MAP
+      name: "&f{flag}"
+      lore:
+        - "Значение: {flag-value}"
+        - "&9Клик — переключить"
+      commands:
+        - "asConsole! rg flag -w {world} -h 1 {region} {flag} {next-state}"
+      materials:
+        pvp: DIAMOND_SWORD
+        build: OAK_PLANK
+        creeper-explosion: TNT
+        fall-damage: IRON_BOOTS
+        greeting: WRITABLE_BOOK
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Предыдущая страница"
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        lore:
+          - "&7Следующая страница"

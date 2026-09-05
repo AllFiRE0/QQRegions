@@ -1,0 +1,37 @@
+# ============================================================
+#  QQRegions — replace.yml
+#  Замена значений заполнителей WorldGuard / WGEFP на ваш текст,
+#  чтобы в меню плагина не появлялись голые yes/no или true/false.
+#
+#  Ключ — название заполнителя. Внутри — список вариантов:
+#    placeholder: какое исходное значение заменить (без учёта регистра)
+#    replacement: на что заменить ('&'-цвета работают)
+#  Спецзначение placeholder: ELSE — замена по умолчанию, если ничего не совпало.
+# ============================================================
+
+'%worldguard_region_has_flag_pvp%':
+  - placeholder: 'yes'
+    replacement: 'включено'
+  - placeholder: 'no'
+    replacement: '&7выключено'
+  - placeholder: 'ELSE'
+    replacement: ''
+
+# Пример шаблона для произвольного флага WorldGuard/WGEFP.
+# ВАЖНО: в реальных меню заменяйте <FlagName> на конкретное имя флага.
+'%worldguard_region_has_flag_<FlagName>%':
+  - placeholder: 'yes'
+    replacement: 'включено'
+  - placeholder: 'no'
+    replacement: '&7выключено'
+  - placeholder: 'ELSE'
+    replacement: ''
+
+# Числовые значения каких-нибудь флагов (например greet, exit, spawn...)
+'%worldguard_region_flags_custom_enabled%':
+  - placeholder: '0'
+    replacement: '&7выкл'
+  - placeholder: '1'
+    replacement: '&aвкл'
+  - placeholder: 'ELSE'
+    replacement: '&7{value}'

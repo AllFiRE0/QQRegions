@@ -1,0 +1,61 @@
+name: QQRegions
+version: '1.0.0'
+main: dev.qqregions.QQRegions
+api-version: '26.2'
+description: Мощное управление регионами поверх WorldGuard
+website: https://github.com/AllF1RE
+author: AllF1RE
+
+depend:
+  - WorldGuard
+
+softdepend:
+  - PlaceholderAPI
+  - WorldGuardExtraFlagsPlus
+  - LuckPerms
+
+permissions:
+  qqregions.use:
+    description: Базовый доступ к командам
+    default: true
+  qqregions.reload:
+    description: Перезагрузка конфигурации (/region reload)
+    default: op
+  qqregions.create:
+    description: Создание регионов
+    default: true
+  qqregions.delete:
+    description: Удаление регионов
+    default: true
+  qqregions.select:
+    description: Выделение территории
+    default: true
+  qqregions.info:
+    description: Информация о регионе (/region info)
+    default: true
+  qqregions.manage:
+    description: Управление участниками и владельцами
+    default: true
+  qqregions.flags:
+    description: Меню флагов
+    default: true
+  qqregions.admin:
+    description: Полный доступ, включая регионы чужих игроков
+    default: op
+    children:
+      qqregions.reload: true
+      qqregions.create: true
+      qqregions.delete: true
+      qqregions.select: true
+      qqregions.info: true
+      qqregions.manage: true
+      qqregions.flags: true
+  qqregions.bypass.selection-limits:
+    description: Игнорировать max-blocks/min-blocks в шаблонах прав
+    default: op
+  qqregions.bypass.disabled-worlds:
+    description: Работать в мирах из disabled-worlds
+    default: op
+  qqregions.bypass.banned-regions:
+    description: Работать с регионами из banned-regions
+    default: op

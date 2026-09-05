@@ -1,0 +1,131 @@
+# ============================================================
+#  QQRegions — языковой файл
+#  Формат: ключ: "перевод"
+#  Всё, что видит игрок/админ/консоль, настраивается только здесь.
+#  Допустимы: '&'-цвета, '&#RRGGBB' и заполнители {переменная}.
+# ============================================================
+
+prefix: "&8[&bQQRegions&8] "
+
+general:
+  only-player: "&cЭта команда доступна только игрокам."
+  no-permission: "&cУ вас недостаточно прав."
+  reloaded: "&aКонфигурация перезагружена."
+  reloaded-summary: "&7Алиасы: &f{aliases}"
+  reload-failed: "&cНе удалось перезагрузить конфигурацию: &7{error}"
+  disabled-world: "&cПлагин отключён в этом мире."
+  player-not-found: "&cИгрок &7{player} &cне найден."
+  unknown-subcommand: "&cНеизвестная подкоманда. Введите &7/{alias} help"
+  usage: "&7Использование: &f/{usage}"
+
+select:
+  point-1: "точка 1"
+  point-2: "точка 2"
+  pos-set: "&a{point} &aустановлена: &7({x}, {y}, {z})"
+  reset: "&eВыделение сброшено."
+  cleared: "&7Выделение очищено."
+  none: "&cСначала выделите область."
+  max-built: "&aВыделение расширено до максимума: &7{blocks} &aблоков."
+  chunk-built: "&aВыделено &7{chunks} &aчанков (&7{blocks} &aблоков)."
+  chunk-over: "&cДоступно максимум &7{chunks} &cчанков."
+  expanded: "&aОбласть расширена: &7{blocks} &aблоков."
+  outset: "&aОбласть расширена во все стороны: &7{blocks} &aблоков."
+  over-limit: "&cПревышен лимит блоков (&7{current}&c/&7{max}&c)."
+  below-min: "&cОбласть меньше минимального размера (&7{current}&c/&7{min}&c)."
+  point-locked: "&cТочка упёрлась в ограничения."
+  invalid-amount: "&cНекорректное количество: &7{amount}"
+  invalid-side: "&cНекорректная сторона: &7{side} &c(&7north, south, east, west, up, down&c)."
+  interactive-on: "&aРежим выделения включён."
+  interactive-help: "&7Кнопки хотбара: &a4&7 — выделить область, &a1&7 — создать, &a6&7 — сброс, &a9&7 — отмена."
+  interactive-select-mode: "&eРежим выделения: &f{point}&e. &7ЛКМ — сменить точку, колесо — двигать."
+  interactive-off: "&7Режим выделения выключен."
+  conflict: "&eВнимание: выделение пересекает регион &7{region}&e."
+  button-create: "&aСоздать регион"
+  button-select: "&eВыделить область"
+  button-reset: "&6Сброс выделения"
+  button-cancel: "&cОтмена"
+
+create:
+  prompt: "&aВведите название региона в чат (&7cancel&a — отмена, выделение сохранится):"
+  cancelled: "&7Ввод названия отменён."
+  invalid-name: "&cНедопустимое название региона. Допустимо: &7{regex}"
+  ok: "&aРегион &7{region} &aсоздан в мире &7{world}&a. (&7{blocks} &aблоков)"
+  already-exists: "&cРегион &7{region} &cуже существует."
+  fail: "&cНе удалось создать регион: &7{error}"
+  none: "&cСначала выделите область (см. &7/{alias} help&c)."
+  banned: "&cС регионом &7{region} &cработать запрещено."
+  cancel-words:
+    - "cancel"
+    - "отмена"
+
+delete:
+  ok: "&aРегион &7{region} &aудалён."
+  not-owner: "&cВы не являетесь владельцем этого региона."
+  not-found: "&cРегион &7{region} &cне найден."
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  fail: "&cНе удалось удалить регион: &7{error}"
+
+add:
+  ok-member: "&aИгрок &7{target} &aдобавлен в участники региона &7{region}&a."
+  ok-owner: "&aИгрок &7{target} &aдобавлен во владельцы региона &7{region}&a."
+  already: "&eИгрок &7{target} &eуже является &7{role}&e."
+  not-allowed: "&cВы не можете редактировать регион &7{region}&c."
+
+remove:
+  ok-member: "&aИгрок &7{target} &aудалён из участников региона &7{region}&a."
+  ok-owner: "&aИгрок &7{target} &aудалён из владельцев региона &7{region}&a."
+  not-in: "&cИгрок &7{target} &cне является &7{role}&c."
+  last-owner: "&cНельзя удалить последнего владельца региона."
+  not-allowed: "&cВы не можете редактировать регион &7{region}&c."
+
+info:
+  title: "&8================[ &b{region} &8]================"
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  world: "&7Мир: &f{world}"
+  type: "&7Тип: &f{type}"
+  owners: "&7Владельцы: &f{owners}"
+  members: "&7Участники: &f{members}"
+  area: "&7Площадь: &f{area} &7блоков | Объём: &f{volume}"
+  priority: "&7Приоритет: &f{priority}"
+  flags-title: "&7Флаги:"
+  flags-line: "  &7{flag}&8: &f{value}"
+  flags-none: "&7  нет"
+
+flags:
+  not-owner: "&cВы не являетесь владельцем этого региона."
+  menu-disabled: "&cМеню флагов не настроено (файл &7menus/flags.yml&c)."
+
+members:
+  owner: "владельцем"
+  member: "участником"
+
+help:
+  header: "&8===== &bQQRegions &7v{version} &8====="
+  line: "&f{cmd}&8: &7{desc}"
+  commands:
+    - usage: "select"
+      desc: "Интерактивное выделение (без аргументов)"
+    - usage: "select pos|point <1|2>"
+      desc: "Установить точку выделения"
+    - usage: "select max"
+      desc: "Максимально разрешённая область вокруг игрока"
+    - usage: "select chunk [количество]"
+      desc: "Выделить область из чанков"
+    - usage: "select expand [сторона] <N>"
+      desc: "Расширить/сузить выделение"
+    - usage: "select outset <N> [h|v]"
+      desc: "Расширить во все стороны"
+    - usage: "create <название>"
+      desc: "Создать регион из выделения"
+    - usage: "delete [название]"
+      desc: "Удалить регион, которым вы владеете"
+    - usage: "info [название]"
+      desc: "Информация о регионе"
+    - usage: "add [member|owner] <ник> [регион]"
+      desc: "Добавить игрока в регион"
+    - usage: "remove [member|owner] <ник> [регион]"
+      desc: "Убрать игрока из региона"
+    - usage: "flags [название]"
+      desc: "Меню флагов (владельцы)"
+    - usage: "reload"
+      desc: "Перезагрузить конфигурацию"
