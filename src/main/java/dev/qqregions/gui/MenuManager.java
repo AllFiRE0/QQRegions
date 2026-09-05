@@ -1,6 +1,6 @@
 package dev.qqregions.gui;
 
-import com.sk89q.worldguard.protection.ProtectedRegion;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;

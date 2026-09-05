@@ -1,6 +1,6 @@
 package dev.qqregions.gui;
 
-import com.sk89q.worldguard.protection.ProtectedRegion;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import dev.qqregions.QQRegions;

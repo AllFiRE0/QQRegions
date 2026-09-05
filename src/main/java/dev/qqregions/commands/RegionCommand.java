@@ -1,7 +1,7 @@
 package dev.qqregions.commands;
 
 import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldguard.protection.ProtectedRegion;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Lang;
 import dev.qqregions.config.SelectionTemplate;
@@ -454,7 +454,7 @@ public class RegionCommand {
                     return out;
                 case "info":
                     List<String> names = new ArrayList<>();
-                    for (com.sk89q.worldguard.protection.ProtectedRegion r : plugin.wg().all(p.getWorld())) {
+                    for (com.sk89q.worldguard.protection.regions.ProtectedRegion r : plugin.wg().all(p.getWorld())) {
                         if (!plugin.config().isBannedRegion(r.getId())) {
                             names.add(r.getId());
                         }
