@@ -17,13 +17,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>25</maven.compiler.release>
 
-        <!--
-          ВАЖНО: версия Paper API ядра Leaf 26.2.
-          Leaf сообщает в логе "Implementing API version 26.2.build.99-alpha".
-          Версии Paper API выглядят как 26.2.0-R0.1-SNAPSHOT. Если сборка не находит
-          артефакт, укажи точную версию жмыхи из https://repo.papermc.io.
-        -->
-        <paper.version>26.2.0-R0.1-SNAPSHOT</paper.version>
+        <!-- API ядра Leaf 26.2 (форк Paper). https://github.com/Winds-Studio/Leaf -->
+        <leaf.version>26.2.local-SNAPSHOT</leaf.version>
 
         <!-- WorldGuard для MC 26.2. Если существует более свежая версия — обнови. -->
         <worldguard.version>7.0.3</worldguard.version>
@@ -32,6 +27,10 @@
     </properties>
 
     <repositories>
+        <repository>
+            <id>leafmc</id>
+            <url>https://maven.leafmc.one/snapshots/</url>
+        </repository>
         <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
@@ -47,11 +46,11 @@
     </repositories>
 
     <dependencies>
-        <!-- Paper / Leaf API -->
+        <!-- Leaf / Paper API -->
         <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
-            <version>${paper.version}</version>
+            <groupId>cn.dreeam.leaf</groupId>
+            <artifactId>leaf-api</artifactId>
+            <version>${leaf.version}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -61,6 +60,13 @@
             <artifactId>worldguard-bukkit</artifactId>
             <version>${worldguard.version}</version>
             <scope>provided</scope>
+            <exclusions>
+                <!-- bstats-bukkit:1.7 нет в репозиториях, а при компиляции не нужен -->
+                <exclusion>
+                    <groupId>org.bstats</groupId>
+                    <artifactId>bstats-bukkit</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- PlaceholderAPI (мягкая зависимость) -->
