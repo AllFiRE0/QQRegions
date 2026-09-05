@@ -311,7 +311,10 @@ public class Menu {
                 if (b == null) {
                     continue;
                 }
-                Integer slot = b.contains("slot") ? b.getInt("slot") : null;
+                Integer slot = null;
+                if (b.contains("slot")) {
+                    slot = b.getInt("slot");
+                }
                 if (slot == null) {
                     slot = auto++;
                 }
@@ -342,7 +345,10 @@ public class Menu {
         if (b == null) {
             return null;
         }
-        Integer slot = b.contains("slot") ? b.getInt("slot") : defSlot;
+        Integer slot = defSlot;
+        if (b.contains("slot")) {
+            slot = b.getInt("slot");
+        }
         List<String> lore = b.getStringList("lore");
         return new MenuItem(
                 b.getString("material", "ARROW"),
