@@ -88,6 +88,8 @@
                 <configuration>
                     <release>25</release>
                     <encoding>UTF-8</encoding>
+                    <fork>true</fork>
+                    <forceLegacyJavacApi>true</forceLegacyJavacApi>
                 </configuration>
             </plugin>
             <!-- ресурсы: только то, что реально лежит в src/main/resources -->
