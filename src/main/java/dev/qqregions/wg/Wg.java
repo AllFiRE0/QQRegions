@@ -232,7 +232,7 @@ public class Wg {
             if (r.getId().equals(probe.getId()) || plugin.config().isBannedRegion(r.getId())) {
                 continue;
             }
-            if (r.intersects(probe)) {
+            if (!probe.getIntersectingRegions(List.of(r)).isEmpty()) {
                 out.add(r);
             }
         }
