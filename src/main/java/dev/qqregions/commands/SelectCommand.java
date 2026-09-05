@@ -267,7 +267,9 @@ public class SelectCommand {
                     return;
             }
         }
-        apply(p, sel -> sel.withOutset(amount, horizontal, vertical), "select.outset");
+        final boolean fh = horizontal;
+        final boolean fv = vertical;
+        apply(p, sel -> sel.withOutset(amount, fh, fv), "select.outset");
     }
 
     // ---------- применение изменений с лимитами ----------
