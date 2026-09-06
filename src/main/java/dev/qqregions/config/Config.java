@@ -92,7 +92,7 @@ public class Config {
         debug = cfg.getBoolean("debug", false);
 
         point1 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-1"),
-                Material.DARK_GRAY_STAINED_GLASS_PANE, Color.fromRGB(0x6b6b6b), Material.GRAY_CONCRETE);
+                Material.GRAY_STAINED_GLASS_PANE, Color.fromRGB(0x6b6b6b), Material.GRAY_CONCRETE);
         point2 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-2"),
                 Material.YELLOW_STAINED_GLASS_PANE, Color.fromRGB(0xffa500), Material.ORANGE_CONCRETE);
 

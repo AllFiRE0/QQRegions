@@ -128,7 +128,7 @@ interactive:
   # Имена панелей настраиваются в lang.yml (select.point-pane-1/2).
   select-points:
     point-1:
-      pane: DARK_GRAY_STAINED_GLASS_PANE
+      pane: GRAY_STAINED_GLASS_PANE
       highlight: "#6b6b6b"      # тёмно-серый
       block: GRAY_CONCRETE
     point-2:
