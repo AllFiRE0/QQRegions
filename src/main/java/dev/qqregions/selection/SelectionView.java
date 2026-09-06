@@ -261,51 +261,104 @@ public class SelectionView {
                 | (p.getBlockZ() + 30000000);
     }
 
+    /**
+     * Точки по всем 12 рёбрам куба, сгенерированные ПО-ЧЕСТНОМУ.
+     * Шаг адаптивный: ужимается, чтобы общее число точек влезло в cap.
+     * Рёбра обходим по кругу (round-robin), поэтому при обрезке лимитом
+     * куски остаются у КАЖДОГО ребра, а не только у «горизонтальных».
+     */
     private static List<BlockVector3> edgePoints(Selection sel, int density, int maxPoints) {
-        int d = Math.max(0, density);
+        int cap = Math.max(8, maxPoints > 0 ? maxPoints : 8);
+        int d = Math.max(1, density);
         BlockVector3 mn = sel.min();
         BlockVector3 mx = sel.max();
-        int x1 = mn.getBlockX(), y1 = mn.getBlockY(), z1 = mn.getBlockZ();
-        int x2 = mx.getBlockX(), y2 = mx.getBlockY(), z2 = mx.getBlockZ();
+        int sx = Math.abs(mx.getBlockX() - mn.getBlockX());
+        int sy = Math.abs(mx.getBlockY() - mn.getBlockY());
+        int sz = Math.abs(mx.getBlockZ() - mn.getBlockZ());
 
-        List<BlockVector3> out = new ArrayList<>();
+        int stride = d;
+        int maxDim = Math.max(1, Math.max(sx, Math.max(sy, sz)));
+        while (stride <= maxDim && countAt(stride, sx, sy, sz) > cap) {
+            stride++;
+        }
+
+        Edge[] edges = new Edge[]{
+                edge(mn, BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), sx, stride),
+                edge(mn, BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sx, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sx, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sx, stride),
+                edge(mn, BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stride),
+        };
+
+        List<BlockVector3> out = new ArrayList<>(Math.min(cap + 8, (int) (totalLen(sx, sy, sz) + 1)));
         Set<Long> seen = new HashSet<>();
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x2, y1, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x1, y1, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z1), BlockVector3.at(x2, y1, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z2), BlockVector3.at(x2, y1, z2), d);
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z1), BlockVector3.at(x2, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z1), BlockVector3.at(x1, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y2, z1), BlockVector3.at(x2, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z2), BlockVector3.at(x2, y2, z2), d);
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x1, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z1), BlockVector3.at(x2, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z2), BlockVector3.at(x1, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z2), BlockVector3.at(x2, y2, z2), d);
-
+        boolean progress = true;
+        while (progress && out.size() < cap) {
+            progress = false;
+            for (Edge e : edges) {
+                if (!e.hasNext()) {
+                    continue;
+                }
+                BlockVector3 p = e.next();
+                if (seen.add(blockKey(p))) {
+                    out.add(p);
+                    progress = true;
+                    if (out.size() >= cap) {
+                        break;
+                    }
+                }
+            }
+        }
         return out;
     }
 
-    private static void addLine(List<BlockVector3> out, Set<Long> seen, int maxPoints,
-                                BlockVector3 a, BlockVector3 b, int density) {
-        int len = Math.abs(a.getBlockX() - b.getBlockX())
-                + Math.abs(a.getBlockY() - b.getBlockY())
-                + Math.abs(a.getBlockZ() - b.getBlockZ());
-        int steps = density <= 0 || len == 0 ? 1 : Math.max(1, len / density + 1);
-        for (int i = 0; i <= steps; i++) {
-            if (out.size() >= maxPoints) {
-                return;
-            }
-            int x = a.getBlockX() + (b.getBlockX() - a.getBlockX()) * i / steps;
-            int y = a.getBlockY() + (b.getBlockY() - a.getBlockY()) * i / steps;
-            int z = a.getBlockZ() + (b.getBlockZ() - a.getBlockZ()) * i / steps;
-            long key = ((long) (x + 30000000) << 42) | ((long) (y + 1024) << 21) | (z + 30000000);
-            if (seen.add(key)) {
-                out.add(BlockVector3.at(x, y, z));
-            }
+    private static long totalLen(int sx, int sy, int sz) {
+        return 4L * (sx + sy + sz) + 12;
+    }
+
+    private static long countAt(int stride, int sx, int sy, int sz) {
+        return totalLen(sx, sy, sz) / stride + 12;
+    }
+
+    /** Ленивое ребро: точки через {stride} блоков от a к b (включая конец). */
+    private static Edge edge(BlockVector3 a, BlockVector3 b, int len, int stride) {
+        return new Edge(a, b, len, stride);
+    }
+
+    private static final class Edge {
+        final BlockVector3 a;
+        final int dx, dy, dz;
+        final int len;
+        final int stride;
+        int cur = 0;
+
+        Edge(BlockVector3 a, BlockVector3 b, int len, int stride) {
+            this.a = a;
+            this.dx = b.getBlockX() - a.getBlockX();
+            this.dy = b.getBlockY() - a.getBlockY();
+            this.dz = b.getBlockZ() - a.getBlockZ();
+            this.len = len;
+            this.stride = stride;
+        }
+
+        boolean hasNext() {
+            return cur <= len;
+        }
+
+        BlockVector3 next() {
+            int t = Math.min(cur, len);
+            cur += stride;
+            return BlockVector3.at(
+                    t == 0 ? a.getBlockX() : a.getBlockX() + dx * t / Math.max(1, len),
+                    t == 0 ? a.getBlockY() : a.getBlockY() + dy * t / Math.max(1, len),
+                    t == 0 ? a.getBlockZ() : a.getBlockZ() + dz * t / Math.max(1, len));
         }
     }
 }
