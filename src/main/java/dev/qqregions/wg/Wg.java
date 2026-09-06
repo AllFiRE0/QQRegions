@@ -268,7 +268,8 @@ public class Wg {
             } else if (flag instanceof BooleanFlag) {
                 parsed = Boolean.parseBoolean(s);
             } else {
-                parsed = flag.parseString(s);
+                // строковые/числовые/наборные флаги не поддерживаются из меню
+                return false;
             }
         } catch (Throwable t) {
             return false;

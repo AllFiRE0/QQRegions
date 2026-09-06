@@ -343,7 +343,7 @@ public class MenuManager implements Listener {
     /** Установить флаг региона через API WG: @flag:<имя>:{значение} (значение allow/deny/true/false). */
     private void setFlag(Player p, Map<String, String> ctx, String spec) {
         String worldName = ctx.get("world");
-        org.bukkit.World world = worldName == null ? null : Bukkit.getWorld(worldName);
+        org.bukkit.World world = worldName == null ? null : org.bukkit.Bukkit.getWorld(worldName);
         ProtectedRegion region = world == null ? null : plugin.wg().byName(world, ctx.get("region"));
         if (world == null || region == null) {
             return;
@@ -358,7 +358,7 @@ public class MenuManager implements Listener {
         if (flag == null) {
             return;
         }
-        String allow = "allow".equalsIgnoreCase(value);
+        boolean allow = "allow".equalsIgnoreCase(value);
         if (flag instanceof StateFlag) {
             value = allow ? "allow" : "deny";
         } else if (flag instanceof BooleanFlag) {
