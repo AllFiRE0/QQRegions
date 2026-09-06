@@ -140,13 +140,10 @@ public final class Colors {
         if (up.startsWith("#")) {
             up = up.substring(1);
         }
-        try {
-            for (BarColor c : BarColor.values()) {
-                if (c.name().equals(up)) {
-                    return c;
-                }
+        for (BarColor c : BarColor.values()) {
+            if (c.name().equals(up)) {
+                return c;
             }
-        } catch (Exception ignored) {
         }
         int rgb = parse(raw);
         if (rgb < 0) {
@@ -155,13 +152,26 @@ public final class Colors {
         BarColor best = def;
         double bestDist = Double.MAX_VALUE;
         for (BarColor c : BarColor.values()) {
-            double d = dist(rgb, c.getColor());
+            double d = dist(rgb, BAR_RGB.get(c));
             if (d < bestDist) {
                 bestDist = d;
                 best = c;
             }
         }
         return best;
+    }
+
+    /** Фиксированные ЦБ палитры боссбара (у org.bukkit.boss.BarColor нет getColor()). */
+    private static final Map<BarColor, Integer> BAR_RGB = new HashMap<>();
+
+    static {
+        BAR_RGB.put(BarColor.PINK, 0xF38BAA);
+        BAR_RGB.put(BarColor.BLUE, 0x3C44AA);
+        BAR_RGB.put(BarColor.RED, 0xFF5555);
+        BAR_RGB.put(BarColor.GREEN, 0x55FF55);
+        BAR_RGB.put(BarColor.YELLOW, 0xFFFF55);
+        BAR_RGB.put(BarColor.PURPLE, 0xAA00AA);
+        BAR_RGB.put(BarColor.WHITE, 0xFFFFFF);
     }
 
     /** Цвет в любом поддерживаемом формате -> RGB int (-1 = не распознан). */
@@ -305,10 +315,10 @@ public final class Colors {
         return Math.min(255, r) << 16 | Math.min(255, g) << 8 | Math.min(255, b);
     }
 
-    private static double dist(int rgb, org.bukkit.Color c) {
-        double dr = ((rgb >> 16) & 0xFF) - c.getRed();
-        double dg = ((rgb >> 8) & 0xFF) - c.getGreen();
-        double db = (rgb & 0xFF) - c.getBlue();
+    private static double dist(int rgb, int other) {
+        double dr = ((rgb >> 16) & 0xFF) - ((other >> 16) & 0xFF);
+        double dg = ((rgb >> 8) & 0xFF) - ((other >> 8) & 0xFF);
+        double db = (rgb & 0xFF) - (other & 0xFF);
         return dr * dr + dg * dg + db * db;
     }
 

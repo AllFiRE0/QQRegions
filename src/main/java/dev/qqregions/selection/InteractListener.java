@@ -9,13 +9,18 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
+import org.bukkit.event.player.PlayerBanEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerKickEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -159,6 +164,51 @@ public class InteractListener implements Listener {
     public void onInvClick(org.bukkit.event.inventory.InventoryClickEvent e) {
         if (e.getWhoClicked() instanceof Player p && session(p) != null) {
             e.setCancelled(true);
+        }
+    }
+
+    // ---------- аварийные выходы из сессии ----------
+
+    /** Урон от чего угодно (падение, лава, моб, PvP) — сессия закрывается,
+     * выделение сбрасывается и не отображается. */
+    @EventHandler
+    public void onDamage(EntityDamageEvent e) {
+        if (e.getEntity() instanceof Player p && plugin.selections().hasAny(p)) {
+            plugin.dbg("session reset by damage to " + p.getName());
+            plugin.selections().endSession(p);
+        }
+    }
+
+    /** Нанесён урон ДРУГОМУ ИГРОКУ — у атакующего сессия закрывается,
+     * выделение сбрасывается. */
+    @EventHandler
+    public void onDamageDealt(EntityDamageByEntityEvent e) {
+        if (e.getDamager() instanceof Player p
+                && e.getEntity() instanceof Player
+                && plugin.selections().hasAny(p)) {
+            plugin.dbg("session reset by pvp: " + p.getName());
+            plugin.selections().endSession(p);
+        }
+    }
+
+    /** Смерть — выделение сбрасывается, сессия закрывается. */
+    @EventHandler
+    public void onDeath(PlayerDeathEvent e) {
+        plugin.selections().endSession(e.getPlayer());
+    }
+
+    /** Кик — сессия закрывается, инвентарь восстанавливается. */
+    @EventHandler
+    public void onKick(PlayerKickEvent e) {
+        plugin.selections().endSession(e.getPlayer());
+    }
+
+    /** Бан — сессия закрывается, если игрок был онлайн. */
+    @EventHandler
+    public void onBan(PlayerBanEvent e) {
+        org.bukkit.OfflinePlayer op = e.getPlayer();
+        if (op instanceof Player p) {
+            plugin.selections().endSession(p);
         }
     }
 }

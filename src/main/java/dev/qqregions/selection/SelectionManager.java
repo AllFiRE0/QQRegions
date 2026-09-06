@@ -55,6 +55,12 @@ public class SelectionManager implements Listener {
         return selections.containsKey(player.getUniqueId());
     }
 
+    /** Есть ли у игрока что-то к сбросу (сессия или выделение/подсветка). */
+    public boolean hasAny(Player player) {
+        UUID id = player.getUniqueId();
+        return sessions.containsKey(id) || selections.containsKey(id) || views.containsKey(id);
+    }
+
     public void reset(Player player) {
         UUID id = player.getUniqueId();
         selections.remove(id);
@@ -125,10 +131,22 @@ public class SelectionManager implements Listener {
     }
 
     public void endSession(Player player) {
-        InteractSession s = sessions.remove(player.getUniqueId());
+        UUID id = player.getUniqueId();
+        InteractSession s = sessions.remove(id);
         if (s != null) {
             s.end();
         }
+        // «Выход из сессии в обычный инвентарь» всегда сбрасывает выделение
+        // и убирает подсветку (cancel, повторный /region select, смерть,
+        // урон, кик/бан, запрещённый мир — всё идёт через endSession).
+        reset(player);
+    }
+
+    /** Запрещён ли мир для плагина с учётом прав игрока. */
+    public boolean worldDisabledFor(Player player) {
+        return plugin.config().isWorldDisabled(player.getWorld())
+                && !player.hasPermission("qqregions.admin")
+                && !player.hasPermission("qqregions.bypass.disabled-worlds");
     }
 
     public void endAll() {
@@ -143,6 +161,14 @@ public class SelectionManager implements Listener {
     }
 
     public void tick() {
+        // В запрещённом мире сессия/выделение не живут (без скана регионов —
+        // только проверка конфига).
+        for (Player p : plugin.getServer().getOnlinePlayers()) {
+            if (worldDisabledFor(p)) {
+                plugin.dbg("session reset: disabled world " + p.getWorld().getName() + " for " + p.getName());
+                endSession(p);
+            }
+        }
         for (InteractSession s : sessions.values()) {
             s.update();
         }
@@ -179,7 +205,7 @@ public class SelectionManager implements Listener {
                 continue; // сессия рисует сама
             }
             Player p = plugin.getServer().getPlayer(id);
-            if (p == null || !p.isOnline()) {
+            if (p == null || !p.isOnline() || worldDisabledFor(p)) {
                 continue;
             }
             Selection sel = se.getValue();

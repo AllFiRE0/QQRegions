@@ -227,10 +227,14 @@ public class InteractSession {
         namePrompt = false;
         resetWheelAcc();
         PlayerInventory inv = player.getInventory();
-        inv.clear();
-        inv.setArmorContents(armor);
-        inv.setItemInOffHand(offhand);
-        inv.setContents(contents);
+        // При смерти инвентарь не восстанавливаем: сервер и так очищает/дропает
+        // содержимое, иначе предметы «откатились» бы — дубль.
+        if (!player.isDead()) {
+            inv.clear();
+            inv.setArmorContents(armor);
+            inv.setItemInOffHand(offhand);
+            inv.setContents(contents);
+        }
         hideBar();
         view.cleanup();
         clearWorldEdit();
