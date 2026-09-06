@@ -60,6 +60,10 @@ public class Config {
     private HighlightOptions highlight;
     private MarketOptions market;
     private RaidOptions raid;
+    /** select-status: экшнбар/боссбар статуса выделения для всех способов select. */
+    private SelectStatusOptions selectStatus;
+    /** guard: защита механик от лага (TPS/пинг), enable:false по умолчанию. */
+    private GuardOptions guard;
 
     /** flags-menu.whitelist: флаги, доступные всем бесплатно (пусто = прежнее поведение). */
     private Set<String> flagsMenuWhitelist = new HashSet<>();
@@ -139,6 +143,8 @@ public class Config {
         highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
         market = new MarketOptions(cfg.getConfigurationSection("market"));
         raid = new RaidOptions(cfg.getConfigurationSection("raid"));
+        selectStatus = new SelectStatusOptions(cfg.getConfigurationSection("select-status"));
+        guard = new GuardOptions(cfg.getConfigurationSection("guard"));
 
         flagsMenuWhitelist = new HashSet<>(lower(cfg.getStringList("flags-menu.whitelist")));
         flagsShopIgnore = new HashSet<>(lower(cfg.getStringList("flags-menu.shop-ignore")));
@@ -312,6 +318,16 @@ public class Config {
         return raid;
     }
 
+    /** Экшнбар/боссбар статуса выделения для всех способов select. */
+    public SelectStatusOptions selectStatus() {
+        return selectStatus;
+    }
+
+    /** Защита механик меню от лага/высокого пинга. */
+    public GuardOptions guard() {
+        return guard;
+    }
+
     /** Флаги, видимые всем без права (пустой список = как раньше, по правам). */
     public Set<String> flagsMenuWhitelist() {
         return flagsMenuWhitelist;
@@ -472,6 +488,108 @@ public class Config {
             conflictColor = Colors.bar(s.getString("conflict.color", "YELLOW"), BarColor.YELLOW);
             conflictText = s.getString("conflict.text", "&eВыделение пересекает чужой регион!");
             valueColor = s.getString("value-color", "&f");
+        }
+    }
+
+    /**
+     * Экшнбар/боссбар статуса выделения для ВСЕХ способов select:
+     *  - interactive-actionbar — обновляемый цветной текст в экшнбаре во время
+     *    интерактивного select (тексты/цвета — из bossbar.normal/full/conflict);
+     *  - command-show — экшнбар+боссбар после командных выделений (pos, point,
+     *    max, chunk, expand, outset) на show-seconds;
+     *  - info — отдельный экшнбар с доп. информацией (высоты, конфликты) для
+     *    всех способов select, поверх основного статуса/боссбара.
+     */
+    public static class SelectStatusOptions {
+        public final boolean enabled;
+        public final boolean interactiveActionbar;
+        public final boolean commandShow;
+        /** Как показывать статус командных выделений: BOTH | ACTIONBAR | BOSSBAR. */
+        public final String commandMode;
+        public final int showSeconds;
+        public final int updateTicks;
+        public final InfoOptions info;
+
+        public static class InfoOptions {
+            public final boolean enabled;
+            public final int showSeconds;
+            public final int updateTicks;
+            /** Плейсхолдеры: {height-top} {height-bottom} {conflict} {conflict-regions}
+             *  {conflict-count} {current} {max} {percent} {player}. */
+            public final String text;
+
+            InfoOptions(ConfigurationSection s) {
+                if (s == null) {
+                    enabled = false;
+                    showSeconds = 10;
+                    updateTicks = 5;
+                    text = "&7Высота: &a{height-top}&7/&a{height-bottom} &8• &7Количество конфликтов: &f{conflict-count} &8(&f{conflict-regions}&8)";
+                    return;
+                }
+                enabled = s.getBoolean("enabled", false);
+                showSeconds = Math.max(1, s.getInt("show-seconds", 10));
+                updateTicks = Math.max(1, s.getInt("update-ticks", 5));
+                text = s.getString("text",
+                        "&7Высота: &a{height-top}&7/&a{height-bottom} &8• &7Конфликты: &f{conflict-count} &8(&f{conflict-regions}&8)");
+            }
+        }
+
+        SelectStatusOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = true;
+                interactiveActionbar = true;
+                commandShow = true;
+                commandMode = "BOTH";
+                showSeconds = 10;
+                updateTicks = 5;
+                info = new InfoOptions(null);
+                return;
+            }
+            enabled = s.getBoolean("enabled", true);
+            interactiveActionbar = s.getBoolean("interactive-actionbar", true);
+            commandShow = s.getBoolean("command-show", true);
+            String mm = s.getString("command-mode", "BOTH").toUpperCase(java.util.Locale.ROOT);
+            if (!mm.equals("ACTIONBAR") && !mm.equals("BOSSBAR") && !mm.equals("BOTH")) {
+                mm = "BOTH";
+            }
+            commandMode = mm;
+            showSeconds = Math.max(0, s.getInt("show-seconds", 10));
+            updateTicks = Math.max(1, s.getInt("update-ticks", 5));
+            info = new InfoOptions(s.getConfigurationSection("info"));
+        }
+    }
+
+    /**
+     * Защита механик (главное — клики меню) от лага/высокого пинга:
+     * при включённом guard действие отменяется, если TPS сервера ниже
+     * min-tps или пинг игрока выше max-ping. По умолчанию выключено.
+     * Предотвращает «дюп» предметов из кнопок меню при лагах.
+     */
+    public static class GuardOptions {
+        public final boolean enabled;
+        public final double minTps;
+        public final int maxPing;
+
+        GuardOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = false;
+                minTps = 15.0;
+                maxPing = 5000;
+                return;
+            }
+            enabled = s.getBoolean("enabled", false);
+            minTps = Math.max(0, s.getDouble("min-tps", 15.0));
+            maxPing = Math.max(0, s.getInt("max-ping", 5000));
+        }
+
+        /** Проверить серверный TPS (последняя 1-минутная выборка, Paper/Leaf API). */
+        public static double tps() {
+            try {
+                double[] tps = org.bukkit.Bukkit.getTPS();
+                return tps == null || tps.length == 0 ? 20.0 : tps[0];
+            } catch (Throwable t) {
+                return 20.0;
+            }
         }
     }
 
@@ -668,6 +786,9 @@ public class Config {
             public final BarColor color;
             public final BarStyle style;
             public final String text;
+            /** Полоса фазы «вора» (после захвата): {thief} {time}. */
+            public final String thiefText;
+            public final BarColor thiefColor;
 
             RaidDisplay(ConfigurationSection s) {
                 if (s == null) {
@@ -676,6 +797,8 @@ public class Config {
                     color = BarColor.RED;
                     style = BarStyle.SEGMENTED_10;
                     text = "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}";
+                    thiefText = "&2Вор &f{thief}&2: &f{time}&2 сек";
+                    thiefColor = BarColor.GREEN;
                     return;
                 }
                 mode = s.getString("mode", "ACTIONBAR").toUpperCase(java.util.Locale.ROOT);
@@ -695,6 +818,14 @@ public class Config {
                 }
                 style = st;
                 text = s.getString("text", "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}");
+                thiefText = s.getString("thief-text", "&2Вор &f{thief}&2: &f{time}&2 сек");
+                BarColor tc;
+                try {
+                    tc = BarColor.valueOf(s.getString("thief-color", "GREEN"));
+                } catch (IllegalArgumentException e) {
+                    tc = BarColor.GREEN;
+                }
+                thiefColor = tc;
             }
         }
 

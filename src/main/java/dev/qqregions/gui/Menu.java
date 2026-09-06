@@ -268,7 +268,10 @@ public class Menu {
             Map<String, String> fc = new LinkedHashMap<>(ctx);
             fc.put("flag-name", flagName);
             fc.put("flag", id);
+            fc.put("flag-id", id);
+            fc.put("flag-raw", id);
             fc.put("flag-value", value);
+            fc.put("flag-value-raw", value);
             fc.put("flag-value-label", valueLabel);
             fc.put("group", group);
             fc.put("group-label", groupLabel);
@@ -374,9 +377,11 @@ public class Menu {
         if (slotMap != null) {
             slotMap.clear();
         }
+        boolean isAdmin = player.hasPermission("qqregions.admin") || player.isOp();
+        String role = ctx.get("role");
         for (Map.Entry<Integer, MenuItem> e : buttons.entrySet()) {
             Integer slot = e.getKey();
-            if (slot != null && slot >= 0 && slot < size) {
+            if (slot != null && slot >= 0 && slot < size && e.getValue().visible(role, isAdmin)) {
                 inv.setItem(slot, e.getValue().build(plugin, player, ctx));
                 if (slotMap != null) {
                     slotMap.put(slot, e.getValue());
@@ -391,12 +396,14 @@ public class Menu {
             int end = Math.min(dynItems.size(), start + poolSize);
             for (int i = start; i < end; i++) {
                 int slot = pool.get((i - start) % poolSize);
-                if (slot < 0 || slot >= size || inv.getItem(slot) != null) {
+                MenuItem item = dynItems.get(i);
+                if (slot < 0 || slot >= size || inv.getItem(slot) != null
+                        || !item.visible(role, isAdmin)) {
                     continue;
                 }
-                inv.setItem(slot, dynItems.get(i).build(plugin, player, ctx));
+                inv.setItem(slot, item.build(plugin, player, ctx));
                 if (slotMap != null) {
-                    slotMap.put(slot, dynItems.get(i));
+                    slotMap.put(slot, item);
                 }
             }
         }
@@ -505,7 +512,9 @@ public class Menu {
                         b.getString("name", " "),
                         b.getStringList("lore").isEmpty() ? null : b.getStringList("lore"),
                         b.getStringList("commands").isEmpty() ? null : b.getStringList("commands"),
-                        b.getString("permission", ""));
+                        b.getString("permission", ""),
+                        null, null, null, false,
+                        b.getString("role-required", ""));
                 menu.addButton(slot, item);
             }
         }

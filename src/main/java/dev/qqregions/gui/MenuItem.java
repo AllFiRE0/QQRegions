@@ -31,6 +31,9 @@ public class MenuItem {
     private final List<String> lore;
     private final List<String> commands;
     private final String permission;
+    /** Требуемая для ПОКАЗА кнопки роль (owner/member/other); "" = любая.
+     *  Админ (qqregions.admin) и операторы видят кнопку при любой роли. */
+    private final String roleRequired;
 
     /** имя флага для динамических кнопок, null для статичных */
     private final String flag;
@@ -43,12 +46,19 @@ public class MenuItem {
 
     public MenuItem(String material, int amount, Integer slot, String name,
                     List<String> lore, List<String> commands, String permission) {
-        this(material, amount, slot, name, lore, commands, permission, null, null, null, false);
+        this(material, amount, slot, name, lore, commands, permission, null, null, null, false, null);
     }
 
     public MenuItem(String material, int amount, Integer slot, String name,
                     List<String> lore, List<String> commands, String permission,
                     String flag, String group, List<String> states, boolean stateFlag) {
+        this(material, amount, slot, name, lore, commands, permission, flag, group, states, stateFlag, null);
+    }
+
+    public MenuItem(String material, int amount, Integer slot, String name,
+                    List<String> lore, List<String> commands, String permission,
+                    String flag, String group, List<String> states, boolean stateFlag,
+                    String roleRequired) {
         this.material = material;
         this.amount = amount;
         this.slot = slot;
@@ -56,6 +66,7 @@ public class MenuItem {
         this.lore = lore;
         this.commands = commands;
         this.permission = permission;
+        this.roleRequired = roleRequired;
         this.flag = flag;
         this.group = group;
         this.states = states;
@@ -72,6 +83,21 @@ public class MenuItem {
 
     public String permission() {
         return permission;
+    }
+
+    public String roleRequired() {
+        return roleRequired;
+    }
+
+    /** true, если кнопку можно ПОКАЗАТЬ игроку: роль совпадает или админ/оператор. */
+    public boolean visible(String role, boolean isAdmin) {
+        if (roleRequired == null || roleRequired.trim().isEmpty()) {
+            return true;
+        }
+        if (isAdmin) {
+            return true;
+        }
+        return roleRequired.trim().equalsIgnoreCase(role == null ? "" : role);
     }
 
     public boolean isDynamic() {

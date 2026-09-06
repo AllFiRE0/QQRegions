@@ -2,16 +2,23 @@ package dev.qqregions.config;
 
 import dev.qqregions.QQRegions;
 import dev.qqregions.util.Msg;
+import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Языковой файл lang.yml. Все сообщения плагина хранятся здесь в
@@ -24,6 +31,8 @@ public class Lang {
     private FileConfiguration cfg;
     /** Встроенные переводы из jar — опора для пустых/битых значений файла. */
     private FileConfiguration defs;
+    /** Активные задачи экшнбаров (уникальный UUID игрока). */
+    private final Map<UUID, Integer> actionbarTasks = new HashMap<>();
 
     public Lang(QQRegions plugin) {
         this.plugin = plugin;
@@ -148,5 +157,55 @@ public class Lang {
 
     public Component compPrefixed(String key, String... kv) {
         return Msg.color(prefixed(key, kv));
+    }
+
+    /**
+     * Отправить сообщение игроку, учитывая спец-префикс "actionbar:N!" в конце
+     * перевода: тогда текст идёт в экшнбар и повторяется N секунд (каждые 20
+     * тиков), без [префикса] плагина. Иначе — обычное сообщение с префиксом.
+     */
+    private static final Pattern ACTIONBAR_PREFIX =
+            Pattern.compile("^actionbar:(\\d+)!(.*)$", Pattern.DOTALL);
+
+    public void send(Player p, String key, String... kv) {
+        String msg = fmt(key, kv);
+        Matcher m = ACTIONBAR_PREFIX.matcher(msg);
+        if (m.matches()) {
+            sendActionbar(p, m.group(2), parseIntSafe(m.group(1)));
+            return;
+        }
+        p.sendMessage(compPrefixed(key, kv));
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
+    /** Экшнбар, обновляемый в течение N секунд (раз в 20 тиков). */
+    public void sendActionbar(Player p, String raw, int seconds) {
+        UUID id = p.getUniqueId();
+        Integer prev = actionbarTasks.remove(id);
+        if (prev != null) {
+            plugin.getServer().getScheduler().cancelTask(prev);
+        }
+        final Component comp = Msg.color(Papi.set(p, raw));
+        final long until = System.currentTimeMillis() + (long) Math.max(0, seconds) * 1000L;
+        final int[] tid = new int[1];
+        tid[0] = plugin.getServer().getScheduler().runTaskTimer(plugin, new Runnable() {
+            @Override
+            public void run() {
+                if (!p.isOnline() || System.currentTimeMillis() >= until) {
+                    plugin.getServer().getScheduler().cancelTask(tid[0]);
+                    actionbarTasks.remove(id);
+                    return;
+                }
+                p.sendActionBar(comp);
+            }
+        }, 0L, 20L).getTaskId();
+        actionbarTasks.put(id, tid[0]);
     }
 }

@@ -4,8 +4,14 @@ import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
+import dev.qqregions.util.Msg;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -29,6 +35,8 @@ public class SelectionManager implements Listener {
     private final Map<UUID, InteractSession> sessions = new HashMap<>();
     private final Map<UUID, SelectionView> views = new HashMap<>();
     private final Map<UUID, Inspected> inspected = new HashMap<>();
+    /** Статус (экшнбар/боссбар) командных выделений на N секунд. */
+    private final Map<UUID, CommandHud> commandHuds = new HashMap<>();
 
     /** Просмотр выделения другого игрока (/region select view <ник>). */
     public static final class Inspected {
@@ -41,6 +49,16 @@ public class SelectionManager implements Listener {
             this.targetName = targetName;
             this.view = view;
         }
+    }
+
+    /** Экшнбар/боссбар командного выделения: живёт show-seconds с последнего изменения. */
+    private static final class CommandHud {
+        BossBar bar;
+        NamespacedKey barKey;
+        String lastSig;
+        /** осталось «вызовов тика плагина» (тик раз в 5 серверных тиков = 4/сек). */
+        int remain;
+        int timer;
     }
 
     public SelectionManager(QQRegions plugin) {
@@ -192,6 +210,10 @@ public class SelectionManager implements Listener {
             in.view.cleanup();
         }
         inspected.clear();
+        for (CommandHud h : commandHuds.values()) {
+            hideHud(h);
+        }
+        commandHuds.clear();
     }
 
     // ---------- просмотр чужого выделения (/region select view) ----------
@@ -273,6 +295,7 @@ public class SelectionManager implements Listener {
             s.update();
         }
         renderCommandSelections();
+        renderCommandStatus();
         renderInspects();
     }
 
@@ -338,6 +361,105 @@ public class SelectionManager implements Listener {
         }
     }
 
+    /**
+     * Статус командных выделений (pos/point/max/chunk/expand/outset):
+     * экшнбар + боссбар на show-seconds с обновлением каждые update-ticks.
+     * Интерактивную сессию не трогает — она рисует свой бар сама.
+     */
+    private void renderCommandStatus() {
+        Config.SelectStatusOptions so = plugin.config().selectStatus();
+        boolean enabled = so != null && so.enabled && so.commandShow;
+        if (!enabled) {
+            for (CommandHud h : commandHuds.values()) {
+                hideHud(h);
+            }
+            commandHuds.clear();
+            return;
+        }
+        commandHuds.entrySet().removeIf(e -> {
+            UUID id = e.getKey();
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline() || sessions.containsKey(id)) {
+                hideHud(e.getValue());
+                return true;
+            }
+            Selection sel = selections.get(id);
+            if (sel == null || !p.getWorld().equals(sel.getWorld())) {
+                hideHud(e.getValue());
+                return true;
+            }
+            return false;
+        });
+        Config.BossBarOptions bo = plugin.config().bossbar();
+        for (Player p : plugin.getServer().getOnlinePlayers()) {
+            UUID id = p.getUniqueId();
+            if (sessions.containsKey(id) || worldDisabledFor(p)) {
+                continue;
+            }
+            Selection sel = selections.get(id);
+            if (sel == null || !p.getWorld().equals(sel.getWorld())) {
+                continue;
+            }
+            String sig = sel.getWorld().getName() + '|' + sel.min() + '|' + sel.max();
+            CommandHud hud = commandHuds.computeIfAbsent(id, k -> new CommandHud());
+            if (!sig.equals(hud.lastSig)) {
+                hud.lastSig = sig;
+                hud.remain = so.showSeconds <= 0 ? Integer.MAX_VALUE : so.showSeconds * 4;
+                hud.timer = 0;
+            }
+            if (hud.remain <= 0) {
+                hideHud(hud);
+                continue;
+            }
+            hud.remain--;
+            hud.timer += 5;
+            if (hud.timer >= Math.max(1, so.updateTicks)) {
+                hud.timer = 0;
+                commandHudShow(p, sel, hud, so, bo);
+            }
+        }
+    }
+
+    private void commandHudShow(Player p, Selection sel, CommandHud hud,
+                                Config.SelectStatusOptions so, Config.BossBarOptions bo) {
+        String mode = so.commandMode;
+        if (so.info.enabled) {
+            // доп. инфо-экшнбар (высоты/конфликты) вместо статусного экшнбара.
+            p.sendActionBar(Msg.color(SelectStatus.renderInfo(plugin, p, sel, so.info.text)));
+        } else if (mode.equals("ACTIONBAR") || mode.equals("BOTH")) {
+            p.sendActionBar(SelectStatus.text(plugin, p, sel, bo));
+        }
+        boolean showBar = (mode.equals("BOSSBAR") || mode.equals("BOTH"))
+                && bo.enabled && !bo.mode.equals("NONE");
+        if (!showBar) {
+            hideHud(hud);
+            return;
+        }
+        Component comp = SelectStatus.text(plugin, p, sel, bo);
+        if (hud.bar == null) {
+            hud.barKey = new NamespacedKey(plugin, "selcmd_" + p.getUniqueId());
+            hud.bar = Bukkit.createBossBar(hud.barKey,
+                    PlainTextComponentSerializer.plainText().serialize(comp),
+                    SelectStatus.color(plugin, p, sel, bo), bo.style);
+        } else {
+            hud.bar.setTitle(PlainTextComponentSerializer.plainText().serialize(comp));
+            hud.bar.setColor(SelectStatus.color(plugin, p, sel, bo));
+        }
+        hud.bar.setProgress(SelectStatus.progress(plugin, p, sel));
+        hud.bar.addPlayer(p);
+    }
+
+    private void hideHud(CommandHud h) {
+        if (h.bar != null) {
+            h.bar.removeAll();
+            if (h.barKey != null) {
+                Bukkit.removeBossBar(h.barKey);
+            }
+            h.bar = null;
+            h.barKey = null;
+        }
+    }
+
     /** true, если игрок дальше blocks от центра выделения (2D-радиус).
      *  Предназначено для view-hide-distance в config.yml. */
     private boolean farFromSelection(Player p, Selection sel, int blocks) {
@@ -361,6 +483,10 @@ public class SelectionManager implements Listener {
         if (v != null) {
             v.cleanup();
         }
+        CommandHud h = commandHuds.remove(id);
+        if (h != null) {
+            hideHud(h);
+        }
     }
 
     @EventHandler
@@ -371,6 +497,10 @@ public class SelectionManager implements Listener {
         SelectionView v = views.remove(id);
         if (v != null) {
             v.cleanup();
+        }
+        CommandHud h = commandHuds.remove(id);
+        if (h != null) {
+            hideHud(h);
         }
     }
 }

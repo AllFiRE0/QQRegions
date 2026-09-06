@@ -57,6 +57,9 @@ public class InteractSession {
     private BossBar bar;
     private NamespacedKey barKey;
     private int barTimer = 0;
+    /** таймеры экшнбаров select-status (тик плагина раз в 5 серверных тиков). */
+    private int selectTimer = 0;
+    private int infoTimer = 0;
 
     /** Общий рендер выделения (частицы или блок-дисплеи). */
     private final SelectionView view;
@@ -84,7 +87,7 @@ public class InteractSession {
     public boolean start() {
         String uuid = player.getUniqueId().toString();
         if (!plugin.store().save(uuid, player.getInventory())) {
-            player.sendMessage(plugin.lang().compPrefixed("select.interactive-on-fail"));
+            plugin.lang().send(player, "select.interactive-on-fail");
             return false;
         }
         PlayerInventory inv = player.getInventory();
@@ -92,7 +95,7 @@ public class InteractSession {
         inv.setItemInOffHand(null);
         renderButtons();
         inv.setHeldItemSlot(SLOT_SELECT);
-        player.sendMessage(plugin.lang().compPrefixed("select.interactive-on"));
+        plugin.lang().send(player, "select.interactive-on");
         player.sendMessage(plugin.lang().comp("select.interactive-help"));
         plugin.dbg("session start: " + player.getName() + " @" + world.getName()
                 + " (syncWorldEdit=" + plugin.config().syncWorldEdit() + ")");
@@ -186,17 +189,17 @@ public class InteractSession {
         SelectionManager mgr = plugin.selections();
         Selection sel = mgr.get(player);
         if (sel == null) {
-            player.sendMessage(plugin.lang().compPrefixed("create.none", "alias", plugin.config().commandName()));
+            plugin.lang().send(player, "create.none", "alias", plugin.config().commandName());
             return;
         }
         if (mgr.belowMin(player, sel)) {
             SelectionTemplate t = mgr.template(player);
-            player.sendMessage(plugin.lang().compPrefixed("select.below-min",
-                    "current", fmt(sel.volume()), "min", fmt(t.getMinBlocks())));
+            plugin.lang().send(player, "select.below-min",
+                    "current", fmt(sel.volume()), "min", fmt(t.getMinBlocks()));
             return;
         }
         namePrompt = true;
-        player.sendMessage(plugin.lang().compPrefixed("create.prompt"));
+        plugin.lang().send(player, "create.prompt");
     }
 
     private void toggleSelect() {
@@ -216,15 +219,15 @@ public class InteractSession {
             renderButtons();
         }
         syncWorldEdit();
-        player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
-                "point", plugin.lang().fmt("select.point-" + activePoint)));
+        plugin.lang().send(player, "select.interactive-select-mode",
+                "point", plugin.lang().fmt("select.point-" + activePoint));
     }
 
     private void reset() {
         BlockVector3 feet = feet(player);
         plugin.selections().set(player, new Selection(player.getWorld(), feet, feet));
         syncWorldEdit();
-        player.sendMessage(plugin.lang().compPrefixed("select.reset"));
+        plugin.lang().send(player, "select.reset");
     }
 
     private void cancel() {
@@ -255,7 +258,7 @@ public class InteractSession {
         view.cleanup();
         clearWorldEdit();
         if (player.isOnline()) {
-            player.sendMessage(plugin.lang().compPrefixed("select.interactive-off"));
+            plugin.lang().send(player, "select.interactive-off");
         }
         plugin.dbg("session end: " + player.getName());
     }
@@ -285,8 +288,8 @@ public class InteractSession {
         activePoint = point;
         resetWheelAcc();
         renderSelectHotbar();
-        player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
-                "point", plugin.lang().fmt("select.point-" + activePoint)));
+        plugin.lang().send(player, "select.interactive-select-mode",
+                "point", plugin.lang().fmt("select.point-" + activePoint));
         plugin.dbg("point switch -> " + activePoint);
     }
 
@@ -298,7 +301,7 @@ public class InteractSession {
         syncWorldEdit();
         Selection sel = plugin.selections().get(player);
         long blocks = sel == null ? 0 : sel.volume();
-        player.sendMessage(plugin.lang().compPrefixed("select.confirmed", "blocks", fmt(blocks)));
+        plugin.lang().send(player, "select.confirmed", "blocks", fmt(blocks));
         plugin.dbg("select confirmed: " + blocks + " blocks");
     }
 
@@ -328,7 +331,7 @@ public class InteractSession {
         BlockVector3 cur = sel.getPos(activePoint);
         BlockVector3 next = computeMove(cur, forward, steps);
         if (next == null) {
-            player.sendMessage(plugin.lang().compPrefixed("select.point-locked"));
+            plugin.lang().send(player, "select.point-locked");
             return;
         }
         if (next == cur) {
@@ -412,28 +415,28 @@ public class InteractSession {
         List<String> cancelWords = plugin.lang().stringList("create.cancel-words");
         for (String w : cancelWords) {
             if (name.equalsIgnoreCase(w)) {
-                player.sendMessage(plugin.lang().compPrefixed("create.cancelled"));
+                plugin.lang().send(player, "create.cancelled");
                 return;
             }
         }
         Selection sel = plugin.selections().get(player);
         if (sel == null) {
-            player.sendMessage(plugin.lang().compPrefixed("create.none", "alias", plugin.config().commandName()));
+            plugin.lang().send(player, "create.none", "alias", plugin.config().commandName());
             return;
         }
         if (!plugin.config().namePattern().matcher(name).matches()) {
-            player.sendMessage(plugin.lang().compPrefixed("create.invalid-name",
-                    "regex", plugin.config().namePattern().pattern()));
+            plugin.lang().send(player, "create.invalid-name",
+                    "regex", plugin.config().namePattern().pattern());
             namePrompt = true;
             return;
         }
         String norm = plugin.config().normalizeName(name);
         try {
             plugin.wg().create(sel, norm, player);
-            player.sendMessage(plugin.lang().compPrefixed("create.ok",
-                    "region", norm, "world", sel.getWorld().getName(), "blocks", fmt(sel.volume())));
+            plugin.lang().send(player, "create.ok",
+                    "region", norm, "world", sel.getWorld().getName(), "blocks", fmt(sel.volume()));
         } catch (RegionException e) {
-            player.sendMessage(plugin.lang().compPrefixed(e.getKey(), e.getKv()));
+            plugin.lang().send(player, e.getKey(), e.getKv());
         }
     }
 
@@ -465,6 +468,28 @@ public class InteractSession {
         } else {
             hideBar();
         }
+
+        // select-status: обновляемый цветной текст в экшнбаре + доп. инфо-экшнбар.
+        Config.SelectStatusOptions so = cfg.selectStatus();
+        if (so != null && so.enabled) {
+            boolean bossbarHandlesActionbar = cfg.bossbar().enabled
+                    && "ACTIONBAR".equals(cfg.bossbar().mode);
+            if (so.info.enabled) {
+                // доп. инфо-экшнбар (высоты/конфликты) — заменяет статусный экшнбар.
+                infoTimer += 5;
+                if (infoTimer >= so.info.updateTicks) {
+                    infoTimer = 0;
+                    player.sendActionBar(Msg.color(
+                            SelectStatus.renderInfo(plugin, player, sel, so.info.text)));
+                }
+            } else if (so.interactiveActionbar && !bossbarHandlesActionbar) {
+                selectTimer += 5;
+                if (selectTimer >= so.updateTicks) {
+                    selectTimer = 0;
+                    player.sendActionBar(SelectStatus.text(plugin, player, sel, cfg.bossbar()));
+                }
+            }
+        }
     }
 
     private void updateBar(Selection sel, Config.BossBarOptions bo) {
@@ -473,33 +498,8 @@ public class InteractSession {
             hideBar();
             return;
         }
-        long cur = sel.volume();
-        long max = plugin.selections().effectiveMaxBlocks(player);
-        boolean conflict = !plugin.selections().isBypassed(player) && !plugin.wg().intersecting(sel).isEmpty();
-
-        String text;
-        BarColor color;
-        boolean full = max > 0 && cur >= max;
-        if (conflict) {
-            text = bo.conflictText;
-            color = bo.conflictColor;
-        } else if (full) {
-            text = bo.fullText;
-            color = bo.fullColor;
-        } else {
-            text = bo.normalText;
-            color = bo.normalColor;
-        }
-        String percent = max <= 0 ? "100" : String.valueOf(Math.min(100L, cur * 100 / max));
-        // {value-color} — цвет перед {current}: &f в норме, красный при лимите
-        // (значение тоже красится этим цветом, боссбар остаётся красным).
-        String valueColor = full ? "&c" : bo.valueColor;
-        text = text.replace("{value-color}", valueColor)
-                .replace("{current}", fmt(cur))
-                .replace("{max}", fmt(max))
-                .replace("{percent}", percent)
-                .replace("{player}", player.getName());
-        Component comp = Msg.color(text);
+        Component comp = SelectStatus.text(plugin, player, sel, bo);
+        BarColor color = SelectStatus.color(plugin, player, sel, bo);
 
         if (mode.equals("ACTIONBAR")) {
             player.sendActionBar(comp);
@@ -515,8 +515,7 @@ public class InteractSession {
             bar.setTitle(PlainTextComponentSerializer.plainText().serialize(comp));
             bar.setColor(color);
         }
-        double progress = max <= 0 ? 1.0 : Math.min(1.0, (double) cur / max);
-        bar.setProgress(progress);
+        bar.setProgress(SelectStatus.progress(plugin, player, sel));
         bar.addPlayer(player);
     }
 

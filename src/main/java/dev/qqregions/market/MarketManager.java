@@ -359,14 +359,14 @@ public final class MarketManager {
     // ---------- уведомления ----------
 
     private void notifyBoth(Offer o, String keyTenantOrBuyer, String keyOther, UUID first, UUID second) {
-        player(first).ifPresent(p -> p.sendMessage(plugin.lang().compPrefixed(keyTenantOrBuyer,
+        player(first).ifPresent(p -> plugin.lang().send(p, keyTenantOrBuyer,
                 "region", o.region,
                 "world", o.world,
-                "price", economy().format(o.price))));
-        player(second).ifPresent(p -> p.sendMessage(plugin.lang().compPrefixed(keyOther,
+                "price", economy().format(o.price)));
+        player(second).ifPresent(p -> plugin.lang().send(p, keyOther,
                 "region", o.region,
                 "world", o.world,
-                "price", economy().format(o.price))));
+                "price", economy().format(o.price)));
     }
 
     private static java.util.Optional<Player> player(UUID u) {

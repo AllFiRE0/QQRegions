@@ -140,6 +140,7 @@ Menus:
           - "&7Запустить рейд на регион &f{region}"
           - "&7Требует клан (JustTeams)"
         permission: qqregions.raid
+        role-required: other
         commands:
           - "@raid:start"
       "back":
@@ -237,6 +238,7 @@ Menus:
           - "&7Запустить рейд на регион &f{region}"
           - "&7Требует клан (JustTeams)"
         permission: qqregions.raid
+        role-required: other
         commands:
           - "@raid:start"
       "back":
@@ -328,6 +330,7 @@ Menus:
           - "&7Запустить рейд на регион &f{region}"
           - "&7Требует клан (JustTeams)"
         permission: qqregions.raid
+        role-required: other
         commands:
           - "@raid:start"
       "back":

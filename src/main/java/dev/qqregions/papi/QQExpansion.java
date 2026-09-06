@@ -1,9 +1,11 @@
 package dev.qqregions.papi;
 
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.SelectionTemplate;
 import dev.qqregions.selection.Selection;
+import dev.qqregions.selection.SelectStatus;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -77,6 +79,14 @@ public class QQExpansion extends PlaceholderExpansion {
                     return "no";
                 }
                 return yesNo(!plugin.wg().intersecting(plugin.selections().get(p)).isEmpty());
+            case "selection_height_top":
+                return heightTop(offline);
+            case "selection_height_bottom":
+                return heightBottom(offline);
+            case "selection_conflict_regions":
+                return conflictRegions(offline);
+            case "selection_conflict_count":
+                return String.valueOf(foreignCount(offline));
             case "region_current":
                 if (!(offline instanceof Player p)) {
                     return "";
@@ -219,6 +229,49 @@ public class QQExpansion extends PlaceholderExpansion {
 
     private static boolean isOnline(OfflinePlayer p) {
         return p instanceof Player && p.isOnline();
+    }
+
+    /** Блоков от игрока до верхней границы выделения (0 если нет выделения). */
+    private String heightTop(OfflinePlayer offline) {
+        if (!(offline instanceof Player p) || !plugin.selections().has(p)) {
+            return "0";
+        }
+        return String.valueOf(SelectStatus.heightTop(plugin.selections().get(p), p));
+    }
+
+    /** Блоков от игрока до нижней границы выделения (0 если нет выделения). */
+    private String heightBottom(OfflinePlayer offline) {
+        if (!(offline instanceof Player p) || !plugin.selections().has(p)) {
+            return "0";
+        }
+        return String.valueOf(SelectStatus.heightBottom(plugin.selections().get(p), p));
+    }
+
+    /** Чужие регионы, пересекающие выделение, через запятую ("" если нет). */
+    private String conflictRegions(OfflinePlayer offline) {
+        if (!(offline instanceof Player p) || !plugin.selections().has(p)) {
+            return "";
+        }
+        java.util.List<ProtectedRegion> foreign =
+                SelectStatus.foreignIntersecting(plugin, plugin.selections().get(p), p);
+        if (foreign.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (ProtectedRegion r : foreign) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(r.getId());
+        }
+        return sb.toString();
+    }
+
+    private int foreignCount(OfflinePlayer offline) {
+        if (!(offline instanceof Player p) || !plugin.selections().has(p)) {
+            return 0;
+        }
+        return SelectStatus.foreignIntersecting(plugin, plugin.selections().get(p), p).size();
     }
 
     private long blocks(OfflinePlayer offline) {

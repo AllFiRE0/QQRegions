@@ -5,6 +5,7 @@ import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
+import dev.qqregions.config.Config;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -307,6 +308,21 @@ public class MenuManager implements Listener {
         return null;
     }
 
+    /** Разрешено ли действие при включённом guard: TPS >= min-tps и пинг <= max-ping. */
+    private static boolean guardOk(Player p, Config.GuardOptions g) {
+        if (Config.GuardOptions.tps() < g.minTps) {
+            return false;
+        }
+        try {
+            if (g.maxPing > 0 && p.getPing() > g.maxPing) {
+                return false;
+            }
+        } catch (Throwable ignored) {
+            // старый API без getPing — проверку пинга пропускаем
+        }
+        return true;
+    }
+
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
         List<MenuItem> dynItems;
@@ -366,6 +382,13 @@ public class MenuManager implements Listener {
             return;
         }
         e.setCancelled(true);
+        // Защита от «дюпа» кнопок при лагах: при включённом guard клик
+        // отменяется, если TPS ниже min-tps или пинг игрока выше max-ping.
+        Config.GuardOptions guard = plugin.config().guard();
+        if (guard.enabled && !guardOk(p, guard)) {
+            plugin.lang().send(p, "guard.blocked");
+            return;
+        }
         int slot = e.getRawSlot();
         if (slot < 0 || slot >= om.inv.getSize()) {
             return;
@@ -840,7 +863,7 @@ public class MenuManager implements Listener {
             return;
         }
         if (!p.hasPermission("qqregions.admin") && !p.hasPermission("qqregions.raid")) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cУ вас нет права на рейд."));
+            plugin.lang().send(p, "general.no-permission");
             return;
         }
         String res;
@@ -854,7 +877,8 @@ public class MenuManager implements Listener {
         if (res != null) {
             p.sendMessage(dev.qqregions.util.Msg.color("&c" + res));
         } else {
-            p.sendMessage(dev.qqregions.util.Msg.color("&aРейд запущен! Все нападающие должны оставаться в регионе."));
+            plugin.lang().send(p, "raid.ok",
+                    "region", r != null ? r.getId() : (ctx.get("region") == null ? "" : ctx.get("region")));
         }
     }
 
@@ -904,7 +928,7 @@ public class MenuManager implements Listener {
     /** «Мои флаги»: список купленных в магазине флагов. */
     public boolean openMyFlags(Player p) {
         if (plugin.shop().ownedFlags(p.getUniqueId()).isEmpty()) {
-            p.sendMessage(plugin.lang().compPrefixed("shop.none-owned"));
+            plugin.lang().send(p, "shop.none-owned");
             return false;
         }
         Map<String, String> ctx = new HashMap<>();
@@ -1021,21 +1045,21 @@ public class MenuManager implements Listener {
         switch (res) {
             case "ok" -> {
                 if ("flag".equals(kind)) {
-                    p.sendMessage(plugin.lang().compPrefixed("shop.flag-bought",
+                    plugin.lang().send(p, "shop.flag-bought",
                             "flag-name", plugin.config().flagName(id),
-                            "price", plugin.market().economy().format(plugin.shop().priceOf(id))));
+                            "price", plugin.market().economy().format(plugin.shop().priceOf(id)));
                 } else {
-                    p.sendMessage(plugin.lang().compPrefixed("shop.pack-bought",
+                    plugin.lang().send(p, "shop.pack-bought",
                             "pack-name", packName(kind, id),
-                            "price", plugin.market().economy().format(packPrice(kind, id))));
+                            "price", plugin.market().economy().format(packPrice(kind, id)));
                 }
             }
-            case "already" -> p.sendMessage(plugin.lang().compPrefixed("shop.already",
-                    "flag-name", plugin.config().flagName(id)));
-            case "no-money" -> p.sendMessage(plugin.lang().compPrefixed("shop.no-money"));
-            case "not-found" -> p.sendMessage(plugin.lang().compPrefixed("shop.not-found"));
-            case "no-economy" -> p.sendMessage(plugin.lang().compPrefixed("shop.no-economy"));
-            default -> p.sendMessage(plugin.lang().compPrefixed("shop.error"));
+            case "already" -> plugin.lang().send(p, "shop.already",
+                    "flag-name", plugin.config().flagName(id));
+            case "no-money" -> plugin.lang().send(p, "shop.no-money");
+            case "not-found" -> plugin.lang().send(p, "shop.not-found");
+            case "no-economy" -> plugin.lang().send(p, "shop.no-economy");
+            default -> plugin.lang().send(p, "shop.error");
         }
         OpenMenu live = open.get(p.getUniqueId());
         if (live != null) {

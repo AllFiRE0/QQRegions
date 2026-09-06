@@ -88,19 +88,19 @@ public final class RaidManager {
     /** Псевдокоманда кнопки рейда (@raid:start). Возвращает текст ошибки/успеха (null = старт). */
     public String start(Player p) {
         if (!plugin.config().raid().enabled) {
-            return "Команда рейда недоступна.";
+            return m("raid.err.disabled");
         }
         if (!teams.enabled()) {
-            return "JustTeams не установлен — кланы недоступны.";
+            return m("raid.err.no-clans");
         }
         ProtectedRegion cur = plugin.wg().current(p);
         if (cur == null) {
-            return "Вы не находитесь в регионе.";
+            return m("raid.err.not-in-region");
         }
         World w = p.getWorld();
         ProtectedRegion r = plugin.wg().byName(w, cur.getId());
         if (r == null) {
-            return "Регион не найден.";
+            return m("raid.err.region-not-found");
         }
         return start(p, r);
     }
@@ -108,16 +108,16 @@ public final class RaidManager {
     /** Запустить рейд в заданном регионе (регион задан явно, не по позиции игрока). */
     public String start(Player p, ProtectedRegion r) {
         if (r == null) {
-            return "Регион не найден.";
+            return m("raid.err.region-not-found");
         }
         if (!plugin.config().raid().enabled) {
-            return "Команда рейда недоступна.";
+            return m("raid.err.disabled");
         }
         if (!teams.enabled()) {
-            return "JustTeams не установлен — кланы недоступны.";
+            return m("raid.err.no-clans");
         }
         if (state != State.IDLE) {
-            return "Рейд уже идёт.";
+            return m("raid.err.already");
         }
         World w = p.getWorld();
         return startChecks(p, w, r);
@@ -126,20 +126,22 @@ public final class RaidManager {
     private String startChecks(Player p, World w, ProtectedRegion r) {
         Config.RaidOptions o = plugin.config().raid();
         if (o.isBlacklisted(r.getId()) || plugin.config().isBannedRegion(r.getId())) {
-            return "С этим регионом рейды запрещены.";
+            return m("raid.err.blacklisted");
         }
         // владелец/участник региона не может рейдить свой же
         if (plugin.wg().isOwner(r, p.getUniqueId()) || plugin.wg().isMember(r, p.getUniqueId())) {
-            return "Вы не можете рейдить свой регион.";
+            return m("raid.err.own-region");
         }
         TeamRef clan = teams.team(p.getUniqueId());
         if (clan == null) {
-            return "Вы не состоите в клане.";
+            return m("raid.err.no-clan");
         }
         // собрать всех ЧУЖИХ игроков в регионе
         List<Player> inRegion = playersInRegion(w, r);
         if (inRegion.size() < o.minAttackers) {
-            return "Слишком мало нападающих (" + inRegion.size() + "/" + o.minAttackers + ").";
+            return m("raid.err.few-attackers",
+                    "count", String.valueOf(inRegion.size()),
+                    "min", String.valueOf(o.minAttackers));
         }
         List<Player> attackers = new ArrayList<>();
         for (Player pl : inRegion) {
@@ -152,25 +154,33 @@ public final class RaidManager {
             }
         }
         if (attackers.size() < o.minAttackers) {
-            return "Нападающих из вашего клана недостаточно ("
-                    + attackers.size() + "/" + o.minAttackers + ").";
+            return m("raid.err.few-clan",
+                    "count", String.valueOf(attackers.size()),
+                    "min", String.valueOf(o.minAttackers));
         }
         // % онлайн-членов клана в регионе
         List<UUID> online = teams.onlineMembers(clan);
         if (online.isEmpty()) {
-            return "В клане нет онлайн-членов.";
+            return m("raid.err.no-online");
         }
         int need = (int) Math.ceil(percentOf(online.size(), o.onlinePercent));
         long present = attackers.stream().map(Player::getUniqueId)
                 .filter(online::contains).count();
         if (present < need) {
-            return "В регионе слишком малый % клана (" + present + "/" + need + ").";
+            return m("raid.err.low-percent",
+                    "count", String.valueOf(present),
+                    "need", String.valueOf(need));
         }
         if (o.ownersOfflineRequired && hasDefendersOnline(w, r)) {
-            return "Владелец или участник региона онлайн.";
+            return m("raid.err.defender-online");
         }
         begin(w.getName(), r, clan, attackers);
         return null;
+    }
+
+    /** Перевод из lang.yml с подстановкой {заполнителей}. */
+    private String m(String key, String... kv) {
+        return plugin.lang().fmt(key, kv);
     }
 
     public void begin(String worldName, ProtectedRegion region, TeamRef clan, List<Player> attackers) {
@@ -351,8 +361,7 @@ public final class RaidManager {
         int total = o.thiefSeconds;
         int passed = thiefTicks / 20;
         String time = String.valueOf(Math.max(0, total - passed));
-        showBar("&2Вор &f{thief}&2: &f{time}&2 сек",
-                BarColor.GREEN, o.display.style,
+        showBar(o.display.thiefText, o.display.thiefColor, o.display.style,
                 ctxWith("thief", nameOf(thief), "time", time),
                 progress(passed, total));
     }

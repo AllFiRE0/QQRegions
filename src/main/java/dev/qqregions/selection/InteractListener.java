@@ -145,7 +145,7 @@ public class InteractListener implements Listener {
             }
             if (cmd.equals(blocked) || cmd.startsWith(blocked + " ")) {
                 e.setCancelled(true);
-                e.getPlayer().sendMessage(plugin.lang().compPrefixed("select.command-blocked", "cmd", e.getMessage()));
+                plugin.lang().send(e.getPlayer(), "select.command-blocked", "cmd", e.getMessage());
                 plugin.dbg("blocked command '" + e.getMessage() + "' by " + e.getPlayer().getName());
                 return;
             }
@@ -258,7 +258,7 @@ public class InteractListener implements Listener {
         }
         plugin.selections().endSession(p);
         if (plugin.store().restore(uuid, p)) {
-            p.sendMessage(plugin.lang().compPrefixed("select.inventory-restored"));
+            plugin.lang().send(p, "select.inventory-restored");
             plugin.dbg("inventory restored from disk snapshot: " + p.getName());
         } else {
             plugin.dbg("inventory restore FAILED for " + p.getName() + " (repeated later on next join/respawn)");

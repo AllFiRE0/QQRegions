@@ -437,6 +437,6 @@ public class SelectCommand {
     }
 
     private void send(Player p, String key, String... kv) {
-        p.sendMessage(plugin.lang().compPrefixed(key, kv));
+        plugin.lang().send(p, key, kv);
     }
 }

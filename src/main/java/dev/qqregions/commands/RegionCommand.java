@@ -805,11 +805,10 @@ public class RegionCommand {
     }
 
     private void lang(CommandSender sender, String key, String... kv) {
-        Component c = plugin.lang().compPrefixed(key, kv);
-        if (sender instanceof Player) {
-            sender.sendMessage(c);
+        if (sender instanceof Player p) {
+            plugin.lang().send(p, key, kv);
         } else {
-            sender.sendMessage(c);
+            sender.sendMessage(plugin.lang().compPrefixed(key, kv));
         }
     }
 
