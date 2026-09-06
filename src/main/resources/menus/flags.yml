@@ -177,6 +177,15 @@ Menus:
         lore:
           - "&7Следующая страница"
         slot: 51
+      search:
+        material: WRITABLE_BOOK
+        name: "&eПоиск флагов"
+        lore:
+          - "&7Поиск по имени или переводу"
+          - "&7Нажмите и введите запрос в чат"
+        slot: 48
+        commands:
+          - "@flag-search"
   "member":
     role-required: member
     priority: 20
@@ -359,6 +368,15 @@ ignore-flags:
         lore:
           - "&7Следующая страница"
         slot: 51
+      search:
+        material: WRITABLE_BOOK
+        name: "&eПоиск флагов"
+        lore:
+          - "&7Поиск по имени или переводу"
+          - "&7Нажмите и введите запрос в чат"
+        slot: 48
+        commands:
+          - "@flag-search"
   "default":
     priority: 5
     permission-group: ""
@@ -444,3 +462,12 @@ ignore-flags:
         lore:
           - "&7Следующая страница"
         slot: 51
+      search:
+        material: WRITABLE_BOOK
+        name: "&eПоиск флагов"
+        lore:
+          - "&7Поиск по имени или переводу"
+          - "&7Нажмите и введите запрос в чат"
+        slot: 48
+        commands:
+          - "@flag-search"

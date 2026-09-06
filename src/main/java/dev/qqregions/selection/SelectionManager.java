@@ -4,6 +4,7 @@ import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
+import org.bukkit.Color;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -26,6 +27,20 @@ public class SelectionManager implements Listener {
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, InteractSession> sessions = new HashMap<>();
     private final Map<UUID, SelectionView> views = new HashMap<>();
+    private final Map<UUID, Inspected> inspected = new HashMap<>();
+
+    /** Просмотр выделения другого игрока (/region select view <ник>). */
+    public static final class Inspected {
+        public final UUID targetId;
+        public final String targetName;
+        public final SelectionView view;
+
+        public Inspected(UUID targetId, String targetName, SelectionView view) {
+            this.targetId = targetId;
+            this.targetName = targetName;
+            this.view = view;
+        }
+    }
 
     public SelectionManager(QQRegions plugin) {
         this.plugin = plugin;
@@ -63,6 +78,7 @@ public class SelectionManager implements Listener {
 
     public void reset(Player player) {
         UUID id = player.getUniqueId();
+        stopInspect(player);
         selections.remove(id);
         SelectionView v = views.remove(id);
         if (v != null) {
@@ -81,8 +97,17 @@ public class SelectionManager implements Listener {
                 || player.hasPermission("qqregions.bypass.selection-limits");
     }
 
+    /** Эффективный лимит блоков: максимум из права и купленного расширения. */
+    public long effectiveMaxBlocks(Player player) {
+        if (isBypassed(player)) {
+            return 100_000_000L;
+        }
+        return Math.max(template(player).getMaxBlocks(),
+                plugin.shop().maxBlocksExtension(player.getUniqueId()));
+    }
+
     public boolean overLimit(Player player, Selection selection) {
-        return !isBypassed(player) && selection.volume() > template(player).getMaxBlocks();
+        return !isBypassed(player) && selection.volume() > effectiveMaxBlocks(player);
     }
 
     public boolean belowMin(Player player, Selection selection) {
@@ -162,6 +187,76 @@ public class SelectionManager implements Listener {
             v.cleanup();
         }
         views.clear();
+        for (Inspected in : inspected.values()) {
+            in.view.cleanup();
+        }
+        inspected.clear();
+    }
+
+    // ---------- просмотр чужого выделения (/region select view) ----------
+
+    /** Включить просмотр выделения игрока target. 0=ok, 1=офлайн, 2=сам себе, 3=нет выделения. */
+    public int inspectView(Player viewer, String target) {
+        stopInspect(viewer);
+        Player t = plugin.getServer().getPlayerExact(target);
+        if (t == null) {
+            return 1;
+        }
+        if (t.getUniqueId().equals(viewer.getUniqueId())) {
+            return 2;
+        }
+        Selection sel = selections.get(t.getUniqueId());
+        if (sel == null) {
+            return 3;
+        }
+        inspected.put(viewer.getUniqueId(),
+                new Inspected(t.getUniqueId(), t.getName(), new SelectionView(plugin, viewer)));
+        return 0;
+    }
+
+    public void stopInspect(Player viewer) {
+        Inspected in = inspected.remove(viewer.getUniqueId());
+        if (in != null) {
+            in.view.cleanup();
+        }
+    }
+
+    /** Рендер просмотра чужих выделений (следит за живыми изменениями цели). */
+    private void renderInspects() {
+        java.util.List<UUID> drop = new ArrayList<>();
+        inspected.entrySet().removeIf(e -> {
+            Player p = plugin.getServer().getPlayer(e.getKey());
+            if (p == null || !p.isOnline() || worldDisabledFor(p)) {
+                e.getValue().view.cleanup();
+                return true;
+            }
+            return false;
+        });
+        for (Map.Entry<UUID, Inspected> e : inspected.entrySet()) {
+            Inspected in = e.getValue();
+            Player p = plugin.getServer().getPlayer(e.getKey());
+            if (p == null) {
+                continue;
+            }
+            Selection sel = selections.get(in.targetId);
+            if (sel == null || !p.getWorld().equals(sel.getWorld())) {
+                in.view.cleanup();
+                drop.add(e.getKey());
+                continue;
+            }
+            Config cfg = plugin.config();
+            if (sel.volume() <= 1) {
+                Color col = cfg.blockView() ? cfg.pointStyle(2).highlight : cfg.particles().dustColor;
+                in.view.renderNow(sel, col, cfg.pointStyle(2).block, sel.getPos(1));
+            } else if (cfg.blockView()) {
+                in.view.update(sel, cfg.pointStyle(2).highlight, cfg.pointStyle(2).block, null);
+            } else {
+                in.view.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
+            }
+        }
+        for (UUID u : drop) {
+            inspected.remove(u);
+        }
     }
 
     public void tick() {
@@ -177,6 +272,7 @@ public class SelectionManager implements Listener {
             s.update();
         }
         renderCommandSelections();
+        renderInspects();
     }
 
     /** Подсветка выделений, созданных обычными командами (не через сессию). */
@@ -216,13 +312,12 @@ public class SelectionManager implements Listener {
             if (!p.getWorld().equals(sel.getWorld())) {
                 continue;
             }
-            // Вырожденное выделение (0x0x0 / одна точка) рисовать незачем:
-            // это и не выделение ещё, только лишняя работа каждый тик.
+            // Одна точка — рисуем маркер в этой точке, но не объём.
             if (sel.volume() <= 1) {
-                SelectionView dead = views.remove(id);
-                if (dead != null) {
-                    dead.cleanup();
-                }
+                Config cfg = plugin.config();
+                SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
+                Color col = cfg.blockView() ? cfg.pointStyle(2).highlight : cfg.particles().dustColor;
+                v.renderNow(sel, col, cfg.pointStyle(2).block, sel.getPos(1));
                 continue;
             }
             Config cfg = plugin.config();
@@ -260,6 +355,7 @@ public class SelectionManager implements Listener {
     public void onQuit(PlayerQuitEvent e) {
         UUID id = e.getPlayer().getUniqueId();
         endSession(e.getPlayer());
+        stopInspect(e.getPlayer());
         SelectionView v = views.remove(id);
         if (v != null) {
             v.cleanup();
@@ -270,6 +366,7 @@ public class SelectionManager implements Listener {
     public void onWorldChange(PlayerChangedWorldEvent e) {
         UUID id = e.getPlayer().getUniqueId();
         endSession(e.getPlayer());
+        stopInspect(e.getPlayer());
         SelectionView v = views.remove(id);
         if (v != null) {
             v.cleanup();

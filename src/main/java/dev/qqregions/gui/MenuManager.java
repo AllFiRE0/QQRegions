@@ -26,12 +26,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Менеджер GUI-меню. Загружает файлы из папки menus/, хранит открытые
  * меню и обновляет их по update_interval, исполняет команды кнопок.
  */
 public class MenuManager implements Listener {
+
+    /** Режимы сортировки предложений рынка (переключаются @sort). */
+    private static final List<String> MARKET_SORT = List.of("name", "price", "default");
 
     /** файл (без .yml) -> упорядоченные по приоритету шаблоны */
     private final Map<String, List<Menu>> menus = new HashMap<>();
@@ -40,6 +44,8 @@ public class MenuManager implements Listener {
      *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
      *  чистит open), но промпт должен пережить это и обработать сообщение. */
     private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
+    /** Ожидание поискового запроса в чат: value = "flag" | "market". */
+    private final Map<UUID, String> pendingSearch = new ConcurrentHashMap<>();
     /** История переходов между меню для кнопки @back. */
     private final Map<UUID, Deque<NavState>> history = new HashMap<>();
     private final QQRegions plugin;
@@ -372,7 +378,7 @@ public class MenuManager implements Listener {
                 && !p.hasPermission("qqregions.admin") && !p.hasPermission(item.permission())) {
             return;
         }
-        // флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix).
+// флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix).
         // Бесплатные флаги (flags-menu.whitelist) и купленные в магазине кликаются и без права.
         Menu.DynamicFlags dyn = om.menu.dynamicFlags();
         String flagPermPrefix = dyn == null ? null : dyn.permissionPrefix;
@@ -487,6 +493,18 @@ public class MenuManager implements Listener {
             }
             if (c.startsWith("@raid:")) {
                 raidAction(p, c.substring("@raid:".length()).trim(), om.ctx);
+                continue;
+            }
+            if (c.equalsIgnoreCase("@flag-search")) {
+                startSearchPrompt(p, om, "flag");
+                continue;
+            }
+            if (c.equalsIgnoreCase("@market-search")) {
+                startSearchPrompt(p, om, "market");
+                continue;
+            }
+            if (c.equalsIgnoreCase("@sort")) {
+                cycleSort(p, om);
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -717,15 +735,32 @@ public class MenuManager implements Listener {
     }
 
     /** Кнопки меню рынка: все живые предложения (PENDING/ACTIVE) на регионы.
-     *  ЛКМ — контрагент принимает (@market:accept:<id>), ПКМ-инициатор отменяет. */
+     *  ЛКМ — контрагент принимает (@market:accept:<id>), ПКМ-инициатор отменяет.
+     *  Поиск (ctx["_marketsearch"]) фильтрует по названию региона;
+     *  сортировка (ctx["_sort"]) — name | price | default. */
     private List<MenuItem> marketItems(Menu menu, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        String queryCtx = ctx.get("_marketsearch");
+        Pattern qpat = queryCtx == null ? null : Menu.searchPattern(queryCtx);
+        String sort = ctx.getOrDefault("_sort", "default").toLowerCase(java.util.Locale.ROOT);
+        List<dev.qqregions.market.Offer> cols = new ArrayList<>();
         for (dev.qqregions.market.Offer o : plugin.market().offers()) {
             if (o.status != dev.qqregions.market.Offer.Status.PENDING
                     && o.status != dev.qqregions.market.Offer.Status.ACTIVE) {
                 continue;
             }
+            if (qpat != null && !qpat.matcher(o.region).find()) {
+                continue;
+            }
+            cols.add(o);
+        }
+        if (sort.equals("name")) {
+            cols.sort((a, b) -> a.region.compareToIgnoreCase(b.region));
+        } else if (sort.equals("price")) {
+            cols.sort((a, b) -> Double.compare(a.price, b.price));
+        }
+        for (dev.qqregions.market.Offer o : cols) {
             boolean sale = o.kind == dev.qqregions.market.Offer.Kind.SALE;
             String type = sale ? "продажа" : "аренда";
             String who = sale
@@ -742,7 +777,7 @@ public class MenuManager implements Listener {
             pc.put("market-status", o.status == dev.qqregions.market.Offer.Status.ACTIVE
                     ? (sale ? "активна" : "аренда") : "ожидает");
 
-            String name = tpl.process(plugin, null, pc, 
+            String name = tpl.process(plugin, null, pc,
                     "&f{market-type} &8· &7{market-region}");
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, null, pc, "&7Цена: &f{market-price}"));
@@ -893,6 +928,20 @@ public class MenuManager implements Listener {
             if (price <= 0) {
                 continue;
             }
+            String flagQuery = ctx.get("_flagsearch");
+            if (flagQuery != null) {
+                String q = flagQuery.trim();
+                if (q.isEmpty()) {
+                    continue;
+                }
+                Pattern pat = Menu.searchPattern(q);
+                String translated = plugin.config().flagName(id);
+                String plain = dev.qqregions.util.Msg.color(translated);
+                if (!pat.matcher(id).find() && !pat.matcher(translated).find()
+                        && !pat.matcher(plain).find()) {
+                    continue;
+                }
+            }
             Map<String, String> pc = new HashMap<>(ctx);
             pc.put("flag-name", plugin.config().flagName(id));
             pc.put("price", plugin.market().economy().format(price));
@@ -1028,6 +1077,66 @@ public class MenuManager implements Listener {
         }
         plugin.wg().removePlayerId(world, region, id, owner);
         p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок убран из региона."));
+        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+    }
+
+    /** Начать поиск флагов по названию (по id И переводу {flag-name}). */
+    private void startSearchPrompt(Player p, OpenMenu om, String kind) {
+        pendingSearch.put(p.getUniqueId(), kind);
+        p.sendMessage(plugin.lang().comp("market.search-prompt"));
+        p.sendMessage(plugin.lang().comp("market.search-cancel"));
+    }
+
+    /** Цикл сортировки предложений рынка: Название → Цена → По умолчанию. */
+    private void cycleSort(Player p, OpenMenu om) {
+        String cur = om.ctx.getOrDefault("_sort", "default");
+        int idx = MARKET_SORT.indexOf(cur);
+        String next = MARKET_SORT.get((idx + 1) % MARKET_SORT.size());
+        om.ctx.put("_sort", next);
+        p.sendMessage(plugin.lang().comp("market.sort-set", "mode", next));
+        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onSearchChat(AsyncPlayerChatEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        String kind = pendingSearch.get(id);
+        if (kind == null) {
+            return;
+        }
+        e.setCancelled(true);
+        final String text = e.getMessage().trim();
+        pendingSearch.remove(id);
+        if (text.isEmpty()) {
+            e.getPlayer().sendMessage(plugin.lang().comp("market.search-off"));
+            return;
+        }
+        if (text.equalsIgnoreCase("cancel") || text.equalsIgnoreCase("отмена")
+                || text.equalsIgnoreCase("сброс") || text.equalsIgnoreCase("off")) {
+            e.getPlayer().sendMessage(plugin.lang().comp("market.search-off"));
+            return;
+        }
+        final String q = text;
+        final UUID pid = id;
+        plugin.getServer().getScheduler().runTask(plugin, () -> applySearch(pid, kind, q));
+    }
+
+    private void applySearch(UUID id, String kind, String query) {
+        Player p = plugin.getServer().getPlayer(id);
+        if (p == null || !p.isOnline()) {
+            return;
+        }
+        OpenMenu om = open.get(id);
+        if (om == null) {
+            return;
+        }
+        if ("market".equals(kind)) {
+            om.ctx.put("_marketsearch", query);
+            p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+        } else {
+            om.ctx.put("_flagsearch", query);
+            p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+        }
         render(p, om.menu, om.ctx, om.page, om.role, om.kind);
     }
 

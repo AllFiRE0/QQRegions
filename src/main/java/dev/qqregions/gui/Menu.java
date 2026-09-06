@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Шаблон GUI: блок Menus.<имя> в файле меню.
@@ -247,6 +248,23 @@ public class Menu {
             String groupsList = groupsList(tpl, group);
             String flagName = plugin.config().flagName(id);
 
+            // активный поиск флагов (ctx["_flagsearch"]): совпадение по id
+            // или переведённому имени {flag-name}; пробелы в запросе = "любое
+            // число пробелов" (regex), регистр не важен.
+            String flagQuery = ctx.get("_flagsearch");
+            if (flagQuery != null) {
+                String q = flagQuery.trim();
+                if (q.isEmpty()) {
+                    continue;
+                }
+                Pattern pat = searchPattern(q);
+                String plain = Msg.color(flagName);
+                if (!pat.matcher(id).find() && !pat.matcher(flagName).find()
+                        && !pat.matcher(plain).find()) {
+                    continue;
+                }
+            }
+
             Map<String, String> fc = new LinkedHashMap<>(ctx);
             fc.put("flag-name", flagName);
             fc.put("flag", id);
@@ -314,6 +332,28 @@ public class Menu {
             out.add(bake(ctx, s));
         }
         return out;
+    }
+
+    /**
+     * Поиск по названию флага: пробел = "любое кол-во пробелов",
+     * кириллица/латиница не важны, поиск по raw id,
+     * translated {flag-name} и бешиблову тексту (Msg.color).
+     */
+    static Pattern searchPattern(String query) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < query.length(); i++) {
+            char c = query.charAt(i);
+            if (c == ' ') {
+                sb.append("\\s+");
+            } else {
+                sb.append(Pattern.quote(String.valueOf(c)));
+            }
+        }
+        try {
+            return Pattern.compile(sb.toString(), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+        } catch (Throwable t) {
+            return Pattern.compile("");
+        }
     }
 
     /**

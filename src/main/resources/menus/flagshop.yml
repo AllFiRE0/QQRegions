@@ -31,6 +31,15 @@ Menus:
           - "&7Закрыть меню"
         commands:
           - "close"
+      "search":
+        slot: 4
+        material: PAPER
+        name: "&eПоиск флага"
+        lore:
+          - "&7По id или переводу"
+          - "&7Нажмите и введите запрос в чат"
+        commands:
+          - "@flag-search"
       "market":
         slot: 45
         material: GOLD_INGOT

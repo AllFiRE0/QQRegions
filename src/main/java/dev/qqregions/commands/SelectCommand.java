@@ -20,7 +20,7 @@ import java.util.Locale;
  */
 public class SelectCommand {
 
-    private static final List<String> SUBS = List.of("pos", "point", "max", "chunk", "expand", "outset");
+    private static final List<String> SUBS = List.of("pos", "point", "max", "chunk", "expand", "outset", "view");
     private static final List<String> SIDES = List.of("north", "south", "east", "west", "up", "down");
     private static final List<String> AXES = List.of("h", "horizontal", "v", "vertical");
 
@@ -60,6 +60,9 @@ public class SelectCommand {
                 break;
             case "outset":
                 outset(p, args);
+                break;
+            case "view":
+                view(p, args);
                 break;
             default:
                 send(p, "general.unknown-subcommand", "alias", label);
@@ -116,11 +119,7 @@ public class SelectCommand {
 
     private void max(Player p) {
         SelectionManager mgr = plugin.selections();
-        SelectionTemplate t = mgr.template(p);
-        long max = t.getMaxBlocks();
-        if (mgr.isBypassed(p)) {
-            max = 100_000_000L;
-        }
+        long max = mgr.effectiveMaxBlocks(p);
         long L = (long) Math.cbrt((double) max);
         while (L > 1 && L * L * L > max) {
             L--;
@@ -173,10 +172,7 @@ public class SelectCommand {
                 side = 1;
             }
         }
-        long maxBlocks = t.getMaxBlocks();
-        if (mgr.isBypassed(p)) {
-            maxBlocks = Long.MAX_VALUE;
-        }
+        long maxBlocks = mgr.isBypassed(p) ? Long.MAX_VALUE : mgr.effectiveMaxBlocks(p);
         int cx = p.getLocation().getBlockX() >> 4;
         int cz = p.getLocation().getBlockZ() >> 4;
         int wide = side * 16;
@@ -196,7 +192,7 @@ public class SelectCommand {
         if (mgr.overLimit(p, sel)) {
             // даже при band=1 не влезает — упираемся в max-blocks
             send(p, "select.over-limit", "current", RegionCommand.fmt(sel.volume()),
-                    "max", RegionCommand.fmt(t.getMaxBlocks()));
+                    "max", RegionCommand.fmt(mgr.isBypassed(p) ? Long.MAX_VALUE : mgr.effectiveMaxBlocks(p)));
             return;
         }
         mgr.set(p, sel);
@@ -272,6 +268,37 @@ public class SelectCommand {
         apply(p, sel -> sel.withOutset(amount, fh, fv), "select.outset");
     }
 
+    // ---------- view <ник> | view off ----------
+
+    private void view(Player p, String[] args) {
+        SelectionManager mgr = plugin.selections();
+        if (args.length >= 2 && args[1].equalsIgnoreCase("off")) {
+            mgr.stopInspect(p);
+            send(p, "select.view-off");
+            return;
+        }
+        if (args.length < 2) {
+            send(p, "general.usage", "usage", "select view <ник>|off");
+            return;
+        }
+        String target = args[1];
+        int res = mgr.inspectView(p, target);
+        switch (res) {
+            case 1:
+                send(p, "select.view-offline", "target", target);
+                break;
+            case 2:
+                send(p, "select.view-self");
+                break;
+            case 3:
+                send(p, "select.view-no-selection", "target", target);
+                break;
+            default:
+                send(p, "select.view-set", "target", target);
+                break;
+        }
+    }
+
     // ---------- применение изменений с лимитами ----------
 
     private interface Op {
@@ -287,9 +314,8 @@ public class SelectCommand {
         }
         Selection next = mgr.clampToWorld(op.apply(sel));
         if (mgr.overLimit(p, next)) {
-            SelectionTemplate t = mgr.template(p);
             send(p, "select.over-limit", "current", RegionCommand.fmt(next.volume()),
-                    "max", RegionCommand.fmt(t.getMaxBlocks()));
+                    "max", RegionCommand.fmt(mgr.effectiveMaxBlocks(p)));
             return;
         }
         mgr.set(p, next);
@@ -357,6 +383,16 @@ public class SelectCommand {
             if (args.length == 2) {
                 SelectionTemplate t = plugin.selections().template(p);
                 return List.of(String.valueOf(t.getChunks()), "1", "2", "3");
+            }
+        }
+        if (sub.equals("view")) {
+            if (args.length == 2) {
+                List<String> out = new ArrayList<>();
+                out.add("off");
+                for (Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    out.add(online.getName());
+                }
+                return startsWith(out, args[1]);
             }
         }
         return List.of();

@@ -449,6 +449,9 @@ public class InteractSession {
         Config cfg = plugin.config();
         if (selectingMode) {
             view.renderSelect(sel, cfg.pointStyle(1), cfg.pointStyle(2), activePoint);
+        } else if (sel.volume() <= 1) {
+            // одиночная точка — маркер вместо объёма
+            view.renderNow(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, sel.getPos(1));
         } else {
             view.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
         }
@@ -471,7 +474,7 @@ public class InteractSession {
             return;
         }
         long cur = sel.volume();
-        long max = plugin.selections().template(player).getMaxBlocks();
+        long max = plugin.selections().effectiveMaxBlocks(player);
         boolean conflict = !plugin.selections().isBypassed(player) && !plugin.wg().intersecting(sel).isEmpty();
 
         String text;

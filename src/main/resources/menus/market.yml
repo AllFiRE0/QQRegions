@@ -40,6 +40,23 @@ Menus:
           - "&7Вернуться в предыдущее меню"
         commands:
           - "@back"
+      "search":
+        slot: 4
+        material: PAPER
+        name: "&eПоиск по названию"
+        lore:
+          - "&7Фильтр списка предложений"
+          - "&7Нажмите и введите запрос в чат"
+        commands:
+          - "@market-search"
+      "sort":
+        slot: 5
+        material: HOPPER
+        name: "&eСортировка: &fНазвание"
+        lore:
+          - "&7Цикл: Название → Цена → По умолчанию"
+        commands:
+          - "@sort"
       "blocks":
         slot: 44
         material: GOLD_BLOCK

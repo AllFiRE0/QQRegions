@@ -158,7 +158,8 @@ public class RegionCommand {
         }
         SelectionTemplate t = plugin.selections().template(p);
         if (plugin.selections().overLimit(p, sel)) {
-            lang(p, "select.over-limit", "current", fmt(sel.volume()), "max", fmt(t.getMaxBlocks()));
+            lang(p, "select.over-limit", "current", fmt(sel.volume()),
+                    "max", fmt(plugin.selections().effectiveMaxBlocks(p)));
             return;
         }
         if (plugin.selections().belowMin(p, sel)) {
@@ -854,19 +855,39 @@ public class RegionCommand {
                 out.add(online.getName());
             }
         }
-        if (sub.equals("visible") || sub.equals("view")) {
-            // /region visible [название|off|type] [particles|blocks|territory]
+        if (sub.equals("view")) {
+            // /region view [регион] [тип]
             if (args.length == 2) {
-                List<String> opts = new ArrayList<>(List.of("off", "type"));
-                opts.addAll(plugin.wg().visibleNames(p.getWorld(), p));
-                out.addAll(filtered(opts, args, 1));
+                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
                 return out;
             }
-            if (args.length == 3 && args[1].equalsIgnoreCase("type")) {
+            if (args.length == 3) {
                 out.addAll(filtered(HIGHLIGHT_TYPES, args, 2));
                 return out;
             }
             return filtered(out, args, args.length - 1);
+        }
+        if (sub.equals("visible")) {
+            // /region visible [off|type|true|allow|false|deny|регион] [тип] [регион]
+            if (args.length == 2) {
+                List<String> opts = new ArrayList<>(List.of("off", "type", "true", "allow", "false", "deny"));
+                opts.addAll(plugin.wg().visibleNames(p.getWorld(), p));
+                out.addAll(filtered(opts, args, 1));
+                return out;
+            }
+            if (args.length == 3) {
+                out.addAll(filtered(HIGHLIGHT_TYPES, args, 2));
+                return out;
+            }
+            if (args.length == 4) {
+                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
+                return out;
+            }
+            return filtered(out, args, args.length - 1);
+        }
+        if (sub.equals("raid") && args.length == 2) {
+            out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
+            return out;
         }
         if (sub.equals("sell") || sub.equals("rent") || sub.equals("buy")
                 || sub.equals("tenant") || sub.equals("market")) {
@@ -877,7 +898,7 @@ public class RegionCommand {
             } else if (sub.equals("buy") || sub.equals("tenant")) {
                 opts = new ArrayList<>(List.of("accept", "decline", "list"));
             } else {
-                opts = new ArrayList<>(List.of("open", "list"));
+                opts = new ArrayList<>(List.of("open", "list", "flags", "blocks", "myflags"));
             }
             if (args.length == 2) {
                 out.addAll(filtered(opts, args, 1));

@@ -199,11 +199,6 @@ public class HighlightManager implements Listener {
         return isActive(p, key(p.getWorld(), r));
     }
 
-    /** Показать подсветку без переключения (используется /region view). */
-    public void show(Player p, World world, ProtectedRegion r, String type) {
-        show(p, world, r, key(world, r), type);
-    }
-
     /** Скрыть подсветку конкретного региона. */
     public void hide(Player p, World world, ProtectedRegion r) {
         removeActive(p, key(world, r));

@@ -125,6 +125,7 @@ visible:
   view-shown: "&eПросмотр подсветки региона &7{region}&e."
   flag-set: "&aФлаг &f{flag}&a региона &7{region} &aустановлен: &f{value}"
   flag-fail: "&cНе удалось установить флаг подсветки."
+  not-owner: "&cВы не владелец региона &7{region}&c — флаг подсветки менять нельзя."
 
 help:
   header: "&8===== &bQQRegions &7v{version} &8====="
@@ -160,7 +161,7 @@ help:
       desc: "Тип подсветки по умолчанию (без аргумента — текущий)"
     - usage: "visible off"
       desc: "Скрыть все подсветки"
-    - usage: "visible view [регион]"
+    - usage: "view [регион] [particles|blocks|territory]"
       desc: "Временно показать подсветку (без сохранения флага)"
     - usage: "visible true|allow|false|deny [particles|blocks|territory] [регион]"
       desc: "Установить флаг подсветки региона"
@@ -207,6 +208,11 @@ market:
   buy-request-made: "&aЗапрос на покупку &7{region} &aотправлен владельцу."
   tenant-request-made: "&aЗапрос на аренду &7{region} &aотправлен владельцу."
   list-line: "&7[{type}] &f{region} &8· &7{status} &8· &7{price} &8· &7{who} &8· &f{id}"
+  search-prompt: "&eВведите текст для поиска в чат (пробелы не важны):"
+  search-cancel: "&8Напишите &7off&8/&7отмена&8 — убрать поиск."
+  search-set: "&aПоиск: &f{query}"
+  search-off: "&7Поиск выключен."
+  sort-set: "&aСортировка: &f{mode}&a. (&7name&a — название, &7price&a — цена, &7default&a — по умолчанию)"
   accepted-sell: "&aСделка по региону &7{region} &aзавершена: владение передано покупателю."
   accepted-buy: "&aПокупка региона &7{region} &aзавершена: вы теперь владелец."
   accepted-rent: "&aАренда региона &7{region} &aзапущена."
@@ -240,6 +246,7 @@ shop:
   menu-disabled: "&cМеню магазина не настроено."
 
 raid:
+  disabled: "&cРейды отключены в конфиге (raid.enabled: false)."
   none: "&cВы не в регионе и название не указано."
   ok: "&aРейд на &f{region} &aзапущен! Все нападающие должны оставаться в регионе."
   fail: "&cНе удалось запустить рейд: &f{reason}"
