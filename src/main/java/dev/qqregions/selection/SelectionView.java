@@ -164,7 +164,7 @@ public class SelectionView {
 
         List<BlockVector3> inRange = new ArrayList<>();
         Set<Long> wanted = new HashSet<>();
-        for (BlockVector3 p : edgePoints(sel, cfg.particles().density, cfg.particles().maxPoints)) {
+        for (BlockVector3 p : edgePoints(sel, cfg.particles().density, maxBlocks)) {
             if (inRange.size() >= maxBlocks) {
                 break;
             }
@@ -262,10 +262,11 @@ public class SelectionView {
     }
 
     /**
-     * Точки по всем 12 рёбрам куба. Бюджет cap делится ПОРОВНУ на каждое
-     * ребро (cap/12): короткое ребро рисуется КАЖДЫМ блоком (шаг 1), длинное
-     * ужимается до своей доли. Рёбра обходятся по кругу (round-robin), поэтому
-     * лимит никогда не «съедает» вертикальные грани горизонтальными.
+     * Точки по всем 12 рёбрам куба. Каждое ребро рисуется СПЛОШНОЙ полосой
+     * (без чередования): ни одна линия не обрывается в середине. Бюджет cap
+     * делится поровну на ребро (cap/12) — короткие рёбра (в т.ч. вертикали)
+     * идут каждым блоком, длинные ужимаются до своей доли, поэтому весь
+     * объём влезает в бюджет целиком.
      */
     private static List<BlockVector3> edgePoints(Selection sel, int density, int maxPoints) {
         int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
@@ -299,20 +300,11 @@ public class SelectionView {
 
         List<BlockVector3> out = new ArrayList<>(Math.min(cap + 8, 4096));
         Set<Long> seen = new HashSet<>();
-        boolean progress = true;
-        while (progress && out.size() < cap) {
-            progress = false;
-            for (Edge e : edges) {
-                if (!e.hasNext()) {
-                    continue;
-                }
+        for (Edge e : edges) {
+            while (e.hasNext() && out.size() < cap) {
                 BlockVector3 p = e.next();
                 if (seen.add(blockKey(p))) {
                     out.add(p);
-                    progress = true;
-                    if (out.size() >= cap) {
-                        break;
-                    }
                 }
             }
         }
