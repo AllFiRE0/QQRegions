@@ -83,23 +83,21 @@ public class SelectionManager implements Listener {
         return !isBypassed(player) && selection.volume() < template(player).getMinBlocks();
     }
 
-    /** Прижатие к границам мира. */
+    /** Прижатие к границам мира. Сохраняет идентичность точек (без пересортировки!). */
     public Selection clampToWorld(Selection selection) {
         World w = selection.getWorld();
         int minY = w.getMinHeight();
         int maxY = w.getMaxHeight() - 1;
-        BlockVector3 mn = selection.min();
-        BlockVector3 mx = selection.max();
-        mn = mn.withY(clamp(mn.getBlockY(), minY, maxY));
-        mx = mx.withY(clamp(mx.getBlockY(), minY, maxY));
-        mn = mn.withX(clamp(mn.getBlockX(), -30000000, 30000000));
-        mx = mx.withX(clamp(mx.getBlockX(), -30000000, 30000000));
-        mn = mn.withZ(clamp(mn.getBlockZ(), -30000000, 30000000));
-        mx = mx.withZ(clamp(mx.getBlockZ(), -30000000, 30000000));
-        if (mn.getBlockY() > mx.getBlockY()) {
-            mx = mx.withY(mn.getBlockY() + 1);
-        }
-        return new Selection(w, mn, mx);
+        BlockVector3 p1 = clampPoint(selection.getPos(1), minY, maxY);
+        BlockVector3 p2 = clampPoint(selection.getPos(2), minY, maxY);
+        return new Selection(w, p1, p2);
+    }
+
+    private static BlockVector3 clampPoint(BlockVector3 p, int minY, int maxY) {
+        return BlockVector3.at(
+                clamp(p.getBlockX(), -30000000, 30000000),
+                clamp(p.getBlockY(), minY, maxY),
+                clamp(p.getBlockZ(), -30000000, 30000000));
     }
 
     private static int clamp(int v, int lo, int hi) {
