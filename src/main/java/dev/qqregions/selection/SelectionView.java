@@ -152,6 +152,7 @@ public class SelectionView {
 
     private void renderBlockView(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         Config cfg = plugin.config();
+        World world = sel.getWorld();
         int maxBlocks = cfg.viewMaxBlocks();
 
         List<BlockVector3> inRange = new ArrayList<>();
