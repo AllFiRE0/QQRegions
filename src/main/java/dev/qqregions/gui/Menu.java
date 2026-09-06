@@ -44,12 +44,13 @@ public class Menu {
     private final Map<Integer, MenuItem> buttons = new LinkedHashMap<>();
 
     private final DynamicFlags dyn;
+    private final DynamicPlayers dynPlayers;
     private MenuItem navPrev;
     private MenuItem navNext;
 
     public Menu(String title, int rows, int updateInterval, int priority,
                 String permissionGroup, String placeholderGroup, String roleRequired,
-                MenuItem fill, DynamicFlags dyn) {
+                MenuItem fill, DynamicFlags dyn, DynamicPlayers dynPlayers) {
         this.title = title;
         this.rows = rows;
         this.updateInterval = updateInterval;
@@ -59,6 +60,7 @@ public class Menu {
         this.roleRequired = roleRequired;
         this.fill = fill;
         this.dyn = dyn;
+        this.dynPlayers = dynPlayers;
     }
 
     public int priority() {
@@ -103,6 +105,26 @@ public class Menu {
         return dyn;
     }
 
+    public DynamicPlayers dynamicPlayers() {
+        return dynPlayers;
+    }
+
+    /** Есть ли активная динамическая секция (флаги или игроки). */
+    private boolean dynamicEnabled() {
+        return (dyn != null && dyn.enabled) || (dynPlayers != null && dynPlayers.enabled);
+    }
+
+    /** Пул слотов под динамические кнопки (из активной секции). */
+    public List<Integer> poolSlots() {
+        if (dyn != null && dyn.enabled) {
+            return dyn.slots;
+        }
+        if (dynPlayers != null && dynPlayers.enabled) {
+            return dynPlayers.slots;
+        }
+        return java.util.List.of(9);
+    }
+
     public MenuItem navPrev() {
         return navPrev;
     }
@@ -113,14 +135,17 @@ public class Menu {
 
     /** Размер пула слотов под динамические кнопки (страница). */
     public int pageSize() {
-        return dyn == null ? 1 : Math.max(1, dyn.slots.size());
+        if (!dynamicEnabled()) {
+            return 1;
+        }
+        return Math.max(1, poolSlots().size());
     }
 
     public int maxPages(int dynSize) {
-        if (dyn == null || !dyn.enabled || dynSize <= 0) {
+        if (!dynamicEnabled() || dynSize <= 0) {
             return 1;
         }
-        int pool = Math.max(1, dyn.slots.size());
+        int pool = Math.max(1, poolSlots().size());
         return Math.max(1, (dynSize + pool - 1) / pool);
     }
 
@@ -233,12 +258,13 @@ public class Menu {
             }
         }
 
-        if (dyn != null && dyn.enabled && dynItems != null && !dynItems.isEmpty()) {
-            int poolSize = Math.max(1, dyn.slots.size());
+        if (dynamicEnabled() && dynItems != null && !dynItems.isEmpty()) {
+            List<Integer> pool = poolSlots();
+            int poolSize = Math.max(1, pool.size());
             int start = Math.max(0, Math.min(dynItems.size(), page * poolSize));
             int end = Math.min(dynItems.size(), start + poolSize);
             for (int i = start; i < end; i++) {
-                int slot = dyn.slots.get((i - start) % poolSize);
+                int slot = pool.get((i - start) % poolSize);
                 if (slot < 0 || slot >= size || inv.getItem(slot) != null) {
                     continue;
                 }
@@ -326,7 +352,8 @@ public class Menu {
         }
 
         DynamicFlags dyn = DynamicFlags.parse(g.getConfigurationSection("dynamic-flags"));
-        Menu menu = new Menu(title, rows, update, priority, permGroup, phGroup, roleRequired, fill, dyn);
+        DynamicPlayers dynPlayers = DynamicPlayers.parse(g.getConfigurationSection("dynamic-players"));
+        Menu menu = new Menu(title, rows, update, priority, permGroup, phGroup, roleRequired, fill, dyn, dynPlayers);
 
         ConfigurationSection btns = g.getConfigurationSection("buttons");
         if (btns != null) {
@@ -385,7 +412,7 @@ public class Menu {
                 b.getString("permission", ""));
     }
 
-    // ---------- настройки динамических кнопок ----------
+    // ---------- настройки динамических кнопок флагов ----------
 
     public static class DynamicFlags {
         public final boolean enabled;
@@ -468,6 +495,70 @@ public class Menu {
                     d.getStringList("states"),
                     ignore, materials,
                     d.getString("flag-permission-prefix", ""));
+        }
+    }
+
+    // ---------- настройки динамических кнопок игроков ----------
+
+    /**
+     * Параметры списка участников в меню (как dynamic-flags, но по игрокам):
+     *   slots, material/owner-material/member-material, name ({player}),
+     *   lore (PAPI резолвится на КОНКРЕТНОГО игрока) и commands
+     *   (для владельца — @player-del:{player-id}:{role}; для остальных пусто).
+     */
+    public static class DynamicPlayers {
+        public final boolean enabled;
+        public final List<Integer> slots;
+        public final String material;
+        public final String ownerMaterial;
+        public final String memberMaterial;
+        public final String name;
+        public final List<String> lore;
+        public final List<String> commands;
+
+        DynamicPlayers(boolean enabled, List<Integer> slots, String material,
+                       String ownerMaterial, String memberMaterial, String name,
+                       List<String> lore, List<String> commands) {
+            this.enabled = enabled;
+            this.slots = slots;
+            this.material = material;
+            this.ownerMaterial = ownerMaterial;
+            this.memberMaterial = memberMaterial;
+            this.name = name;
+            this.lore = lore;
+            this.commands = commands;
+        }
+
+        public static DynamicPlayers parse(ConfigurationSection d) {
+            if (d == null || !d.getBoolean("enabled", false)) {
+                return null;
+            }
+            List<Integer> slots = new ArrayList<>();
+            if (d.isList("slots")) {
+                for (String s : d.getStringList("slots")) {
+                    try {
+                        slots.add(Integer.parseInt(s.trim()));
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+            if (slots.isEmpty()) {
+                int first = Math.max(0, d.getInt("first-slot", 10));
+                int last = Math.min(53, d.getInt("last-slot", 34));
+                for (int i = first; i <= last; i++) {
+                    slots.add(i);
+                }
+            }
+            if (slots.isEmpty()) {
+                slots.add(9);
+            }
+            String material = d.getString("material", "GOLD_INGOT");
+            return new DynamicPlayers(true, slots, material,
+                    d.getString("owner-material", material),
+                    d.getString("member-material", material),
+                    d.getString("name", "{player}"),
+                    d.getStringList("lore"),
+                    d.getStringList("commands"));
         }
     }
 }

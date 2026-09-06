@@ -176,8 +176,28 @@ public class MenuManager implements Listener {
         if (best == null) {
             return false;
         }
+        if ("info".equalsIgnoreCase(menuName)) {
+            enrichInfoContext(ctx);
+        }
         Kind kind = "players".equalsIgnoreCase(menuName) ? Kind.PLAYERS : Kind.FLAGS;
         return render(player, best, ctx, page, role, kind);
+    }
+
+    /** До-заполнить контекст информационного меню, если его открыли из другого. */
+    private void enrichInfoContext(Map<String, String> ctx) {
+        if (ctx.containsKey("type") && ctx.get("type") != null) {
+            return;
+        }
+        org.bukkit.World w = worldFrom(ctx);
+        ProtectedRegion region = w == null ? null : plugin.wg().byName(w, ctx.get("region"));
+        if (w == null || region == null) {
+            return;
+        }
+        ctx.put("type", region.getType().getName());
+        ctx.put("area", String.valueOf(regionArea(region)));
+        ctx.put("volume", String.valueOf(region.volume()));
+        ctx.put("priority", String.valueOf(safePriority(region)));
+        ctx.put("status", statusOf(region));
     }
 
     /** Шаблон меню с наибольшим приоритетом, подходящий роли и игроку. */
@@ -200,7 +220,7 @@ public class MenuManager implements Listener {
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
         List<MenuItem> dynItems = kind == Kind.PLAYERS
-                ? playerItems(ctx)
+                ? playerItems(menu, ctx)
                 : menu.dynamicFlags(plugin, player, ctx);
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
@@ -316,6 +336,14 @@ public class MenuManager implements Listener {
             }
             if (c.startsWith("@add:")) {
                 startPrompt(p, om, c.substring("@add:".length()).trim());
+                continue;
+            }
+            if (c.startsWith("@pf:")) {
+                String f = c.substring("@pf:".length()).trim().toLowerCase(java.util.Locale.ROOT);
+                if (f.equals("members") || f.equals("owners") || f.equals("all")) {
+                    om.ctx.put("_filter", f);
+                    render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+                }
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -434,9 +462,17 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Кнопки списка участников для меню PLAYERS (владельцы, затем участники). */
-    private List<MenuItem> playerItems(Map<String, String> ctx) {
+    /** Кнопки списка участников (dynamic-players): владельцы, затем участники.
+     * Имя/lore берутся из конфига меню; PAPI резолвится на КОНКРЕТНОГО игрока
+     * (например %vault_eco_balance%). Владельцу шаблон задаёт команду
+     * @player-del:{player-id}:{role}; у остальных ролей — просмотр без команд.
+     * Фильтр: ctx["_filter"] = all|owners|members. */
+    private List<MenuItem> playerItems(Menu menu, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
+        Menu.DynamicPlayers dp = menu.dynamicPlayers();
+        if (dp == null) {
+            return out;
+        }
         String worldName = ctx.get("world");
         if (worldName == null) {
             return out;
@@ -446,17 +482,47 @@ public class MenuManager implements Listener {
         if (w == null || region == null) {
             return out;
         }
+        String filter = ctx.getOrDefault("_filter", "all").toLowerCase(java.util.Locale.ROOT);
+        MenuItem template = new MenuItem(dp.material, 1, null, dp.name, dp.lore, dp.commands,
+                "", null, null, null, false);
         for (dev.qqregions.wg.Wg.Participant part : plugin.wg().participants(region)) {
-            String label = part.name() != null ? part.name() : part.uuid().toString().substring(0, 8);
-            Material mat = part.owner() ? Material.DIAMOND : Material.GOLD_INGOT;
-            String display = dev.qqregions.util.Msg.color(
-                    (part.owner() ? "&b" : "&e") + label);
-            List<String> lore = new ArrayList<>(List.of(
-                    dev.qqregions.util.Msg.color("&7Роль: " + (part.owner() ? "&bВладелец" : "&eУчастник")),
-                    dev.qqregions.util.Msg.color("&cЛКМ — убрать из региона")));
-            String key = part.uuid() != null ? part.uuid().toString() : part.name();
-            List<String> cmds = List.of("@player-del:" + key + ":" + (part.owner() ? "owner" : "member"));
-            out.add(new MenuItem(mat.name(), 1, null, display, lore, cmds, ""));
+            if (("members".equals(filter) && part.owner())
+                    || ("owners".equals(filter) && !part.owner())) {
+                continue;
+            }
+            String label = part.name() != null
+                    ? part.name()
+                    : (part.uuid() != null ? part.uuid().toString().substring(0, 8) : "?");
+            org.bukkit.OfflinePlayer op = part.uuid() == null ? null : org.bukkit.Bukkit.getOfflinePlayer(part.uuid());
+            Map<String, String> pc = new HashMap<>(ctx);
+            pc.put("player", label);
+            pc.put("player-id", part.uuid() != null ? part.uuid().toString() : label);
+            pc.put("role", part.owner() ? "owner" : "member");
+            pc.put("role-ru", part.owner() ? "Владелец" : "Участник");
+
+            String name = template.process(plugin, op, pc, dp.name);
+            List<String> lore = null;
+            if (dp.lore != null && !dp.lore.isEmpty()) {
+                lore = new ArrayList<>();
+                for (String l : dp.lore) {
+                    lore.add(l == null ? "" : template.process(plugin, op, pc, l));
+                }
+            }
+            List<String> cmds = null;
+            if (dp.commands != null && !dp.commands.isEmpty()) {
+                cmds = new ArrayList<>();
+                for (String c : dp.commands) {
+                    cmds.add(template.process(plugin, op, pc, c));
+                }
+            }
+            Material mat = Material.matchMaterial(part.owner() ? dp.ownerMaterial : dp.memberMaterial);
+            if (mat == null) {
+                mat = Material.matchMaterial(dp.material);
+            }
+            if (mat == null) {
+                mat = Material.GOLD_INGOT;
+            }
+            out.add(new MenuItem(mat.name(), 1, null, name, lore, cmds, ""));
         }
         return out;
     }

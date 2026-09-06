@@ -2,18 +2,27 @@
 #  QQRegions — меню игроков региона (управление участниками)
 #
 #  Список владельцев/участников заполняется кодом плагина в
-#  секции dynamic-flags.slots ниже: алмазы = владельцы,
-#  золото = участники. ЛКМ по игроку — убрать из региона.
+#  секцию dynamic-players (аналогично dynamic-flags):
+#  - material / owner-material / member-material — предметы кнопок
+#    (владельцы — например DIAMOND, участники — GOLD_INGOT);
+#  - name — имя кнопки ({player} = ник игрока);
+#  - lore — описание: поддерживаются {player} {role} {role-ru}
+#    и %заполнители% PlaceholderAPI, которые резолвятся на КОНКРЕТНОГО
+#    игрока, например %vault_eco_balance% вернёт баланс каждого
+#    игрока из списка (работает так же для любого PAPI-заполнителя);
+#  - commands — команда клика: у владельца шаблон содержит
+#    @player-del:{player-id}:{role} (удаление по клику);
+#    у остальных ролей commands пустой — только просмотр.
 #
-#  Кнопки добавления:
-#    "@add:owner"  — владелец (ввод ника в чат)
-#    "@add:member" — участник (ввод ника в чат)
-#  Управление доступно владельцам региона и админам
-#  (qqregions.admin). У остальных ролей — только просмотр.
+#  Кнопки владельца:
+#    @add:owner / @add:member  — добавить (ввод ника в чат)
+#    @pf:members / @pf:owners  — фильтр списка (только участники/владельцы)
+#    @pf:all                   — показать всех
+#  Управление доступно владельцам и админам (qqregions.admin).
 #
-#  Переменные: {region} {world} {player} {role}
+#  Переменные: {region} {world} {player} {role} {role-ru} {player-id}
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @add:owner|member,
-#                 @player-del:<uuid|ник>:owner|member, close
+#                 @player-del:<uuid|ник>:owner|member, @pf:all|owners|members, close
 # ============================================================
 update_interval: 20
 
@@ -55,7 +64,7 @@ Menus:
         commands:
           - "@menu:flags"
       "add-owner":
-        slot: 48
+        slot: 47
         material: EMERALD
         name: "&b+ Владелец"
         lore:
@@ -63,15 +72,40 @@ Menus:
         commands:
           - "@add:owner"
       "add-member":
-        slot: 50
+        slot: 48
         material: PLAYER_HEAD
         name: "&e+ Участник"
         lore:
           - "&7Нажмите, затем введите ник в чат"
         commands:
           - "@add:member"
-    dynamic-flags:
-      # тут задаются только слоты под список игроков
+      "del-members":
+        slot: 50
+        material: GOLD_INGOT
+        name: "&cУдалить участников"
+        lore:
+          - "&7Показать только участников"
+          - "&7клик по игроку — удалить"
+        commands:
+          - "@pf:members"
+      "del-owners":
+        slot: 51
+        material: DIAMOND
+        name: "&cУдалить владельцев"
+        lore:
+          - "&7Показать только владельцев"
+          - "&7клик по игроку — удалить"
+        commands:
+          - "@pf:owners"
+      "all":
+        slot: 52
+        material: CRAFTING_TABLE
+        name: "&7Все"
+        lore:
+          - "&7Показать всех владельцев и участников"
+        commands:
+          - "@pf:all"
+    dynamic-players:
       enabled: true
       slots:
         - 10
@@ -95,19 +129,29 @@ Menus:
         - 32
         - 33
         - 34
+      material: GOLD_INGOT
+      owner-material: DIAMOND
+      member-material: GOLD_INGOT
+      name: "{player}"
+      lore:
+        - "%vault_eco_balance%$"
+        - "&7Роль: &b{role-ru}"
+        - "&cЛКМ — удалить из региона"
+      commands:
+        - "@player-del:{player-id}:{role}"
     navigation:
       prev:
         material: ARROW
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 47
+        slot: 44
       next:
         material: ARROW
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 52
+        slot: 53
   "default":
     priority: 5
     permission-group: ""
@@ -135,7 +179,7 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
-    dynamic-flags:
+    dynamic-players:
       enabled: true
       slots:
         - 10
@@ -152,16 +196,30 @@ Menus:
         - 23
         - 24
         - 25
+        - 28
+        - 29
+        - 30
+        - 31
+        - 32
+        - 33
+        - 34
+      material: GOLD_INGOT
+      owner-material: DIAMOND
+      member-material: GOLD_INGOT
+      name: "{player}"
+      lore:
+        - "%vault_eco_balance%$"
+        - "&7Роль: &b{role-ru}"
     navigation:
       prev:
         material: ARROW
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 47
+        slot: 44
       next:
         material: ARROW
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 52
+        slot: 53

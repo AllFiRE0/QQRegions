@@ -5,6 +5,7 @@ import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -116,7 +117,9 @@ public class MenuItem {
         return item;
     }
 
-    public String process(QQRegions plugin, Player player, Map<String, String> ctx, String text) {
+    /** Process: {заполнители} контекста + %PlaceholderAPI% + replace.yml.
+     * player может быть любом OfflinePlayer (для шаблонов списка игроков). */
+    public String process(QQRegions plugin, OfflinePlayer player, Map<String, String> ctx, String text) {
         String out = ctx == null ? text : text;
         for (Map.Entry<String, String> e : ctx.entrySet()) {
             out = out.replace("{" + e.getKey() + "}", e.getValue() == null ? "" : e.getValue());

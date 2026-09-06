@@ -162,6 +162,14 @@ Menus:
         name: "&fУчастники:"
         lore:
           - "{members}"
+      "players":
+        slot: 20
+        material: PLAYER_HEAD
+        name: "&eИгроки"
+        lore:
+          - "&7Просмотр владельцев и участников"
+        commands:
+          - "@menu:players"
   "other":
     role-required: other
     priority: 10
@@ -211,3 +219,11 @@ Menus:
         name: "&fУчастники:"
         lore:
           - "{members}"
+      "players":
+        slot: 15
+        material: PLAYER_HEAD
+        name: "&eИгроки"
+        lore:
+          - "&7Просмотр владельцев и участников"
+        commands:
+          - "@menu:players"
