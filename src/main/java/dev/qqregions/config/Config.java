@@ -49,6 +49,7 @@ public class Config {
     private int viewDistance = 200;
     private int viewMaxBlocks = 500;
     private float viewBlockScale = 0.35f;
+    private int viewDotsPerEdge = 16;
     private boolean commandSelectionView = true;
 
     private ParticleOptions particles;
@@ -102,6 +103,7 @@ public class Config {
         viewDistance = cfg.getInt("interactive.view-distance", 200);
         viewMaxBlocks = cfg.getInt("interactive.view-max-blocks", 500);
         viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
+        viewDotsPerEdge = Math.max(2, cfg.getInt("interactive.view-dots-per-edge", 16));
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
 
         buttonMaterials.clear();
@@ -219,6 +221,10 @@ public class Config {
 
     public int viewMaxBlocks() {
         return viewMaxBlocks;
+    }
+
+    public int viewDotsPerEdge() {
+        return viewDotsPerEdge;
     }
 
     public float viewBlockScale() {
