@@ -2,7 +2,6 @@ package dev.qqregions.selection;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.regions.CuboidRegion;
 import com.sk89q.worldedit.regions.selector.CuboidRegionSelector;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
@@ -487,8 +486,7 @@ public class InteractSession {
             com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(sel.getWorld());
             com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
                     .getSessionManager().get(BukkitAdapter.adapt(player));
-            session.setRegionSelector(weWorld, new CuboidRegionSelector(weWorld,
-                    new CuboidRegion(weWorld, sel.min(), sel.max())));
+            session.setRegionSelector(weWorld, new CuboidRegionSelector(weWorld, sel.min(), sel.max()));
         } catch (Throwable t) {
             plugin.dbg("WE sync failed for " + player.getName() + ": " + t);
         }
