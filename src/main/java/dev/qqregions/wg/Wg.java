@@ -213,6 +213,19 @@ public class Wg {
         return region != null && (contains(region.getOwners(), uuid) || contains(region.getMembers(), uuid));
     }
 
+    /** UUID всех владельцев региона. */
+    public Set<UUID> ownerUuids(ProtectedRegion region) {
+        Set<UUID> out = new HashSet<>();
+        if (region == null) {
+            return out;
+        }
+        try {
+            out.addAll(region.getOwners().getUniqueIds());
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
     private boolean contains(DefaultDomain set, Player player) {
         try {
             return set.contains(player.getUniqueId());

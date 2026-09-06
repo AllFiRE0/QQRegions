@@ -307,7 +307,17 @@ public class InteractSession {
     }
 
     public void onWheel(boolean scrollUp) {
-        if (!selectingMode) {
+        onWheel(scrollUp, 1);
+    }
+
+    /**
+     * Обработка прокрутки колеса. steps — число "щелчков" за одно движение
+     * (Bukkit при быстром прокручивании шлёт ОДИН PlayerItemHeldEvent с
+     * разницей слотов > 1; раньше такие броски игнорировались, и точка не
+     * двигалась). Теперь точка смещается пропорционально числу шагов.
+     */
+    public void onWheel(boolean scrollUp, int steps) {
+        if (!selectingMode || steps <= 0) {
             return;
         }
         Selection sel = plugin.selections().get(player);
@@ -316,7 +326,7 @@ public class InteractSession {
         }
         boolean forward = plugin.config().invertWheel() == scrollUp;
         BlockVector3 cur = sel.getPos(activePoint);
-        BlockVector3 next = computeMove(cur, forward);
+        BlockVector3 next = computeMove(cur, forward, steps);
         if (next == null) {
             player.sendMessage(plugin.lang().compPrefixed("select.point-locked"));
             return;
@@ -331,14 +341,15 @@ public class InteractSession {
             Config cfg = plugin.config();
             view.renderSelect(moved, cfg.pointStyle(1), cfg.pointStyle(2), activePoint);
         }
-        plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next);
+        plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next + " (steps " + steps + ")");
     }
 
     /**
      * Движение активной точки ТОЛЬКО по направлению взгляда (все оси).
      * За одно деление колеса точка проходит
-     * wheel-distance * (shift-множитель) / wheel-slots блоков; дробные остатки
-     * копятся в wheelAcc, чтобы медленные значения не терялись.
+     * wheel-distance * (shift-множитель) / wheel-slots блоков; steps —
+     * сколько делений прокрутили за раз. Дробные остатки копятся в wheelAcc,
+     * чтобы медленные значения не терялись.
      */
     private final double[] wheelAcc = new double[3];
 
@@ -346,7 +357,7 @@ public class InteractSession {
         wheelAcc[0] = wheelAcc[1] = wheelAcc[2] = 0;
     }
 
-    private BlockVector3 computeMove(BlockVector3 cur, boolean forward) {
+    private BlockVector3 computeMove(BlockVector3 cur, boolean forward, int steps) {
         Config cfg = plugin.config();
         double per = cfg.wheelDistance()
                 * (player.isSneaking() ? cfg.wheelShiftSpeed() : 1.0)
@@ -354,8 +365,9 @@ public class InteractSession {
         if (!forward) {
             per = -per;
         }
+        double total = per * steps;
         org.bukkit.util.Vector dir = player.getLocation().getDirection();
-        double[] dv = {dir.getX() * per, dir.getY() * per, dir.getZ() * per};
+        double[] dv = {dir.getX() * total, dir.getY() * total, dir.getZ() * total};
 
         int x = cur.getBlockX();
         int y = cur.getBlockY();

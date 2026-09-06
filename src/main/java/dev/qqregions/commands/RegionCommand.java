@@ -113,6 +113,7 @@ public class RegionCommand {
             plugin.commands().register();
             plugin.menus().reload();
             plugin.market().reload();
+            plugin.raid().reload();
             lang(sender, "general.reloaded");
             lang(sender, "general.reloaded-summary", "aliases", String.join(", ", plugin.config().aliases()));
         } catch (Throwable t) {

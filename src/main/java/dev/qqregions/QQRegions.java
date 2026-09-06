@@ -8,6 +8,7 @@ import dev.qqregions.gui.MenuManager;
 import dev.qqregions.highlight.HighlightManager;
 import dev.qqregions.market.MarketManager;
 import dev.qqregions.papi.QQExpansion;
+import dev.qqregions.raid.RaidManager;
 import dev.qqregions.selection.InteractListener;
 import dev.qqregions.selection.SelectionManager;
 import dev.qqregions.selection.SessionStore;
@@ -37,6 +38,7 @@ public final class QQRegions extends JavaPlugin {
     private InteractListener interactListener;
     private HighlightManager highlight;
     private MarketManager market;
+    private RaidManager raid;
 
     public static QQRegions get() {
         return instance;
@@ -68,6 +70,7 @@ public final class QQRegions extends JavaPlugin {
         this.interactListener = new InteractListener(this);
         this.highlight = new HighlightManager(this);
         this.market = new MarketManager(this);
+        this.raid = new RaidManager(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
@@ -92,6 +95,7 @@ public final class QQRegions extends JavaPlugin {
         selections.tick();
         menus.tick();
         highlight.tick();
+        raid.tick();
         marketTick();
     }
 
@@ -165,6 +169,10 @@ public final class QQRegions extends JavaPlugin {
 
     public MarketManager market() {
         return market;
+    }
+
+    public RaidManager raid() {
+        return raid;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */

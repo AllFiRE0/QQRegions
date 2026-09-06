@@ -92,8 +92,35 @@ public class QQExpansion extends PlaceholderExpansion {
                         .filter(o -> o.status == dev.qqregions.market.Offer.Status.PENDING
                                 || o.status == dev.qqregions.market.Offer.Status.ACTIVE)
                         .count());
+            case "raid_active":
+                return yesNo(plugin.raid().active());
+            case "raid_state":
+                return plugin.raid().stateName();
+            case "raid_region":
+                return plugin.raid().regionName();
+            case "raid_world":
+                return plugin.raid().worldName();
+            case "raid_clan":
+                return plugin.raid().clanName();
+            case "raid_thief":
+                return plugin.raid().thiefName();
+            case "raid_players":
+            case "raid_count":
+                return String.valueOf(plugin.raid().attackerCount());
+            case "raid_total":
+                return String.valueOf(plugin.raid().attackerCount());
+            case "raid_remaining":
+            case "raid_time":
+                int rem = plugin.raid().remainingSeconds();
+                return rem < 0 ? "0" : String.valueOf(rem);
+            case "raid_cooldown":
+                return String.valueOf(plugin.raid().cooldownSeconds());
             default:
                 break;
+        }
+        if (params.startsWith("raid_")) {
+            String rest = params.substring("raid_".length());
+            return raidParam(offline, rest);
         }
         if (params.startsWith("eco_has_")) {
             try {
@@ -120,6 +147,34 @@ public class QQExpansion extends PlaceholderExpansion {
 
     private boolean economy() {
         return plugin.market().enabled();
+    }
+
+    /** Параметризованные raid-заполнители: world:region -> состояние рейда. */
+    private String raidParam(OfflinePlayer offline, String rest) {
+        // пока не различаем мир/регион — отдаём глобальное состояние
+        if (!plugin.raid().active()) {
+            return rest.equalsIgnoreCase("active") ? "no" : "";
+        }
+        switch (rest.toLowerCase(java.util.Locale.ROOT)) {
+            case "active":
+                return "yes";
+            case "region":
+                return plugin.raid().regionName();
+            case "clan":
+                return plugin.raid().clanName();
+            case "thief":
+                return plugin.raid().thiefName();
+            case "time":
+            case "remaining":
+                int rem = plugin.raid().remainingSeconds();
+                return rem < 0 ? "0" : String.valueOf(rem);
+            case "count":
+            case "players":
+            case "total":
+                return String.valueOf(plugin.raid().attackerCount());
+            default:
+                return "";
+        }
     }
 
     private String priceOf(String key) {

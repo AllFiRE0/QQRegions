@@ -14,6 +14,7 @@ softdepend:
   - WorldGuardExtraFlagsPlus
   - LuckPerms
   - Vault
+  - JustTeams
 
 permissions:
   qqregions.use:
@@ -46,6 +47,9 @@ permissions:
   qqregions.market:
     description: Рынок регионов (sell/rent/buy/tenant/market)
     default: true
+  qqregions.raid:
+    description: Запуск рейдов клана (JustTeams)
+    default: true
   qqregions.admin:
     description: Полный доступ, включая регионы чужих игроков
     default: op
@@ -59,6 +63,7 @@ permissions:
       qqregions.flags: true
       qqregions.visible: true
       qqregions.market: true
+      qqregions.raid: true
   qqregions.bypass.selection-limits:
     description: Игнорировать max-blocks/min-blocks в шаблонах прав
     default: op

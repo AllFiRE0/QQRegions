@@ -42,8 +42,7 @@ public final class Economy {
         vault = null;
         mGetBalance = mHas = mWithdraw = mDeposit = null;
         try {
-            if (Bukkit.getPluginManager().getPlugin("Vault") != null
-                    && plugin.config().market().economyEnabled) {
+            if (plugin.config().market().economyEnabled) {
                 Class<?> eco = Class.forName("net.milkbowl.vault.economy.Economy");
                 ServicesManager sm = Bukkit.getServicesManager();
                 Method reg = ServicesManager.class.getMethod("getRegisteredProvider", Class.class);

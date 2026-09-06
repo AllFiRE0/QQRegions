@@ -66,16 +66,28 @@ public class InteractListener implements Listener {
         }
         int prev = e.getPreviousSlot();
         int next = e.getNewSlot();
-        boolean scrollUp = next == (prev + 1) % 9;
-        boolean scrollDown = next == (prev + 8) % 9;
-        if (s.isSelectingMode() && (scrollUp || scrollDown)) {
-            // В select-режиме колесо двигает точку, слот не меняем.
-            e.setCancelled(true);
-            s.onWheel(scrollUp);
+        if (!s.isSelectingMode()) {
+            plugin.dbg("hotbar slot: " + e.getPlayer().getName() + " -> " + next);
             return;
         }
-        // Иначе хотбар свободен: смена цифрами 1-9 или колесом — как обычно.
-        plugin.dbg("hotbar slot: " + e.getPlayer().getName() + " -> " + next);
+        // Определяем направление и число "щелчков" колеса по разнице слотов.
+        // Bukkit при быстром прокручивании шлёт ОДНО событие с разницей > 1
+        // (промежуточные слоты пропускаются), поэтому ориентируемся на дельту.
+        int delta = (next - prev + 9) % 9;      // 0..8
+        boolean scrollUp;
+        int steps;
+        if (delta <= 4) {
+            scrollUp = true;
+            steps = delta;
+        } else {
+            scrollUp = false;
+            steps = 9 - delta;
+        }
+        // В select-режиме колесо двигает точку, слот не меняем.
+        e.setCancelled(true);
+        if (steps >= 1) {
+            s.onWheel(scrollUp, steps);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

@@ -59,6 +59,7 @@ public class Config {
     private BossBarOptions bossbar;
     private HighlightOptions highlight;
     private MarketOptions market;
+    private RaidOptions raid;
 
     public Config(QQRegions plugin) {
         this.plugin = plugin;
@@ -128,6 +129,7 @@ public class Config {
         bossbar = new BossBarOptions(cfg.getConfigurationSection("bossbar"));
         highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
         market = new MarketOptions(cfg.getConfigurationSection("market"));
+        raid = new RaidOptions(cfg.getConfigurationSection("raid"));
     }
 
     private static List<String> lower(List<String> in) {
@@ -280,6 +282,11 @@ public class Config {
     /** Настройки подсветки регионов (команды /region visible и флаг territory-visible). */
     public HighlightOptions highlight() {
         return highlight;
+    }
+
+    /** Настройки рейда клана «Воришка» (кнопка в меню info, шаблон other). */
+    public RaidOptions raid() {
+        return raid;
     }
 
     // ---------------- вложенные опции ----------------
@@ -500,6 +507,170 @@ public class Config {
             }
             rentCharge = rc;
             periodMillis = Math.max(1, r == null ? 1440 : r.getInt("period-minutes", 1440)) * 60_000L;
+        }
+    }
+
+    // ---------------- рейд клана «Воришка» (JustTeams) ----------------
+
+    /**
+     * Рейд клана на чужой регион (кнопка в info-меню у роли other).
+     *   min-attackers       — мин. число нападающих (членов клана) в регионе для старта;
+     *   online-percent      — мин. % ОНЛАЙН-членов клана, которые должны быть в регионе
+     *                         (трактовка значения: < 1 = доля (0.5 = 50%), >= 1 = проценты (50 = 50%));
+     *   capture-time        — секунды фазы захвата (все нападающие должны ПРОДЕРЖАТЬСЯ в регионе,
+     *                         выход любого — сброс);
+     *   thief-time          — секунды, которые «вор» держит доступ к региону;
+     *   cooldown-time       — секунды кулдауна региона после завершения рейда;
+     *   blacklist           — регионы (id), которые нельзя рейдить;
+     *   owners-offline-required — владельцы/участники региона должны быть офлайн для старта;
+     *   abort-on-owner-online  — сорвать рейд, если владелец/участник региона зашёл во время захвата;
+     *   economy             — списание монет (PLAYER = баланс инициатора, CLAN = банк клана).
+     */
+    public static class RaidOptions {
+        public final boolean enabled;
+        public final int minAttackers;
+        public final double onlinePercent;
+        public final int captureSeconds;
+        public final int thiefSeconds;
+        public final int cooldownSeconds;
+        public final Set<String> blacklist;
+        public final boolean ownersOfflineRequired;
+        public final boolean abortOnOwnerOnline;
+        public final RaidEconomy economy;
+        public final RaidDisplay display;
+        public final RaidNotify notifyStart;
+        public final RaidNotify notifyThief;
+        public final RaidNotify notifyEnd;
+        public final RaidNotify notifyReset;
+
+        public enum RaidSource { PLAYER, CLAN }
+
+        RaidOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = false;
+                minAttackers = 2;
+                onlinePercent = 50;
+                captureSeconds = 60;
+                thiefSeconds = 60;
+                cooldownSeconds = 300;
+                blacklist = Set.of();
+                ownersOfflineRequired = true;
+                abortOnOwnerOnline = true;
+                economy = new RaidEconomy(null);
+                display = new RaidDisplay(null);
+                RaidNotify def = new RaidNotify("BROADCAST", "", List.of());
+                notifyStart = def;
+                notifyThief = def;
+                notifyEnd = def;
+                notifyReset = def;
+                return;
+            }
+            enabled = s.getBoolean("enabled", false);
+            minAttackers = Math.max(1, s.getInt("min-attackers", 2));
+            onlinePercent = s.getDouble("online-percent", 50);
+            captureSeconds = Math.max(1, s.getInt("capture-time", 60));
+            thiefSeconds = Math.max(1, s.getInt("thief-time", 60));
+            cooldownSeconds = Math.max(0, s.getInt("cooldown-time", 300));
+            blacklist = new HashSet<>(lower(s.getStringList("blacklist")));
+            ownersOfflineRequired = s.getBoolean("owners-offline-required", true);
+            abortOnOwnerOnline = s.getBoolean("abort-on-owner-online", true);
+            economy = new RaidEconomy(s.getConfigurationSection("economy"));
+            display = new RaidDisplay(s.getConfigurationSection("display"));
+            notifyStart = new RaidNotify(s.getConfigurationSection("notify.start"));
+            notifyThief = new RaidNotify(s.getConfigurationSection("notify.thief"));
+            notifyEnd = new RaidNotify(s.getConfigurationSection("notify.end"));
+            notifyReset = new RaidNotify(s.getConfigurationSection("notify.reset"));
+        }
+
+        public boolean isBlacklisted(String region) {
+            return blacklist.contains(region.toLowerCase(java.util.Locale.ROOT));
+        }
+
+        /**
+         * Списание при выборе «вора»; PLAYER вычитает процент с баланса нападающего
+         * (инициатора), CLAN — процент с банка клана (JustTeams).
+         */
+        public static class RaidEconomy {
+            public final boolean enabled;
+            public final RaidSource source;
+            public final double percent;
+
+            RaidEconomy(ConfigurationSection s) {
+                if (s == null) {
+                    enabled = false;
+                    source = RaidSource.CLAN;
+                    percent = 10;
+                    return;
+                }
+                enabled = s.getBoolean("enabled", false);
+                RaidSource src;
+                try {
+                    src = RaidSource.valueOf(s.getString("source", "CLAN"));
+                } catch (IllegalArgumentException e) {
+                    src = RaidSource.CLAN;
+                }
+                source = src;
+                percent = s.getDouble("percent", 10);
+            }
+        }
+
+        /** Боссбар/экшнбар процесса рейда. */
+        public static class RaidDisplay {
+            public final String mode;
+            public final int updateTicks;
+            public final BarColor color;
+            public final BarStyle style;
+            public final String text;
+
+            RaidDisplay(ConfigurationSection s) {
+                if (s == null) {
+                    mode = "ACTIONBAR";
+                    updateTicks = 20;
+                    color = BarColor.RED;
+                    style = BarStyle.SEGMENTED_10;
+                    text = "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}";
+                    return;
+                }
+                mode = s.getString("mode", "ACTIONBAR").toUpperCase(java.util.Locale.ROOT);
+                updateTicks = Math.max(5, s.getInt("update-ticks", 20));
+                BarColor c;
+                try {
+                    c = BarColor.valueOf(s.getString("color", "RED"));
+                } catch (IllegalArgumentException e) {
+                    c = BarColor.RED;
+                }
+                color = c;
+                BarStyle st;
+                try {
+                    st = BarStyle.valueOf(s.getString("style", "SEGMENTED_10"));
+                } catch (IllegalArgumentException e) {
+                    st = BarStyle.SEGMENTED_10;
+                }
+                style = st;
+                text = s.getString("text", "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}");
+            }
+        }
+
+        /** Оповещение стадии рейда. message — если не пусто, шлётся в чат всем
+         *  (или приватно для notify.*); commands — исполняются как asConsole!/asPlayer!. */
+        public static class RaidNotify {
+            public final String message;
+            public final List<String> commands;
+
+            RaidNotify(String message, List<String> commands) {
+                this.message = message;
+                this.commands = commands == null ? List.of() : commands;
+            }
+
+            RaidNotify(ConfigurationSection s) {
+                if (s == null) {
+                    message = "";
+                    commands = List.of();
+                } else {
+                    message = s.getString("message", "");
+                    commands = new ArrayList<>(s.getStringList("commands"));
+                }
+            }
         }
     }
 }

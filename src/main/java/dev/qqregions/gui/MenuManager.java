@@ -404,6 +404,10 @@ public class MenuManager implements Listener {
                 marketAction(p, c.substring("@market:".length()).trim());
                 continue;
             }
+            if (c.startsWith("@raid:")) {
+                raidAction(p, c.substring("@raid:".length()).trim(), om.ctx);
+                continue;
+            }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
         }
     }
@@ -710,6 +714,24 @@ public class MenuManager implements Listener {
         if (open.containsKey(p.getUniqueId())) {
             OpenMenu live = open.get(p.getUniqueId());
             render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        }
+    }
+
+    /** Обработчик @raid:<action> из кнопок меню (запуск рейда). */
+    private void raidAction(Player p, String spec, Map<String, String> ctx) {
+        String action = spec.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!"start".equals(action)) {
+            return;
+        }
+        if (!p.hasPermission("qqregions.admin") && !p.hasPermission("qqregions.raid")) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cУ вас нет права на рейд."));
+            return;
+        }
+        String res = plugin.raid().start(p);
+        if (res != null) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&c" + res));
+        } else {
+            p.sendMessage(dev.qqregions.util.Msg.color("&aРейд запущен! Все нападающие должны оставаться в регионе."));
         }
     }
 

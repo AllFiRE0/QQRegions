@@ -236,3 +236,13 @@ Menus:
           - "&7Просмотр владельцев и участников"
         commands:
           - "@menu:players"
+      "raid":
+        slot: 47
+        material: NETHERITE_SWORD
+        name: "&cРейд клана"
+        lore:
+          - "&7Запустить рейд на регион &f{region}"
+          - "&7Требует клан (JustTeams)"
+        permission: qqregions.raid
+        commands:
+          - "@raid:start"
