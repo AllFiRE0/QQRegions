@@ -115,7 +115,7 @@ public class SelectionView {
         // Весь контур рисуется БЕЗ обрезания по дистанции: лимит точек уже
         // ограничивает нагрузку (max-points), а далёкие куски раньше
         // «отрывались» из-за view-distance.
-        for (BlockVector3 p : edgePoints(sel, po.density, po.maxPoints)) {
+        for (BlockVector3 p : edgePoints(sel, po.maxPoints)) {
             spawnParticle(world, po, color, p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5);
         }
         if (marker != null) {
@@ -155,11 +155,11 @@ public class SelectionView {
         Config cfg = plugin.config();
         World world = sel.getWorld();
 
-        // Точки-кубики по всем 12 рёбрам: у каждого ребра ~равное число точек,
-        // шаг растёт с длиной ребра (20б -> 1·0·1, 40б -> 1·0·0·1), поэтому
-        // контур всегда влезает в бюджет, а вертикальные грани не режутся.
-        int cap = Math.max(24, cfg.viewDotsPerEdge() * 12);
-        List<BlockVector3> points = edgePoints(sel, cfg.particles().density, cap);
+        // Точки-кубики по всем 12 рёбрам: один шаг для всех рёбер, так что
+        // вертикальные грани выглядят точно так же, как горизонтальные.
+        // Бюджет = view-max-blocks (потолок дисплеев), если периметр влезает —
+        // контур идёт каждым блоком.
+        List<BlockVector3> points = edgePoints(sel, cfg.viewMaxBlocks());
 
         List<BlockVector3> need = new ArrayList<>();
         List<Long> spare = new ArrayList<>();
@@ -280,40 +280,38 @@ public class SelectionView {
     }
 
     /**
-     * Точки по всем 12 рёбрам куба. Каждое ребро рисуется СПЛОШНОЙ полосой
-     * (без чередования): ни одна линия не обрывается в середине. Бюджет cap
-     * делится поровну на ребро (cap/12) — короткие рёбра (в т.ч. вертикали)
-     * идут каждым блоком, длинные ужимаются до своей доли, поэтому весь
-     * объём влезает в бюджет целиком.
+     * Точки по всем 12 рёбрам куба. ОДИН и тот же шаг для всех рёбер:
+     * вертикальные грани получаются точно такими же, как горизонтальные
+     * (раньше шаг считался по каждой оси отдельно, и у высокой области
+     * вертикали прореживались сильнее — разрывы вплоть до 17 блоков).
+     * Если периметр не влезает в бюджет cap — шаг растёт одинаково по всем
+     * рёбрам; если влезает — контур идёт каждым блоком.
      */
-    private static List<BlockVector3> edgePoints(Selection sel, int density, int maxPoints) {
+    private static List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
         int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
-        int base = Math.max(1, density);
         BlockVector3 mn = sel.min();
         BlockVector3 mx = sel.max();
         int sx = Math.abs(mx.getBlockX() - mn.getBlockX());
         int sy = Math.abs(mx.getBlockY() - mn.getBlockY());
         int sz = Math.abs(mx.getBlockZ() - mn.getBlockZ());
 
-        int perEdge = Math.max(2, cap / 12);
-        int need = perEdge - 1;
-        int stX = strideFor(sx, need, base);
-        int stY = strideFor(sy, need, base);
-        int stZ = strideFor(sz, need, base);
+        long total = 4L * (sx + sy + sz);
+        int room = Math.max(1, cap - 12);
+        int stride = total <= room ? 1 : (int) Math.max(1, (total + room - 1) / room);
 
         Edge[] edges = new Edge[]{
-                edge(mn, BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), sx, stX),
-                edge(mn, BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stZ),
-                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stZ),
-                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sx, stX),
-                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sx, stX),
-                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stZ),
-                edge(BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stZ),
-                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sx, stX),
-                edge(mn, BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stY),
-                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stY),
-                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stY),
-                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stY),
+                edge(mn, BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), sx, stride),
+                edge(mn, BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), sx, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sx, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sz, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sx, stride),
+                edge(mn, BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mn.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mn.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mn.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mn.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stride),
+                edge(BlockVector3.at(mx.getBlockX(), mn.getBlockY(), mx.getBlockZ()), BlockVector3.at(mx.getBlockX(), mx.getBlockY(), mx.getBlockZ()), sy, stride),
         };
 
         List<BlockVector3> out = new ArrayList<>(Math.min(cap + 8, 4096));
@@ -327,17 +325,6 @@ public class SelectionView {
             }
         }
         return out;
-    }
-
-    /**
-     * Доля бюджета для ребра длины len: короткое ребро (len <= need) рисуется
-     * КАЖДЫМ блоком (шаг 1), длинное ужимается до ~need точек (не чаще base).
-     */
-    private static int strideFor(int len, int need, int base) {
-        if (len <= need) {
-            return 1;
-        }
-        return Math.max(base, (len + need - 1) / need);
     }
 
     /** Ленивое ребро: точки через {stride} блоков от a к b (включая конец). */

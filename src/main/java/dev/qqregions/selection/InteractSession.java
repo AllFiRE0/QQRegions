@@ -3,6 +3,7 @@ package dev.qqregions.selection;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.selector.CuboidRegionSelector;
+import com.sk89q.worldedit.regions.selector.RegionSelector;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
@@ -63,6 +64,10 @@ public class InteractSession {
     /** Мир, в котором живёт сессия (для сброса WE-селекции). */
     private final World world;
 
+    /** Прежняя WE-селекция игрока: сохраняем на старте и возвращаем в конце. */
+    private RegionSelector prevSelector;
+    private com.sk89q.worldedit.world.World weWorld;
+
     public InteractSession(QQRegions plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
@@ -84,6 +89,23 @@ public class InteractSession {
         player.sendMessage(plugin.lang().comp("select.interactive-help"));
         plugin.dbg("session start: " + player.getName() + " @" + world.getName()
                 + " (syncWorldEdit=" + plugin.config().syncWorldEdit() + ")");
+        saveWorldEditSelector();
+    }
+
+    /** Запоминаем прежнюю WE-селекцию, чтобы вернуть её игроку после сессии. */
+    private void saveWorldEditSelector() {
+        if (!plugin.config().syncWorldEdit()) {
+            return;
+        }
+        try {
+            weWorld = BukkitAdapter.adapt(world);
+            com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
+                    .getSessionManager().get(BukkitAdapter.adapt(player));
+            prevSelector = session.getRegionSelector(weWorld);
+        } catch (Throwable t) {
+            plugin.dbg("WE selector save failed for " + player.getName() + ": " + t);
+            prevSelector = null;
+        }
     }
 
     private ItemStack button(String id, String nameKey) {
@@ -494,16 +516,16 @@ public class InteractSession {
         }
     }
 
-    /** Сбрасывает WorldEdit-селекцию игрока при выходе из сессии. */
+    /** Возвращает прежнюю WE-селекцию игрока (или сбрасывает, если её не было). */
     private void clearWorldEdit() {
         if (!plugin.config().syncWorldEdit()) {
             return;
         }
         try {
-            com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
+            com.sk89q.worldedit.world.World w = weWorld != null ? weWorld : BukkitAdapter.adapt(world);
             com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
                     .getSessionManager().get(BukkitAdapter.adapt(player));
-            session.setRegionSelector(weWorld, null);
+            session.setRegionSelector(w, prevSelector);
         } catch (Throwable t) {
             plugin.dbg("WE clear failed for " + player.getName() + ": " + t);
         }
