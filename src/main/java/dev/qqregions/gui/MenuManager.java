@@ -264,7 +264,7 @@ public class MenuManager implements Listener {
             if (stack != null && stack.isEmpty()) {
                 history.remove(p.getUniqueId());
             }
-            p.sendMessage(dev.qqregions.util.Msg.color("&7Нет предыдущего меню."));
+            plugin.lang().send(p, "menu.no-prev");
             return;
         }
         if (stack.isEmpty()) {
@@ -603,7 +603,7 @@ public class MenuManager implements Listener {
     /** Телепорт в центр региона (только админ и владелец). */
     private void teleportToRegion(Player p, Map<String, String> ctx, String role) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(role)) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cТелепорт доступен только владельцам/админам."));
+            plugin.lang().send(p, "menu.teleport-owner-only");
             return;
         }
         String worldName = ctx.get("world");
@@ -623,7 +623,7 @@ public class MenuManager implements Listener {
             int y = Math.max(min.y(), world.getMinHeight()) + 1;
             p.teleport(new org.bukkit.Location(world, cx + 0.5, y, cz + 0.5));
         } catch (Throwable t) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cНе удалось телепортироваться."));
+            plugin.lang().send(p, "menu.teleport-fail");
         }
     }
 
@@ -699,9 +699,8 @@ public class MenuManager implements Listener {
         }
         boolean ok = plugin.wg().setFlagGroup(world, region, flag, next);
         String label = plugin.replace().resolve("flag-groups", next);
-        p.sendMessage(dev.qqregions.util.Msg.color(
-                (ok ? "&a" : "&c") + "Флаг &f" + flag.getName() + "&r: группа &f" + label
-                        + (ok ? "&a." : "&c (не удалось сменить).")));
+        plugin.lang().send(p, ok ? "menu.group-set" : "menu.group-set-fail",
+                "flag", flag.getName(), "group", label);
         OpenMenu live = open.get(p.getUniqueId());
         if (live != null) {
             render(p, live.menu, live.ctx, live.page, live.role, live.kind);
@@ -817,13 +816,13 @@ public class MenuManager implements Listener {
                     ? (sale ? "активна" : "аренда") : "ожидает");
 
             String name = tpl.process(plugin, null, pc,
-                    "&f{market-type} &8· &7{market-region}");
+                    plugin.lang().get("menu.lore-market-type-region"));
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, null, pc, "&7Цена: &f{market-price}"));
-            lore.add(tpl.process(plugin, null, pc,
-                    sale ? "&7Покупатель: &f{market-who}" : "&7Арендатор: &f{market-who}"));
-            lore.add(tpl.process(plugin, null, pc, "&7Статус: &f{market-status}"));
-            lore.add("&9ЛКМ — принять • &eПКМ — отменить");
+            lore.add(tpl.process(plugin, null, pc, plugin.lang().get("menu.lore-price")));
+            lore.add(tpl.process(plugin, null, pc, plugin.lang().get(
+                    sale ? "menu.lore-market-who-buyer" : "menu.lore-market-who-tenant")));
+            lore.add(tpl.process(plugin, null, pc, plugin.lang().get("menu.lore-market-status")));
+            lore.add(plugin.lang().get("menu.lore-market-accept-cancel"));
 
             List<String> cmds = List.of("@market:accept:" + o.id);
             out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore, cmds, ""));
@@ -840,28 +839,37 @@ public class MenuManager implements Listener {
         String action = parts[0].trim().toLowerCase(java.util.Locale.ROOT);
         dev.qqregions.market.Offer o = plugin.market().byId(parts[1].trim());
         if (o == null) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cПредложение не найдено."));
+            plugin.lang().send(p, "menu.offer-not-found");
             return;
         }
         String res;
         switch (action) {
             case "accept":
                 res = plugin.market().accept(o, p);
-                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
-                        ? "&aПринято: &f" + o.region
-                        : "&cНе удалось принять: &f" + res));
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&aпринять", "reason", marketReason(res));
+                }
                 break;
             case "decline":
                 res = plugin.market().decline(o, p);
-                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
-                        ? "&eОтклонено: &f" + o.region
-                        : "&cНе удалось отклонить: &f" + res));
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, "menu.offer-declined", "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&eотклонить", "reason", marketReason(res));
+                }
                 break;
             case "cancel":
                 res = plugin.market().cancel(o, p);
-                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
-                        ? "&eОтменено: &f" + o.region
-                        : "&cНе удалось отменить: &f" + res));
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, "menu.offer-cancelled", "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&eотменить", "reason", marketReason(res));
+                }
                 break;
             default:
                 return;
@@ -870,6 +878,12 @@ public class MenuManager implements Listener {
             OpenMenu live = open.get(p.getUniqueId());
             render(p, live.menu, live.ctx, live.page, live.role, live.kind);
         }
+    }
+
+    /** Код причины из MarketManager -> готовый текст из lang.yml (market.*). */
+    private String marketReason(String code) {
+        String s = plugin.lang().get("market." + code).trim();
+        return s.isEmpty() ? code : s;
     }
 
     /** Обработчик @raid:<action> из кнопок меню (запуск рейда). */
@@ -891,7 +905,8 @@ public class MenuManager implements Listener {
             res = plugin.raid().start(p);
         }
         if (res != null) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&c" + res));
+            // res — уже готовый перевод (RaidManager fmt из lang), только показать.
+            p.sendMessage(dev.qqregions.util.Msg.color(res));
         } else {
             plugin.lang().send(p, "raid.ok",
                     "region", r != null ? r.getId() : (ctx.get("region") == null ? "" : ctx.get("region")));
@@ -903,7 +918,7 @@ public class MenuManager implements Listener {
         org.bukkit.World w = worldFrom(ctx);
         ProtectedRegion r = w == null ? null : plugin.wg().byName(w, ctx.get("region"));
         if (w == null || r == null) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cРегион не найден."));
+            plugin.lang().send(p, "menu.region-not-found");
             return;
         }
         plugin.highlight().show(p, w, r, plugin.highlight().typeOf(p));
@@ -962,12 +977,11 @@ public class MenuManager implements Listener {
         Set<String> whitelist = plugin.config().flagsMenuWhitelist();
         Set<String> shopIgnore = plugin.config().flagsShopIgnore();
         Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
-        boolean allFree = whitelist.isEmpty();
         Menu.DynamicFlags dyn = menu.dynamicFlags();
         for (com.sk89q.worldguard.protection.flags.Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
             String key = id == null ? "" : id.toLowerCase(java.util.Locale.ROOT);
-            if (key.isEmpty() || allFree || whitelist.contains(key)
+            if (key.isEmpty() || whitelist.contains(key)
                     || shopIgnore.contains(key) || owned.contains(key)) {
                 continue;
             }
@@ -994,9 +1008,9 @@ public class MenuManager implements Listener {
             pc.put("price", plugin.market().economy().format(price));
             String name = tpl.process(plugin, player, pc, "&f{flag-name}");
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price}"));
-            lore.add("&7После покупки появится в меню флагов");
-            lore.add("&eЛКМ — купить");
+            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-price")));
+            lore.add(plugin.lang().get("menu.lore-flag-shop-hint"));
+            lore.add(plugin.lang().get("menu.lore-buy"));
             String mat = dyn == null ? null : dyn.materials.get(id);
             out.add(new MenuItem(mat == null ? "EMERALD" : mat, 1, null, name, lore,
                     List.of("@shop-buy:flag:" + key), ""));
@@ -1019,9 +1033,9 @@ public class MenuManager implements Listener {
             pc.put("price", plugin.market().economy().format(p.price()));
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, player, pc, "&7Увеличивает выделение на &f{pack-amount}&7 блоков"));
-            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price}"));
-            lore.add("&eЛКМ — купить");
+            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-area")));
+            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-price")));
+            lore.add(plugin.lang().get("menu.lore-buy"));
             out.add(new MenuItem("GOLD_INGOT", 1, null, name, lore,
                     List.of("@shop-buy:area:" + p.id()), ""));
         }
@@ -1032,9 +1046,9 @@ public class MenuManager implements Listener {
             pc.put("price", plugin.market().economy().format(p.price()));
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, player, pc, "&7Добавляет &f{pack-amount}&7 к лимиту регионов"));
-            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price} &8(повторяемый)"));
-            lore.add("&eЛКМ — купить");
+            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-region")));
+            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-repeatable")));
+            lore.add(plugin.lang().get("menu.lore-buy"));
             out.add(new MenuItem("EMERALD", 1, null, name, lore,
                     List.of("@shop-buy:region:" + p.id()), ""));
         }
@@ -1108,7 +1122,7 @@ public class MenuManager implements Listener {
     /** Кнопка входа на псевдокоманды меню игроков. */
     private void removeParticipant(Player p, OpenMenu om, String spec) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cУправление участниками доступно только владельцам."));
+            plugin.lang().send(p, "menu.participants-owner-only");
             return;
         }
         String[] parts = spec.split(":", 2);
@@ -1123,7 +1137,7 @@ public class MenuManager implements Listener {
             return;
         }
         plugin.wg().removePlayerId(world, region, id, owner);
-        p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок убран из региона."));
+        plugin.lang().send(p, "menu.player-removed");
         render(p, om.menu, om.ctx, om.page, om.role, om.kind);
     }
 
@@ -1133,10 +1147,8 @@ public class MenuManager implements Listener {
     private void startSearchPrompt(Player p, OpenMenu om, String kind) {
         boolean market = "market".equalsIgnoreCase(kind);
         if (tryInputDialog(p,
-                dev.qqregions.util.Msg.color(market ? "&eПоиск по рынку" : "&eПоиск флагов"),
-                dev.qqregions.util.Msg.color(market
-                        ? "&7Введите название региона для поиска."
-                        : "&7Введите название флага или его перевод."),
+                plugin.lang().comp(market ? "menu.dialog-search-market-title" : "menu.dialog-search-flag-title"),
+                plugin.lang().comp(market ? "menu.dialog-search-market-label" : "menu.dialog-search-flag-label"),
                 query -> onSearchResult(p.getUniqueId(), new SearchPrompt(om, kind), query))) {
             return;
         }
@@ -1222,7 +1234,7 @@ public class MenuManager implements Listener {
      *  При поддержке сервером диалогового API ник вводится через окно, иначе — чатом. */
     private void startPrompt(Player p, OpenMenu om, String kind) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cУправление участниками доступно только владельцам."));
+            plugin.lang().send(p, "menu.participants-owner-only");
             return;
         }
         if (!"owner".equalsIgnoreCase(kind) && !"member".equalsIgnoreCase(kind)) {
@@ -1231,17 +1243,14 @@ public class MenuManager implements Listener {
         String k = kind.toLowerCase(java.util.Locale.ROOT);
         boolean ownerRole = "owner".equalsIgnoreCase(k);
         if (tryInputDialog(p,
-                dev.qqregions.util.Msg.color(ownerRole ? "&eДобавление владельца" : "&eДобавление участника"),
-                dev.qqregions.util.Msg.color("&7Введите ник игрока, которого "
-                        + (ownerRole ? "сделать владельцем региона." : "добавить участником региона.")),
+                plugin.lang().comp(ownerRole ? "menu.dialog-add-owner-title" : "menu.dialog-add-member-title"),
+                plugin.lang().comp("menu.dialog-add-label", "action",
+                        plugin.lang().get(ownerRole ? "menu.dialog-add-action-owner" : "menu.dialog-add-action-member")),
                 name -> onAddResult(p.getUniqueId(), new AddPrompt(om, k), name))) {
             return;
         }
         pendingAdd.put(p.getUniqueId(), new AddPrompt(om, k));
-        p.sendMessage(dev.qqregions.util.Msg.color(
-                "&eВведите в чат ник игрока, которого добавить "
-                        + (ownerRole ? "&bвладельцем&e" : "&eучастником")
-                        + ". Напишите &cотмена&e, чтобы отменить."));
+        p.sendMessage(plugin.lang().comp(ownerRole ? "menu.add-chat-prompt-owner" : "menu.add-chat-prompt-member"));
     }
 
     /** Результат диалога «добавить игрока» (запускается на главном потоке). */
@@ -1260,7 +1269,7 @@ public class MenuManager implements Listener {
                             .canCloseWithEscape(true)
                             .build())
                     .type(DialogType.confirmation(
-                            ActionButton.create(Component.text("OK"), null, 100,
+                            ActionButton.create(Component.text(plugin.lang().get("menu.dialog-ok")), null, 100,
                                     DialogAction.customClick((response, audience) -> {
                                         if (audience instanceof Player pl) {
                                             String value = response.getText("value");
@@ -1268,7 +1277,7 @@ public class MenuManager implements Listener {
                                         }
                                     }, ClickCallback.Options.builder().uses(1)
                                             .lifetime(ClickCallback.DEFAULT_LIFETIME).build())),
-                            ActionButton.create(Component.text("Отмена"), null, 100, null))));
+                            ActionButton.create(Component.text(plugin.lang().get("menu.dialog-cancel")), null, 100, null))));
             p.showDialog(dialog);
             return true;
         } catch (Throwable t) {
@@ -1296,18 +1305,18 @@ public class MenuManager implements Listener {
             return;
         }
         if (name.isEmpty() || name.equalsIgnoreCase("отмена") || name.equalsIgnoreCase("cancel")) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&7Добавление отменено."));
+            plugin.lang().send(p, "menu.add-cancelled");
             return;
         }
         org.bukkit.World world = worldFrom(pr.om.ctx);
         ProtectedRegion region = world == null ? null : plugin.wg().byName(world, pr.om.ctx.get("region"));
         if (world == null || region == null) {
-            p.sendMessage(dev.qqregions.util.Msg.color("&cРегион не найден."));
+            plugin.lang().send(p, "menu.region-not-found");
             return;
         }
         plugin.wg().addPlayerByName(world, region, name, "owner".equalsIgnoreCase(pr.kind));
-        p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок &f" + name + " &aдобавлен"
-                + ("owner".equalsIgnoreCase(pr.kind) ? " как владелец." : " как участник.")));
+        plugin.lang().send(p, "owner".equalsIgnoreCase(pr.kind)
+                ? "menu.player-added-owner" : "menu.player-added-member", "player", name);
         // Меню мог закрыться, когда игрок открыл чат (клиент закрывает инвентарь).
         // Если закрыто — переоткрываем список игроков, чтобы было видно результат.
         if (open.containsKey(id)) {

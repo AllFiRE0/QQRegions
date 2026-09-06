@@ -219,7 +219,9 @@ public class Menu {
             if (ownedOnly) {
                 visible = owned != null && owned.contains(key);
             } else if (allFree) {
-                visible = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
+                boolean ownedFlag = owned != null && owned.contains(key);
+                boolean permOk = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
+                visible = ownedFlag || permOk;
             } else if (whitelist.contains(key)) {
                 visible = true;
             } else if (shopIgnore.contains(key)) {

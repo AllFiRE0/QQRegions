@@ -851,7 +851,7 @@ public class RegionCommand {
                     return out;
                 }
                 default:
-                    return out;
+                    break;
             }
         }
         if (args.length == 3 && (sub.equals("add") || sub.equals("remove"))) {
