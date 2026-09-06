@@ -129,9 +129,8 @@ public class MenuItem {
         if (meta != null) {
             // скрыть служебные строки предметов (урон меча, эффекты зелий,
             // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_POTION_EFFECTS,
-                    ItemFlag.HIDE_DYE, ItemFlag.HIDE_ARMOR_TRIM,
-                    ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,
+                    ItemFlag.HIDE_ARMOR_TRIM, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
             meta.displayName(Msg.color(process(plugin, player, ctx, name == null ? "" : name)));
             List<Component> lines = new ArrayList<>();
             if (lore != null) {
