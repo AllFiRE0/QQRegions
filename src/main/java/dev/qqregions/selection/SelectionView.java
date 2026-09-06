@@ -33,6 +33,7 @@ public class SelectionView {
 
     private final QQRegions plugin;
     private final Player player;
+    /** Точки-кубики контура: ключ = позиция блока, значение = дисплей. */
     private final Map<Long, Entity> viewBlocks = new HashMap<>();
     private Entity viewMarker;
     private Entity viewMarker2;
@@ -153,36 +154,32 @@ public class SelectionView {
     private void renderBlockView(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         Config cfg = plugin.config();
         World world = sel.getWorld();
-        int maxBlocks = cfg.viewMaxBlocks();
 
-        List<BlockVector3> inRange = new ArrayList<>();
-        Set<Long> wanted = new HashSet<>();
-        // Без обрезания по дистанции: весь контур (до view-max-blocks точек)
-        // сплошные полосы по всем 12 рёбрам. Дальше вид-дистанция не режет.
-        for (BlockVector3 p : edgePoints(sel, cfg.particles().density, maxBlocks)) {
-            if (inRange.size() >= maxBlocks) {
-                break;
-            }
-            inRange.add(p);
-            wanted.add(blockKey(p));
-        }
+        // Точки-кубики по всем 12 рёбрам: у каждого ребра ~равное число точек,
+        // шаг растёт с длиной ребра (20б -> 1·0·1, 40б -> 1·0·0·1), поэтому
+        // контур всегда влезает в бюджет, а вертикальные грани не режутся.
+        int cap = Math.max(24, cfg.viewDotsPerEdge() * 12);
+        List<BlockVector3> points = edgePoints(sel, cfg.particles().density, cap);
 
-        // Переиспользуем старые сущности: при движении точки кадр смещается на
-        // 1-2 блока — блоки НЕ пересоздаются, а ТЕЛЕПОРТИРУЮТСЯ на новые места.
-        // Полная пересборка (destroy+spawn сотен сущностей каждый щелчок колеса)
-        // вешала клиент: «тянется только угол, остальное стоит на месте».
         List<BlockVector3> need = new ArrayList<>();
         List<Long> spare = new ArrayList<>();
-        for (BlockVector3 p : inRange) {
+        for (BlockVector3 p : points) {
             if (!viewBlocks.containsKey(blockKey(p))) {
                 need.add(p);
             }
+        }
+        Set<Long> wanted = new HashSet<>();
+        for (BlockVector3 p : points) {
+            wanted.add(blockKey(p));
         }
         for (Long key : new ArrayList<>(viewBlocks.keySet())) {
             if (!wanted.contains(key)) {
                 spare.add(key);
             }
         }
+
+        // Существующие дисплеи ТЕЛЕПОРТИРУЮТСЯ на новые места (а не
+        // пересоздаются): кадр при движении точки плавно смещается целиком.
         int si = 0;
         boolean changed = false;
         for (BlockVector3 p : need) {
@@ -210,8 +207,8 @@ public class SelectionView {
             changed = true;
         }
 
-        // Блок/свечение обновляем ТОЛЬКО когда кадр реально менялся — не гоняем
-        // глянец по всем дисплеям каждый тик (лишний поток NBT-пакетов клиенту).
+        // Блок/свечение — только когда кадр реально менялся (не гоняем NBT
+        // пакеты по всем дисплеям каждый тик в покое).
         if (changed) {
             for (Entity e : viewBlocks.values()) {
                 if (e instanceof BlockDisplay bd) {
