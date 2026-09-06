@@ -15,12 +15,13 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
-import org.bukkit.event.player.PlayerBanEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerKickEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -203,12 +204,34 @@ public class InteractListener implements Listener {
         plugin.selections().endSession(e.getPlayer());
     }
 
-    /** Бан — сессия закрывается, если игрок был онлайн. */
+    // ---------- восстановление инвентаря из дискового снимка ----------
+
+    /** Вход на сервер (например, после рестарта/краша посреди сессии):
+     *  незакрытый снимок инвентаря возвращается игроку. */
     @EventHandler
-    public void onBan(PlayerBanEvent e) {
-        org.bukkit.OfflinePlayer op = e.getPlayer();
-        if (op instanceof Player p) {
-            plugin.selections().endSession(p);
+    public void onJoin(PlayerJoinEvent e) {
+        restoreIfNeeded(e.getPlayer());
+    }
+
+    /** Респавн после смерти ВО время сессии: снимок вернули при end() (death),
+     *  теперь возвращаем предметы. Это даёт 100% сохранность: смерть не рушит
+     *  вещи, а дроп при смерти содержит только кнопки сессии — дубля нет. */
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent e) {
+        restoreIfNeeded(e.getPlayer());
+    }
+
+    private void restoreIfNeeded(Player p) {
+        String uuid = p.getUniqueId().toString();
+        if (!plugin.store().has(uuid)) {
+            return;
+        }
+        plugin.selections().endSession(p);
+        if (plugin.store().restore(uuid, p)) {
+            p.sendMessage(plugin.lang().compPrefixed("select.inventory-restored"));
+            plugin.dbg("inventory restored from disk snapshot: " + p.getName());
+        } else {
+            plugin.dbg("inventory restore FAILED for " + p.getName() + " (repeated later on next join/respawn)");
         }
     }
 }

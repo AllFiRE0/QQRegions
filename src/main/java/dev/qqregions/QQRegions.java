@@ -8,6 +8,7 @@ import dev.qqregions.gui.MenuManager;
 import dev.qqregions.papi.QQExpansion;
 import dev.qqregions.selection.InteractListener;
 import dev.qqregions.selection.SelectionManager;
+import dev.qqregions.selection.SessionStore;
 import dev.qqregions.util.Papi;
 import dev.qqregions.wg.Wg;
 import org.bukkit.Bukkit;
@@ -28,6 +29,7 @@ public final class QQRegions extends JavaPlugin {
     private ReplaceManager replace;
     private Wg wg;
     private SelectionManager selections;
+    private SessionStore store;
     private MenuManager menus;
     private CommandManager commands;
     private InteractListener interactListener;
@@ -46,6 +48,7 @@ public final class QQRegions extends JavaPlugin {
         this.replace = new ReplaceManager(this);
         this.wg = new Wg(this);
         this.selections = new SelectionManager(this);
+        this.store = new SessionStore(this);
         this.menus = new MenuManager(this);
         this.commands = new CommandManager(this);
         this.commands.register();
@@ -108,6 +111,10 @@ public final class QQRegions extends JavaPlugin {
 
     public SelectionManager selections() {
         return selections;
+    }
+
+    public SessionStore store() {
+        return store;
     }
 
     public MenuManager menus() {

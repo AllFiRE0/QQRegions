@@ -79,7 +79,14 @@ public class InteractSession {
         this.view = new SelectionView(plugin, player);
     }
 
-    public void start() {
+    /** Запускает сессию. Возвращает false, если инвентарь не удалось снять на
+     *  диск — сессия не стартует, игрок не остаётся без вещей. */
+    public boolean start() {
+        String uuid = player.getUniqueId().toString();
+        if (!plugin.store().save(uuid, player.getInventory())) {
+            player.sendMessage(plugin.lang().compPrefixed("select.interactive-on-fail"));
+            return false;
+        }
         PlayerInventory inv = player.getInventory();
         inv.clear();
         inv.setItemInOffHand(null);
@@ -90,6 +97,7 @@ public class InteractSession {
         plugin.dbg("session start: " + player.getName() + " @" + world.getName()
                 + " (syncWorldEdit=" + plugin.config().syncWorldEdit() + ")");
         saveWorldEditSelector();
+        return true;
     }
 
     /** Запоминаем прежнюю WE-селекцию, чтобы вернуть её игроку после сессии. */
@@ -227,13 +235,19 @@ public class InteractSession {
         namePrompt = false;
         resetWheelAcc();
         PlayerInventory inv = player.getInventory();
+        String uuid = player.getUniqueId().toString();
         // При смерти инвентарь не восстанавливаем: сервер и так очищает/дропает
-        // содержимое, иначе предметы «откатились» бы — дубль.
-        if (!player.isDead()) {
+        // содержимое, иначе предметы «откатились» бы — дубль. Снимок на диске
+        // оставляем — он вернётся на респавне (см. InteractListener.onRespawn).
+        if (player.isDead()) {
+            plugin.dbg("session end (death): " + player.getName() + " — инвентарь вернётся на респавне");
+        } else {
             inv.clear();
             inv.setArmorContents(armor);
             inv.setItemInOffHand(offhand);
             inv.setContents(contents);
+            // Нормальный выход: снимок на диске больше не нужен.
+            plugin.store().delete(uuid);
         }
         hideBar();
         view.cleanup();

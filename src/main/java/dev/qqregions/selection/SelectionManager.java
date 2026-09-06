@@ -117,7 +117,11 @@ public class SelectionManager implements Listener {
             return false;
         }
         InteractSession s = new InteractSession(plugin, player);
-        s.start();
+        if (!s.start()) {
+            // Инвентарь не удалось снять на диск — сессия не запускается,
+            // чтобы игрок не остался без вещей при краше/рестарте сервера.
+            return false;
+        }
         sessions.put(player.getUniqueId(), s);
         SelectionView v = views.remove(player.getUniqueId());
         if (v != null) {

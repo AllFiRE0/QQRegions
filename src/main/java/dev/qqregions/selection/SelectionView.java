@@ -82,10 +82,10 @@ public class SelectionView {
     private static String fp(Selection sel, BlockVector3 marker, Color color, Material mat, boolean select) {
         StringBuilder sb = new StringBuilder(96);
         sb.append(sel.getWorld().getName()).append('|')
-                .append(sel.min().blockX()).append(',').append(sel.min().blockY()).append(',').append(sel.min().blockZ()).append('|')
-                .append(sel.max().blockX()).append(',').append(sel.max().blockY()).append(',').append(sel.max().blockZ());
+                .append(sel.min().getX()).append(',').append(sel.min().getY()).append(',').append(sel.min().getZ()).append('|')
+                .append(sel.max().getX()).append(',').append(sel.max().getY()).append(',').append(sel.max().getZ());
         if (marker != null) {
-            sb.append('|').append(marker.blockX()).append(',').append(marker.blockY()).append(',').append(marker.blockZ());
+            sb.append('|').append(marker.getX()).append(',').append(marker.getY()).append(',').append(marker.getZ());
         }
         if (color != null) {
             sb.append('|').append(color.asRGB());
@@ -113,7 +113,7 @@ public class SelectionView {
         // только если НИЧЕГО не менялось (обе точки, активная, цвета).
         String fp = fp(sel, othPos, oth.highlight, oth.block, true)
                 + '|' + activePoint
-                + '|' + actPos.blockX() + ',' + actPos.blockY() + ',' + actPos.blockZ()
+                + '|' + actPos.getX() + ',' + actPos.getY() + ',' + actPos.getZ()
                 + '|' + act.highlight.asRGB();
         if (fp.equals(lastFp)) {
             return;
