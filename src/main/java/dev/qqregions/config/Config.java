@@ -558,7 +558,7 @@ public class Config {
                 abortOnOwnerOnline = true;
                 economy = new RaidEconomy(null);
                 display = new RaidDisplay(null);
-                RaidNotify def = new RaidNotify("BROADCAST", "", List.of());
+                RaidNotify def = new RaidNotify("", List.of());
                 notifyStart = def;
                 notifyThief = def;
                 notifyEnd = def;

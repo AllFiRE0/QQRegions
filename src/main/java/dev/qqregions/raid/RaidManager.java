@@ -3,6 +3,7 @@ package dev.qqregions.raid;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
+import dev.qqregions.raid.JustTeamsHook.TeamRef;
 import dev.qqregions.util.Msg;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -342,7 +343,7 @@ public final class RaidManager {
     }
 
     private void showBar(String tpl, BarColor color, BarStyle style, java.util.Map<String, String> ctx, double progress) {
-        Config.RaidDisplay d = plugin.config().raid().display;
+        Config.RaidOptions.RaidDisplay d = plugin.config().raid().display;
         String text = fillContext(tpl, ctx);
         Component comp = Msg.color(text);
         if (d.mode.equals("ACTIONBAR")) {
@@ -378,7 +379,7 @@ public final class RaidManager {
     // ---------- монеты ----------
 
     private void chargeForRaid() {
-        Config.RaidOptions.Economy e = plugin.config().raid().economy;
+        Config.RaidOptions.RaidEconomy e = plugin.config().raid().economy;
         if (!e.enabled) {
             return;
         }
