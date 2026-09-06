@@ -309,9 +309,12 @@ public class SelectCommand {
     private void startInteractive(Player p) {
         SelectionManager mgr = plugin.selections();
         if (!mgr.startSession(p)) {
-            send(p, "select.interactive-on");
+            // сессия уже была активна — выключаем
+            mgr.endSession(p);
+            send(p, "select.interactive-off");
             return;
         }
+        // новые сообщения уже отправил InteractSession.start()
     }
 
     // ---------- таб-подсказки ----------

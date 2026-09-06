@@ -90,6 +90,7 @@ info:
   flags-title: "&7Флаги:"
   flags-line: "  &7{flag}&8: &f{value}"
   flags-none: "&7  нет"
+  menu-disabled: "&cИнформационное меню не настроено (файл &7menus/info.yml&c)."
 
 flags:
   not-owner: "&cВы не являетесь владельцем этого региона."

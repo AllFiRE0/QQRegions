@@ -131,6 +131,38 @@ public class Wg {
         return out;
     }
 
+    /** Роль игрока в регионе: OWNER / MEMBER / NONE (админ всегда OWNER). */
+    public RegionRole role(ProtectedRegion region, Player player) {
+        if (region == null) {
+            return RegionRole.NONE;
+        }
+        if (player.hasPermission("qqregions.admin")) {
+            return RegionRole.OWNER;
+        }
+        if (contains(region.getOwners(), player)) {
+            return RegionRole.OWNER;
+        }
+        if (contains(region.getMembers(), player)) {
+            return RegionRole.MEMBER;
+        }
+        return RegionRole.NONE;
+    }
+
+    /** Регионы, которые игроку дозволено видеть (владелец/участник; админ — все). */
+    public List<String> visibleNames(World world, Player player) {
+        List<String> out = new ArrayList<>();
+        boolean admin = player.hasPermission("qqregions.admin");
+        for (ProtectedRegion r : all(world)) {
+            if (plugin.config().isBannedRegion(r.getId())) {
+                continue;
+            }
+            if (admin || role(r, player) != RegionRole.NONE) {
+                out.add(r.getId());
+            }
+        }
+        return out;
+    }
+
     public void create(Selection selection, String name, Player owner) throws RegionException {
         RegionManager rm = manager(selection.getWorld());
         if (rm == null) {
@@ -274,5 +306,10 @@ public class Wg {
 
     public String members(ProtectedRegion region) {
         return names(region.getMembers());
+    }
+
+    /** Роль игрока в регионе. */
+    public enum RegionRole {
+        NONE, MEMBER, OWNER
     }
 }

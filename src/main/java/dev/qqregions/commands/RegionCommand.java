@@ -1,6 +1,5 @@
 package dev.qqregions.commands;
 
-import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Lang;
@@ -209,63 +208,8 @@ public class RegionCommand {
             lang(p, "info.none");
             return;
         }
-        boolean owner = plugin.wg().owns(region, p);
-
-        p.sendMessage(plugin.lang().comp("info.title", "region", region.getId()));
-        p.sendMessage(plugin.lang().comp("info.world", "world", p.getWorld().getName()));
-        p.sendMessage(plugin.lang().comp("info.type", "type", regionType(region)));
-        p.sendMessage(plugin.lang().comp("info.owners", "owners", plugin.wg().owners(region)));
-        p.sendMessage(plugin.lang().comp("info.members", "members", plugin.wg().members(region)));
-        long area = regionArea(region);
-        p.sendMessage(plugin.lang().comp("info.area", "area", fmt(area), "volume", fmt(region.volume())));
-        long priority = safePriority(region);
-        p.sendMessage(plugin.lang().comp("info.priority", "priority", String.valueOf(priority)));
-
-        if (owner) {
-            List<String> flagLines = flagLines(region);
-            p.sendMessage(plugin.lang().comp("info.flags-title"));
-            if (flagLines.isEmpty()) {
-                p.sendMessage(plugin.lang().comp("info.flags-none"));
-            } else {
-                for (String line : flagLines) {
-                    p.sendMessage(dev.qqregions.util.Msg.color(line));
-                }
-            }
-        }
-    }
-
-    private List<String> flagLines(ProtectedRegion region) {
-        List<String> out = new ArrayList<>();
-        for (var flag : plugin.wg().allFlags()) {
-            Object v = region.getFlag(flag);
-            if (v == null) {
-                continue;
-            }
-            String value = String.valueOf(v);
-            out.add(plugin.lang().fmt("info.flags-line", "flag", flag.getName(), "value", value));
-        }
-        return out;
-    }
-
-    private long safePriority(ProtectedRegion region) {
-        try {
-            return region.getPriority();
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    private String regionType(ProtectedRegion region) {
-        return region.getType().getName();
-    }
-
-    private long regionArea(ProtectedRegion region) {
-        try {
-            BlockVector3 min = region.getMinimumPoint();
-            BlockVector3 max = region.getMaximumPoint();
-            return (long) (max.x() - min.x() + 1) * (max.z() - min.z() + 1);
-        } catch (Throwable t) {
-            return 0;
+        if (!plugin.menus().openInfo(p, p.getWorld(), region)) {
+            lang(p, "info.menu-disabled");
         }
     }
 
@@ -453,13 +397,7 @@ public class RegionCommand {
                     out.addAll(filtered(plugin.wg().ownedNames(p.getWorld(), p), args, 1));
                     return out;
                 case "info":
-                    List<String> names = new ArrayList<>();
-                    for (com.sk89q.worldguard.protection.regions.ProtectedRegion r : plugin.wg().all(p.getWorld())) {
-                        if (!plugin.config().isBannedRegion(r.getId())) {
-                            names.add(r.getId());
-                        }
-                    }
-                    out.addAll(filtered(names, args, 1));
+                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
                     return out;
                 case "add":
                 case "remove":

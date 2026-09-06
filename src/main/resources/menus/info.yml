@@ -1,0 +1,213 @@
+# ============================================================
+#  QQRegions — информационное меню региона (/territory info)
+#
+#  Шаблоны выбираются по роли игрока в регионе (role-required):
+#    owner  — владелец: всё + флаги + управление игроками + телепорт
+#    member — участник: база + списки, без флагов
+#    other  — посторонний: только базовая информация
+#  Любой шаблон с пустым role-required подходит любой роли.
+#
+#  Переменные: {region} {world} {player} {role} {owners} {members}
+#              {type} {area} {volume} {priority} {status}
+#
+#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @teleport,
+#                 asConsole!..., asPlayer!..., close
+# ============================================================
+update_interval: 20
+
+Menus:
+  "owner":
+    role-required: owner
+    priority: 30
+    permission-group: ""            # шаблон владельца (или свой перм)
+    placeholder-group: ""
+    title: "&#000000Информация о регионе ({region})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "region":
+        slot: 10
+        material: NAME_TAG
+        name: "&fРегион: &b{region}"
+        lore:
+          - "&7Мир: &f{world}"
+          - "&7Ваша роль: &aВладелец"
+      "type":
+        slot: 11
+        material: STONE_BRICKS
+        name: "&fТип: &7{type}"
+        lore:
+          - "&7Статус: &a{status}"
+      "area":
+        slot: 12
+        material: GRASS_BLOCK
+        name: "&fПлощадь: &7{area} &fблоков"
+        lore:
+          - "&7Объём: &f{volume} &7блоков"
+      "priority":
+        slot: 13
+        material: REPEATER
+        name: "&fПриоритет: &7{priority}"
+        lore:
+          - "&7Чем выше — тем важнее регион"
+      "owners":
+        slot: 14
+        material: DIAMOND
+        name: "&fВладельцы:"
+        lore:
+          - "{owners}"
+      "members":
+        slot: 15
+        material: GOLD_INGOT
+        name: "&fУчастники:"
+        lore:
+          - "{members}"
+      "flags":
+        slot: 20
+        material: REDSTONE_TORCH
+        name: "&eФлаги"
+        lore:
+          - "&7Открыть редактор флагов"
+        commands:
+          - "@menu:flags"
+      "players":
+        slot: 21
+        material: PLAYER_HEAD
+        name: "&eИгроки"
+        lore:
+          - "&7Управление участниками и владельцами"
+        commands:
+          - "@menu:players"
+      "teleport":
+        slot: 22
+        material: ENDER_PEARL
+        name: "&eТелепорт"
+        lore:
+          - "&7Переместиться в центр региона"
+        permission: qqregions.admin
+        commands:
+          - "@teleport"
+      "delete":
+        slot: 23
+        material: BARRIER
+        name: "&cУдалить регион"
+        lore:
+          - "&7Нажмите для удаления"
+        permission: qqregions.delete
+        commands:
+          - "asConsole! rg delete -w {world} {region}"
+  "member":
+    role-required: member
+    priority: 20
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Информация о регионе ({region})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "region":
+        slot: 10
+        material: NAME_TAG
+        name: "&fРегион: &b{region}"
+        lore:
+          - "&7Мир: &f{world}"
+          - "&7Ваша роль: &eУчастник"
+      "type":
+        slot: 11
+        material: STONE_BRICKS
+        name: "&fТип: &7{type}"
+        lore:
+          - "&7Статус: &a{status}"
+      "area":
+        slot: 12
+        material: GRASS_BLOCK
+        name: "&fПлощадь: &7{area} &fблоков"
+        lore:
+          - "&7Объём: &f{volume} &7блоков"
+      "priority":
+        slot: 13
+        material: REPEATER
+        name: "&fПриоритет: &7{priority}"
+      "owners":
+        slot: 14
+        material: DIAMOND
+        name: "&fВладельцы:"
+        lore:
+          - "{owners}"
+      "members":
+        slot: 15
+        material: GOLD_INGOT
+        name: "&fУчастники:"
+        lore:
+          - "{members}"
+  "other":
+    role-required: other
+    priority: 10
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Информация о регионе ({region})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "region":
+        slot: 10
+        material: NAME_TAG
+        name: "&fРегион: &b{region}"
+        lore:
+          - "&7Мир: &f{world}"
+          - "&7Ваша роль: &7Посторонний"
+      "type":
+        slot: 11
+        material: STONE_BRICKS
+        name: "&fТип: &7{type}"
+      "area":
+        slot: 12
+        material: GRASS_BLOCK
+        name: "&fПлощадь: &7{area} &fблоков"
+        lore:
+          - "&7Объём: &f{volume} &7блоков"
+      "owners":
+        slot: 13
+        material: DIAMOND
+        name: "&fВладельцы:"
+        lore:
+          - "{owners}"
+      "members":
+        slot: 14
+        material: GOLD_INGOT
+        name: "&fУчастники:"
+        lore:
+          - "{members}"

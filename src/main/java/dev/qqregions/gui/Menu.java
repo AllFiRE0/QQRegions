@@ -37,6 +37,8 @@ public class Menu {
     private final int priority;
     private final String permissionGroup;
     private final String placeholderGroup;
+    /** требуемая роль: owner / member / other / "" (любая) */
+    private final String roleRequired;
 
     private final MenuItem fill;
     private final Map<Integer, MenuItem> buttons = new LinkedHashMap<>();
@@ -46,19 +48,34 @@ public class Menu {
     private MenuItem navNext;
 
     public Menu(String title, int rows, int updateInterval, int priority,
-                String permissionGroup, String placeholderGroup, MenuItem fill, DynamicFlags dyn) {
+                String permissionGroup, String placeholderGroup, String roleRequired,
+                MenuItem fill, DynamicFlags dyn) {
         this.title = title;
         this.rows = rows;
         this.updateInterval = updateInterval;
         this.priority = priority;
         this.permissionGroup = permissionGroup;
         this.placeholderGroup = placeholderGroup;
+        this.roleRequired = roleRequired;
         this.fill = fill;
         this.dyn = dyn;
     }
 
     public int priority() {
         return priority;
+    }
+
+    public String roleRequired() {
+        return roleRequired;
+    }
+
+    /** Совпадает ли роль игрока в регионе с требованием шаблона ("" = любая). */
+    public boolean roleMatches(String role) {
+        if (roleRequired == null || roleRequired.trim().isEmpty()) {
+            return true;
+        }
+        String r = role == null ? "" : role.trim().toLowerCase(Locale.ROOT);
+        return roleRequired.trim().equalsIgnoreCase(r);
     }
 
     public int updateInterval() {
@@ -288,6 +305,7 @@ public class Menu {
         int priority = g.getInt("priority", 1);
         String permGroup = g.getString("permission-group", "");
         String phGroup = g.getString("placeholder-group", "");
+        String roleRequired = g.getString("role-required", "");
 
         MenuItem fill = null;
         ConfigurationSection f = g.getConfigurationSection("fill");
@@ -301,7 +319,7 @@ public class Menu {
         }
 
         DynamicFlags dyn = DynamicFlags.parse(g.getConfigurationSection("dynamic-flags"));
-        Menu menu = new Menu(title, rows, update, priority, permGroup, phGroup, fill, dyn);
+        Menu menu = new Menu(title, rows, update, priority, permGroup, phGroup, roleRequired, fill, dyn);
 
         ConfigurationSection btns = g.getConfigurationSection("buttons");
         if (btns != null) {
