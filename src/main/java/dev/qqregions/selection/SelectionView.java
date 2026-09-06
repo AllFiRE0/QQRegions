@@ -35,6 +35,7 @@ public class SelectionView {
     private final Player player;
     private final Map<Long, Entity> viewBlocks = new HashMap<>();
     private Entity viewMarker;
+    private Entity viewMarker2;
     private int timer = 0;
 
     public SelectionView(QQRegions plugin, Player player) {
@@ -62,6 +63,29 @@ public class SelectionView {
         }
     }
 
+    /**
+     * Рендер в select-режиме: контур объёма — цветом активной точки,
+     * маркеры ОБЕИХ точек всегда видны и каждый своим цветом (точка 1 —
+     * серый, точка 2 — оранжевый), чтобы при переключении не терять соседа.
+     */
+    public void renderSelect(Selection sel, Config.PointStyle p1, Config.PointStyle p2, int activePoint) {
+        Config cfg = plugin.config();
+        timer = cfg.particles().updateTicks;
+        Config.PointStyle act = activePoint == 1 ? p1 : p2;
+        Config.PointStyle oth = activePoint == 1 ? p2 : p1;
+        BlockVector3 actPos = sel.getPos(activePoint);
+        BlockVector3 othPos = sel.getPos(activePoint == 1 ? 2 : 1);
+        if (cfg.blockView()) {
+            renderBlockView(sel, act.highlight, act.block, actPos);
+            updateOtherMarker(sel.getWorld(), oth.highlight, oth.block, othPos);
+        } else {
+            renderParticles(sel, act.highlight, null);
+            Config.ParticleOptions po = cfg.particles();
+            markerCube(sel.getWorld(), po, p1.highlight, sel.getPos(1));
+            markerCube(sel.getWorld(), po, p2.highlight, sel.getPos(2));
+        }
+    }
+
     /** Удаляет все спавненные сущности (выход из сессии / смена режима). */
     public void cleanup() {
         for (Entity e : viewBlocks.values()) {
@@ -71,6 +95,10 @@ public class SelectionView {
         if (viewMarker != null) {
             viewMarker.remove();
             viewMarker = null;
+        }
+        if (viewMarker2 != null) {
+            viewMarker2.remove();
+            viewMarker2 = null;
         }
         timer = 0;
     }
@@ -95,12 +123,17 @@ public class SelectionView {
             spawnParticle(world, po, color, p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5);
         }
         if (marker != null) {
-            for (int dx = 0; dx <= 1; dx++) {
-                for (int dy = 0; dy <= 1; dy++) {
-                    for (int dz = 0; dz <= 1; dz++) {
-                        spawnParticle(world, po, color,
-                                marker.getBlockX() + dx, marker.getBlockY() + dy, marker.getBlockZ() + dz);
-                    }
+            markerCube(world, po, color, marker);
+        }
+    }
+
+    /** Кубик-маркер точки: 8 частиц по углам блока. */
+    private void markerCube(World world, Config.ParticleOptions po, Color color, BlockVector3 marker) {
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dy = 0; dy <= 1; dy++) {
+                for (int dz = 0; dz <= 1; dz++) {
+                    spawnParticle(world, po, color,
+                            marker.getBlockX() + dx, marker.getBlockY() + dy, marker.getBlockZ() + dz);
                 }
             }
         }
@@ -172,6 +205,10 @@ public class SelectionView {
                 viewMarker.remove();
                 viewMarker = null;
             }
+            if (viewMarker2 != null) {
+                viewMarker2.remove();
+                viewMarker2 = null;
+            }
         } else if (viewMarker != null && viewMarker.isValid()) {
             viewMarker.teleport(displayLoc(world, marker));
             if (viewMarker instanceof BlockDisplay bd) {
@@ -181,6 +218,20 @@ public class SelectionView {
         } else {
             viewMarker = spawnViewBlock(world, marker, blockMat, color,
                     Math.min(1.0f, cfg.viewBlockScale() * 2.0f));
+        }
+    }
+
+    /** Маркер второй (неактивной) точки в BLOCKS-режиме — свой цвет и блок. */
+    private void updateOtherMarker(World world, Color color, Material blockMat, BlockVector3 pos) {
+        if (viewMarker2 != null && viewMarker2.isValid()) {
+            viewMarker2.teleport(displayLoc(world, pos));
+            if (viewMarker2 instanceof BlockDisplay bd) {
+                bd.setBlock(blockMat.createBlockData());
+                bd.setGlowColorOverride(color);
+            }
+        } else {
+            viewMarker2 = spawnViewBlock(world, pos, blockMat, color,
+                    plugin.config().viewBlockScale());
         }
     }
 

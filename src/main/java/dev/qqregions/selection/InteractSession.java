@@ -11,7 +11,6 @@ import dev.qqregions.wg.RegionException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
-import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -288,8 +287,7 @@ public class InteractSession {
         Selection moved = plugin.selections().get(player);
         if (moved != null) {
             Config cfg = plugin.config();
-            Color c = cfg.pointStyle(activePoint).highlight;
-            view.renderNow(moved, c, cfg.pointStyle(activePoint).block, moved.getPos(activePoint));
+            view.renderSelect(moved, cfg.pointStyle(1), cfg.pointStyle(2), activePoint);
         }
         plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next);
     }
@@ -396,8 +394,7 @@ public class InteractSession {
         }
         Config cfg = plugin.config();
         if (selectingMode) {
-            view.update(sel, cfg.pointStyle(activePoint).highlight,
-                    cfg.pointStyle(activePoint).block, sel.getPos(activePoint));
+            view.renderSelect(sel, cfg.pointStyle(1), cfg.pointStyle(2), activePoint);
         } else {
             view.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
         }
