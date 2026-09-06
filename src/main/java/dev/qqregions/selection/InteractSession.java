@@ -2,8 +2,8 @@ package dev.qqregions.selection;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.regions.Region;
 import com.sk89q.worldedit.regions.selector.CuboidRegionSelector;
-import com.sk89q.worldedit.regions.selector.RegionSelector;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
@@ -65,7 +65,7 @@ public class InteractSession {
     private final World world;
 
     /** Прежняя WE-селекция игрока: сохраняем на старте и возвращаем в конце. */
-    private RegionSelector prevSelector;
+    private Region prevRegion;
     private com.sk89q.worldedit.world.World weWorld;
 
     public InteractSession(QQRegions plugin, Player player) {
@@ -101,10 +101,10 @@ public class InteractSession {
             weWorld = BukkitAdapter.adapt(world);
             com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
                     .getSessionManager().get(BukkitAdapter.adapt(player));
-            prevSelector = session.getRegionSelector(weWorld);
+            prevRegion = session.getSelection(weWorld);
         } catch (Throwable t) {
             plugin.dbg("WE selector save failed for " + player.getName() + ": " + t);
-            prevSelector = null;
+            prevRegion = null;
         }
     }
 
@@ -525,7 +525,11 @@ public class InteractSession {
             com.sk89q.worldedit.world.World w = weWorld != null ? weWorld : BukkitAdapter.adapt(world);
             com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
                     .getSessionManager().get(BukkitAdapter.adapt(player));
-            session.setRegionSelector(w, prevSelector);
+            if (prevRegion != null) {
+                session.setSelection(w, prevRegion);
+            } else {
+                session.setRegionSelector(w, null);
+            }
         } catch (Throwable t) {
             plugin.dbg("WE clear failed for " + player.getName() + ": " + t);
         }
