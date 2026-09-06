@@ -526,7 +526,8 @@ public class InteractSession {
             com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
                     .getSessionManager().get(BukkitAdapter.adapt(player));
             if (prevRegion != null) {
-                session.setSelection(w, prevRegion);
+                session.setRegionSelector(w, new CuboidRegionSelector(w,
+                        prevRegion.getMinimumPoint(), prevRegion.getMaximumPoint()));
             } else {
                 session.setRegionSelector(w, null);
             }
