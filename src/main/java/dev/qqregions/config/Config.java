@@ -42,6 +42,13 @@ public class Config {
     private List<String> blockedCommands = new ArrayList<>();
     private boolean syncWorldEdit = true;
     private boolean debug;
+    private PointStyle point1;
+    private PointStyle point2;
+    private String viewMode = "PARTICLES";
+    private int viewDistance = 200;
+    private int viewMaxBlocks = 500;
+    private float viewBlockScale = 0.35f;
+    private boolean commandSelectionView = true;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
@@ -83,6 +90,17 @@ public class Config {
         blockedCommands = new ArrayList<>(lower(cfg.getStringList("interactive.blocked-commands")));
         syncWorldEdit = cfg.getBoolean("interactive.sync-worldedit", true);
         debug = cfg.getBoolean("debug", false);
+
+        point1 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-1"),
+                Material.DARK_GRAY_STAINED_GLASS_PANE, Color.fromRGB(0x6b6b6b), Material.GRAY_CONCRETE);
+        point2 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-2"),
+                Material.YELLOW_STAINED_GLASS_PANE, Color.fromRGB(0xffa500), Material.ORANGE_CONCRETE);
+
+        viewMode = cfg.getString("interactive.view-mode", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
+        viewDistance = cfg.getInt("interactive.view-distance", 200);
+        viewMaxBlocks = cfg.getInt("interactive.view-max-blocks", 500);
+        viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
+        commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
 
         buttonMaterials.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
@@ -177,6 +195,34 @@ public class Config {
         return debug;
     }
 
+    public PointStyle pointStyle(int point) {
+        return point == 1 ? point1 : point2;
+    }
+
+    public String viewMode() {
+        return viewMode;
+    }
+
+    public boolean blockView() {
+        return "BLOCKS".equals(viewMode);
+    }
+
+    public int viewDistance() {
+        return viewDistance;
+    }
+
+    public int viewMaxBlocks() {
+        return viewMaxBlocks;
+    }
+
+    public float viewBlockScale() {
+        return viewBlockScale;
+    }
+
+    public boolean commandSelectionView() {
+        return commandSelectionView;
+    }
+
     public Material buttonMaterial(String id) {
         Material m = buttonMaterials.get(id);
         return m == null ? Material.BARRIER : m;
@@ -191,6 +237,34 @@ public class Config {
     }
 
     // ---------------- вложенные опции ----------------
+
+    /** Стиль точки выделения: панель хотбара, цвет частиц/свечения, блок-дисплей. */
+    public static class PointStyle {
+        public final Material pane;
+        public final Color highlight;
+        public final Material block;
+
+        PointStyle(ConfigurationSection s, Material defaultPane, Color defaultColor, Material defaultBlock) {
+            if (s == null) {
+                pane = defaultPane;
+                highlight = defaultColor;
+                block = defaultBlock;
+                return;
+            }
+            String mat = s.getString("pane");
+            pane = materialOr(mat, defaultPane);
+            highlight = hexColor(s.getString("highlight"), defaultColor);
+            block = materialOr(s.getString("block"), defaultBlock);
+        }
+
+        private static Material materialOr(String name, Material def) {
+            if (name == null) {
+                return def;
+            }
+            Material m = Material.matchMaterial(name);
+            return m == null ? def : m;
+        }
+    }
 
     public static class ParticleOptions {
         public final boolean enabled;
@@ -255,6 +329,19 @@ public class Config {
             return Color.fromRGB(rgb);
         } catch (Exception e) {
             return Color.GREEN;
+        }
+    }
+
+    private static Color hexColor(String hex, Color def) {
+        try {
+            String h = hex.startsWith("#") ? hex.substring(1) : hex;
+            if (h.isEmpty()) {
+                return def;
+            }
+            int rgb = Integer.parseInt(h, 16);
+            return Color.fromRGB(rgb);
+        } catch (Exception e) {
+            return def;
         }
     }
 

@@ -2,6 +2,7 @@ package dev.qqregions.selection;
 
 import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
+import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -16,12 +17,15 @@ import java.util.UUID;
 
 /**
  * Хранилище выделений и интерактивных сессий выделения.
+ * Для обычных команд выделения (pos, chunk, expand, ...) поддерживает
+ * подсветку выделения через SelectionView (частицы или блок-дисплеи).
  */
 public class SelectionManager implements Listener {
 
     private final QQRegions plugin;
     private final Map<UUID, Selection> selections = new HashMap<>();
     private final Map<UUID, InteractSession> sessions = new HashMap<>();
+    private final Map<UUID, SelectionView> views = new HashMap<>();
 
     public SelectionManager(QQRegions plugin) {
         this.plugin = plugin;
@@ -52,7 +56,12 @@ public class SelectionManager implements Listener {
     }
 
     public void reset(Player player) {
-        selections.remove(player.getUniqueId());
+        UUID id = player.getUniqueId();
+        selections.remove(id);
+        SelectionView v = views.remove(id);
+        if (v != null) {
+            v.cleanup();
+        }
     }
 
     // ---------- шаблоны прав ----------
@@ -106,6 +115,10 @@ public class SelectionManager implements Listener {
         InteractSession s = new InteractSession(plugin, player);
         s.start();
         sessions.put(player.getUniqueId(), s);
+        SelectionView v = views.remove(player.getUniqueId());
+        if (v != null) {
+            v.cleanup();
+        }
         return true;
     }
 
@@ -125,11 +138,63 @@ public class SelectionManager implements Listener {
             s.end();
         }
         sessions.clear();
+        for (SelectionView v : views.values()) {
+            v.cleanup();
+        }
+        views.clear();
     }
 
     public void tick() {
         for (InteractSession s : sessions.values()) {
             s.update();
+        }
+        renderCommandSelections();
+    }
+
+    /** Подсветка выделений, созданных обычными командами (не через сессию). */
+    private void renderCommandSelections() {
+        if (!plugin.config().commandSelectionView()) {
+            if (!views.isEmpty()) {
+                for (SelectionView v : views.values()) {
+                    v.cleanup();
+                }
+                views.clear();
+            }
+            return;
+        }
+        views.entrySet().removeIf(e -> {
+            UUID id = e.getKey();
+            if (!selections.containsKey(id)) {
+                e.getValue().cleanup();
+                return true;
+            }
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline()) {
+                e.getValue().cleanup();
+                return true;
+            }
+            return false;
+        });
+        for (Map.Entry<UUID, Selection> se : selections.entrySet()) {
+            UUID id = se.getKey();
+            if (sessions.containsKey(id)) {
+                continue; // сессия рисует сама
+            }
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline()) {
+                continue;
+            }
+            Selection sel = se.getValue();
+            if (!p.getWorld().equals(sel.getWorld())) {
+                continue;
+            }
+            Config cfg = plugin.config();
+            SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
+            if (cfg.blockView()) {
+                v.update(sel, cfg.pointStyle(2).highlight, cfg.pointStyle(2).block, null);
+            } else {
+                v.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
+            }
         }
     }
 
@@ -137,11 +202,21 @@ public class SelectionManager implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
         endSession(e.getPlayer());
+        SelectionView v = views.remove(id);
+        if (v != null) {
+            v.cleanup();
+        }
     }
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
         endSession(e.getPlayer());
+        SelectionView v = views.remove(id);
+        if (v != null) {
+            v.cleanup();
+        }
     }
 }

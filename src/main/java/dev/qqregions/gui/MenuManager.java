@@ -281,15 +281,36 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Текущее значение флага (через заполнитель WorldGuard) для группы кнопки. */
+    /**
+     * Текущее значение флага для группы кнопки.
+     * Для группы "all" читаем напрямую из API региона (работает без PAPI);
+     * для остальных групп — через заполнитель WorldGuard.
+     */
     private String currentValue(OpenMenu om, MenuItem item) {
         String id = item.flag();
         String group = item.group();
+        if (group == null || group.equalsIgnoreCase("all")) {
+            String worldName = om.ctx.get("world");
+            if (worldName != null) {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorld(worldName);
+                ProtectedRegion region = w == null ? null : plugin.wg().byName(w, om.ctx.get("region"));
+                Flag<?> flag = region == null ? null : plugin.wg().flag(id);
+                if (w != null && region != null && flag != null) {
+                    String v = plugin.wg().flagValue(w, region, flag);
+                    if (v != null && !v.isEmpty()) {
+                        return v.trim().toLowerCase(java.util.Locale.ROOT);
+                    }
+                }
+            }
+        }
         String ph = (group == null || group.equalsIgnoreCase("all"))
                 ? "%worldguard_region_has_flag_" + id + "%"
                 : "%worldguard_region_has_flag_" + id + ":" + group + "%";
         String value = dev.qqregions.util.Papi.set(om.player, ph);
-        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value == null || value.isBlank() || value.contains("%")) {
+            return "";
+        }
+        return value.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Следующее значение в цикле states (или allow&lt;-&gt;deny для StateFlag). */
@@ -367,7 +388,8 @@ public class MenuManager implements Listener {
         plugin.wg().setFlagValue(world, region, flag, value);
         OpenMenu om = open.get(p.getUniqueId());
         if (om != null) {
-            render(p, om.menu, om.ctx, 0, om.role);
+            // сохраняем текущую страницу (не сбрасываем на первую)
+            render(p, om.menu, om.ctx, om.page, om.role);
         }
     }
 

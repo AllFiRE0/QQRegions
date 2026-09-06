@@ -11,10 +11,10 @@ import dev.qqregions.wg.RegionException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BossBar;
@@ -24,10 +24,7 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Интерактивная сессия выделения (/region select).
@@ -60,8 +57,10 @@ public class InteractSession {
 
     private BossBar bar;
     private NamespacedKey barKey;
-    private int particleTimer = 0;
     private int barTimer = 0;
+
+    /** Общий рендер выделения (частицы или блок-дисплеи). */
+    private final SelectionView view;
 
     /** Мир, в котором живёт сессия (для сброса WE-селекции). */
     private final World world;
@@ -74,16 +73,14 @@ public class InteractSession {
         this.contents = inv.getContents().clone();
         this.armor = inv.getArmorContents().clone();
         this.offhand = inv.getItemInOffHand().clone();
+        this.view = new SelectionView(plugin, player);
     }
 
     public void start() {
         PlayerInventory inv = player.getInventory();
         inv.clear();
         inv.setItemInOffHand(null);
-        inv.setItem(SLOT_CREATE, button("create", "select.button-create"));
-        inv.setItem(SLOT_SELECT, button("select", "select.button-select"));
-        inv.setItem(SLOT_RESET, button("reset", "select.button-reset"));
-        inv.setItem(SLOT_CANCEL, button("cancel", "select.button-cancel"));
+        renderButtons();
         inv.setHeldItemSlot(SLOT_SELECT);
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-on"));
         player.sendMessage(plugin.lang().comp("select.interactive-help"));
@@ -101,6 +98,34 @@ public class InteractSession {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /** Раскладка «четыре кнопки» вне режима выделения. */
+    private void renderButtons() {
+        PlayerInventory inv = player.getInventory();
+        for (int slot = 0; slot < 9; slot++) {
+            inv.setItem(slot, null);
+        }
+        inv.setItem(SLOT_CREATE, button("create", "select.button-create"));
+        inv.setItem(SLOT_SELECT, button("select", "select.button-select"));
+        inv.setItem(SLOT_RESET, button("reset", "select.button-reset"));
+        inv.setItem(SLOT_CANCEL, button("cancel", "select.button-cancel"));
+    }
+
+    /** Раскладка «стеклянные панели» в режиме выделения: все 9 слотов. */
+    private void renderSelectHotbar() {
+        PlayerInventory inv = player.getInventory();
+        Config.PointStyle style = plugin.config().pointStyle(activePoint);
+        ItemStack pane = new ItemStack(style.pane);
+        ItemMeta meta = pane.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Msg.color(plugin.lang().get(
+                    activePoint == 1 ? "select.point-pane-1" : "select.point-pane-2")));
+            pane.setItemMeta(meta);
+        }
+        for (int slot = 0; slot < 9; slot++) {
+            inv.setItem(slot, pane.clone());
+        }
     }
 
     private NamespacedKey buttonKey() {
@@ -151,10 +176,16 @@ public class InteractSession {
         plugin.dbg("toggleSelect -> " + selectingMode);
         if (selectingMode) {
             SelectionManager mgr = plugin.selections();
-            BlockVector3 feet = feet(player);
-            Selection sel = new Selection(player.getWorld(), feet.withY(feet.getBlockY() + 1), feet);
-            mgr.set(player, mgr.clampToWorld(sel));
-            activePoint = 2;
+            if (mgr.get(player) == null) {
+                // Первая точка — на теле игрока, вторая — в ногах; дальше свободно.
+                BlockVector3 feet = feet(player);
+                Selection sel = new Selection(player.getWorld(), feet.withY(feet.getBlockY() + 1), feet);
+                mgr.set(player, mgr.clampToWorld(sel));
+            }
+            activePoint = 1;
+            renderSelectHotbar();
+        } else {
+            renderButtons();
         }
         syncWorldEdit();
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
@@ -180,6 +211,7 @@ public class InteractSession {
         inv.setItemInOffHand(offhand);
         inv.setContents(contents);
         hideBar();
+        view.cleanup();
         clearWorldEdit();
         if (player.isOnline()) {
             player.sendMessage(plugin.lang().compPrefixed("select.interactive-off"));
@@ -201,10 +233,35 @@ public class InteractSession {
         if (!selectingMode) {
             return;
         }
-        activePoint = activePoint == 1 ? 2 : 1;
+        if (player.isSneaking()) {
+            confirm();
+            return;
+        }
+        setActivePoint(activePoint == 1 ? 2 : 1);
+    }
+
+    public void setActivePoint(int point) {
+        activePoint = point;
+        renderSelectHotbar();
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
                 "point", plugin.lang().fmt("select.point-" + activePoint)));
         plugin.dbg("point switch -> " + activePoint);
+    }
+
+    /** ЛКМ+Шифт: подтвердить выделение и вернуться к четырём кнопкам. */
+    private void confirm() {
+        selectingMode = false;
+        renderButtons();
+        invHoldSelectSlot();
+        syncWorldEdit();
+        Selection sel = plugin.selections().get(player);
+        long blocks = sel == null ? 0 : sel.volume();
+        player.sendMessage(plugin.lang().compPrefixed("select.confirmed", "blocks", fmt(blocks)));
+        plugin.dbg("select confirmed: " + blocks + " blocks");
+    }
+
+    private void invHoldSelectSlot() {
+        player.getInventory().setHeldItemSlot(SLOT_SELECT);
     }
 
     public void onWheel(boolean scrollUp) {
@@ -224,6 +281,12 @@ public class InteractSession {
         }
         plugin.selections().set(player, plugin.selections().clampToWorld(sel.withPoint(activePoint, next)));
         syncWorldEdit();
+        Selection moved = plugin.selections().get(player);
+        if (moved != null) {
+            Config cfg = plugin.config();
+            Color c = cfg.pointStyle(activePoint).highlight;
+            view.renderNow(moved, c, cfg.pointStyle(activePoint).block, moved.getPos(activePoint));
+        }
         plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next);
     }
 
@@ -267,12 +330,6 @@ public class InteractSession {
         int steps = forward ? step : -step;
         int nx = cur.getBlockX() + (int) Math.round(dx * steps);
         int nz = cur.getBlockZ() + (int) Math.round(dz * steps);
-        if (steps < 0) {
-            int px = eye.getBlockX();
-            int pz = eye.getBlockZ();
-            nx = clamp(nx, Math.min(px, cur.getBlockX()), Math.max(px, cur.getBlockX()));
-            nz = clamp(nz, Math.min(pz, cur.getBlockZ()), Math.max(pz, cur.getBlockZ()));
-        }
         return BlockVector3.at(nx, cur.getBlockY(), nz);
     }
 
@@ -315,18 +372,15 @@ public class InteractSession {
         Selection sel = plugin.selections().get(player);
         if (sel == null) {
             hideBar();
+            view.cleanup();
             return;
         }
         Config cfg = plugin.config();
-
-        if (cfg.particles().enabled) {
-            particleTimer += 5;
-            if (particleTimer >= cfg.particles().updateTicks) {
-                particleTimer = 0;
-                renderParticles(sel, cfg.particles());
-            }
+        if (selectingMode) {
+            view.update(sel, cfg.pointStyle(activePoint).highlight,
+                    cfg.pointStyle(activePoint).block, sel.getPos(activePoint));
         } else {
-            particleTimer = 0;
+            view.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
         }
 
         if (cfg.bossbar().enabled) {
@@ -337,74 +391,6 @@ public class InteractSession {
             }
         } else {
             hideBar();
-        }
-    }
-
-    private void renderParticles(Selection sel, Config.ParticleOptions po) {
-        World world = sel.getWorld();
-        Particle particle;
-        try {
-            particle = Particle.valueOf(po.particleName.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            particle = Particle.DUST;
-        }
-        Object data = null;
-        if (particle == Particle.DUST) {
-            data = new Particle.DustOptions(po.dustColor, po.dustSize);
-        }
-        List<BlockVector3> pts = edgePoints(sel, po.density, po.maxPoints);
-        for (BlockVector3 p : pts) {
-            world.spawnParticle(particle,
-                    p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5,
-                    po.amount, 0.0, 0.0, 0.0, po.speed, data);
-        }
-    }
-
-    private static List<BlockVector3> edgePoints(Selection sel, int density, int maxPoints) {
-        int d = Math.max(0, density);
-        BlockVector3 mn = sel.min();
-        BlockVector3 mx = sel.max();
-        int x1 = mn.getBlockX(), y1 = mn.getBlockY(), z1 = mn.getBlockZ();
-        int x2 = mx.getBlockX(), y2 = mx.getBlockY(), z2 = mx.getBlockZ();
-
-        List<BlockVector3> out = new ArrayList<>();
-        Set<Long> seen = new HashSet<>();
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x2, y1, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x1, y1, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z1), BlockVector3.at(x2, y1, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z2), BlockVector3.at(x2, y1, z2), d);
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z1), BlockVector3.at(x2, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z1), BlockVector3.at(x1, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y2, z1), BlockVector3.at(x2, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y2, z2), BlockVector3.at(x2, y2, z2), d);
-
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z1), BlockVector3.at(x1, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z1), BlockVector3.at(x2, y2, z1), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x1, y1, z2), BlockVector3.at(x1, y2, z2), d);
-        addLine(out, seen, maxPoints, BlockVector3.at(x2, y1, z2), BlockVector3.at(x2, y2, z2), d);
-
-        return out;
-    }
-
-    private static void addLine(List<BlockVector3> out, Set<Long> seen, int maxPoints,
-                                BlockVector3 a, BlockVector3 b, int density) {
-        int len = Math.abs(a.getBlockX() - b.getBlockX())
-                + Math.abs(a.getBlockY() - b.getBlockY())
-                + Math.abs(a.getBlockZ() - b.getBlockZ());
-        int steps = density <= 0 || len == 0 ? 1 : Math.max(1, len / density + 1);
-        for (int i = 0; i <= steps; i++) {
-            if (out.size() >= maxPoints) {
-                return;
-            }
-            int x = a.getBlockX() + (b.getBlockX() - a.getBlockX()) * i / steps;
-            int y = a.getBlockY() + (b.getBlockY() - a.getBlockY()) * i / steps;
-            int z = a.getBlockZ() + (b.getBlockZ() - a.getBlockZ()) * i / steps;
-            long key = ((long) (x + 30000000) << 42) | ((long) (y + 1024) << 21) | (z + 30000000);
-            if (seen.add(key)) {
-                out.add(BlockVector3.at(x, y, z));
-            }
         }
     }
 

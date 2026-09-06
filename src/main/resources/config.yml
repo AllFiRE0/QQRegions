@@ -108,6 +108,33 @@ interactive:
   # Передавать наше выделение в WorldEdit-селекцию игрока, чтобы
   # sVis (Selection Visualizer) автоматически подсвечивал область.
   sync-worldedit: true
+  # Как отображать выделение игроку:
+  #   PARTICLES — обычные частицы (DUST) по рёбрам объёма,
+  #   BLOCKS    — миниатюрные Block Display + glow в цвете точки.
+  view-mode: PARTICLES
+  # Подсвечивать выделение и для обычных команд (/region select pos 1,
+  # select chunk, select expand ...), не только в интерактивной сессии.
+  command-selection-view: true
+  # Дальность показа подсветки выделения от игрока (в блоках).
+  view-distance: 200
+  # Потолок одновременно существующих блоков-дисплеев (защита от лагов).
+  view-max-blocks: 500
+  # Размер блоков-дисплеев (относительный; маркер активной точки крупнее).
+  view-block-scale: 0.35
+  # Стили точек в режиме выделения: стеклянные панели хотбара (все 9
+  # слотов), цвет частиц активной точки/области и цветной блок-дисплей.
+  # pane — материал панели, highlight — цвет частиц/свечения (#RRGGBB),
+  # block — материал блок-дисплея (для view-mode: BLOCKS).
+  # Имена панелей настраиваются в lang.yml (select.point-pane-1/2).
+  select-points:
+    point-1:
+      pane: DARK_GRAY_STAINED_GLASS_PANE
+      highlight: "#6b6b6b"      # тёмно-серый
+      block: GRAY_CONCRETE
+    point-2:
+      pane: YELLOW_STAINED_GLASS_PANE
+      highlight: "#ffa500"      # оранжевый
+      block: ORANGE_CONCRETE
 
 # ------------------------------------------------------------
 # Частицы выделения
