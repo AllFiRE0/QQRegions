@@ -34,7 +34,7 @@ public class SelectionView {
     private final QQRegions plugin;
     private final Player player;
     /** Точки-кубики контура: ключ = позиция блока, значение = дисплей. */
-    private final Map<Long, Entity> viewBlocks = new HashMap<>();
+    private final Map<BlockVector3, Entity> viewBlocks = new HashMap<>();
     private Entity viewMarker;
     private Entity viewMarker2;
     private int timer = 0;
@@ -161,17 +161,17 @@ public class SelectionView {
         List<BlockVector3> points = edgePoints(sel, Math.max(24, cfg.viewDotsPerEdge() * 12));
 
         List<BlockVector3> need = new ArrayList<>();
-        List<Long> spare = new ArrayList<>();
+        List<BlockVector3> spare = new ArrayList<>();
         for (BlockVector3 p : points) {
-            if (!viewBlocks.containsKey(blockKey(p))) {
+            if (!viewBlocks.containsKey(p)) {
                 need.add(p);
             }
         }
-        Set<Long> wanted = new HashSet<>();
+        Set<BlockVector3> wanted = new HashSet<>();
         for (BlockVector3 p : points) {
-            wanted.add(blockKey(p));
+            wanted.add(p);
         }
-        for (Long key : new ArrayList<>(viewBlocks.keySet())) {
+        for (BlockVector3 key : new ArrayList<>(viewBlocks.keySet())) {
             if (!wanted.contains(key)) {
                 spare.add(key);
             }
@@ -191,10 +191,10 @@ public class SelectionView {
                 }
             }
             if (ent == null) {
-                viewBlocks.put(blockKey(p), spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale()));
+                viewBlocks.put(p, spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale()));
             } else {
                 ent.teleport(displayLoc(world, p));
-                viewBlocks.put(blockKey(p), ent);
+                viewBlocks.put(p, ent);
             }
             changed = true;
         }
@@ -272,12 +272,6 @@ public class SelectionView {
         return new Location(world, p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5);
     }
 
-    private static long blockKey(BlockVector3 p) {
-        return ((long) (p.getBlockX() + 30000000) << 42)
-                | ((long) (p.getBlockY() + 1024) << 21)
-                | (p.getBlockZ() + 30000000);
-    }
-
     /**
      * Пунктир по всем 12 рёбрам по правилу «20б -> 1·0·1, 40б -> 1·0·0·1,
      * и т.д.»: у КАЖДОГО ребра почти равный бюджет точек (cap/12),
@@ -319,7 +313,7 @@ public class SelectionView {
         // рисуется полностью — ни одна грань (в т.ч. вертикальная) не
         // пропускается, бюджет соблюдается.
         List<BlockVector3> out = new ArrayList<>(Math.min(cap + 16, 4096));
-        Set<Long> seen = new HashSet<>();
+        Set<BlockVector3> seen = new HashSet<>();
         int[] ns = new int[edges.length];
         for (int i = 0; i < edges.length; i++) {
             ns[i] = edges[i].n;
@@ -327,14 +321,14 @@ public class SelectionView {
         for (Edge e : edges) {
             while (e.hasNext()) {
                 BlockVector3 p = e.next();
-                if (seen.add(blockKey(p))) {
+                if (seen.add(p)) {
                     out.add(p);
                 }
             }
         }
         if (plugin.config().debug()) {
-            plugin.getLogger().info("[selection-view] куб "
-                    + sx + "x" + sy + "x" + sz
+            plugin.getLogger().info("[selection-view] " + mn + ".." + mx
+                    + " куб " + sx + "x" + sy + "x" + sz
                     + " cap=" + cap + " perEdge=" + perEdge
                     + " точек=" + out.size()
                     + " низ=" + arr(ns, 0, 4)
