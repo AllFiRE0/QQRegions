@@ -25,7 +25,7 @@ public class RegionCommand {
 
     private static final List<String> SUBCOMMANDS = List.of(
             "select", "create", "delete", "info", "add", "remove", "flags", "reload", "help",
-            "visible", "view");
+            "visible", "view", "sell", "rent", "buy", "tenant", "market");
 
     private final QQRegions plugin;
     private final SelectCommand selectCommand;
@@ -71,6 +71,13 @@ public class RegionCommand {
             case "view":
                 doVisible(sender, args);
                 return true;
+            case "sell":
+            case "rent":
+            case "buy":
+            case "tenant":
+            case "market":
+                doMarket(sender, label, args);
+                return true;
             default:
                 lang(sender, "general.unknown-subcommand", "alias", label);
                 return true;
@@ -105,6 +112,7 @@ public class RegionCommand {
             plugin.replace().reload();
             plugin.commands().register();
             plugin.menus().reload();
+            plugin.market().reload();
             lang(sender, "general.reloaded");
             lang(sender, "general.reloaded-summary", "aliases", String.join(", ", plugin.config().aliases()));
         } catch (Throwable t) {
@@ -347,10 +355,12 @@ public class RegionCommand {
             lang(p, "visible.disabled");
             return;
         }
-        // /region visible type <particles|blocks> — тип подсветки по умолчанию
+        // /region visible type <particles|blocks|territory> — тип подсветки по умолчанию
         if (args.length >= 2 && args[1].equalsIgnoreCase("type")) {
             if (args.length < 3) {
-                lang(p, "general.usage", "usage", plugin.config().commandName() + " visible type <particles|blocks>");
+                // Без аргумента — показать текущий тип и доступные.
+                lang(p, "visible.type-current", "type", plugin.highlight().typeOf(p),
+                        "types", String.join(", ", HIGHLIGHT_TYPES));
                 return;
             }
             String type = args[2].toLowerCase(Locale.ROOT);
@@ -393,9 +403,213 @@ public class RegionCommand {
         }
     }
 
-    private static boolean isViewType(String type) {
+    private static final List<String> HIGHLIGHT_TYPES = List.of("particles", "blocks", "territory");
+
+private static boolean isViewType(String type) {
         String t = type.toLowerCase(Locale.ROOT);
-        return t.equals("particles") || t.equals("blocks");
+        return t.equals("particles") || t.equals("blocks") || t.equals("territory");
+    }
+
+    // ---------- рынок (sell / rent / buy / tenant / market) ----------
+
+    /** Диспетчер рыночных подкоманд. */
+    private void doMarket(CommandSender sender, String label, String[] args) {
+        if (requirePlayer(sender)) {
+            return;
+        }
+        Player p = (Player) sender;
+        if (!adminPerm(p, "qqregions.market")) {
+            lang(p, "general.no-permission");
+            return;
+        }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("market")) {
+            // /region market — меню рынка
+            boolean opened = plugin.menus().openMarket(p);
+            if (!opened) {
+                lang(p, "market.menu-disabled");
+            }
+            return;
+        }
+        if (!plugin.market().enabled()) {
+            lang(p, plugin.config().market().enabled ? "market.economy-off" : "market.disabled");
+            return;
+        }
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+        if (action.equals("accept") || action.equals("decline")
+                || action.equals("cancel") || action.equals("list")) {
+            String offerId = args.length > 2 ? args[2] : null;
+            if (action.equals("list")) {
+                for (dev.qqregions.market.Offer o : plugin.market().mine(p.getUniqueId())) {
+                    String who = o.kind == dev.qqregions.market.Offer.Kind.SALE
+                            ? plugin.market().nameOf(o.buyer)
+                            : plugin.market().nameOf(o.tenant);
+                    lang(p, "market.list-line",
+                            "type", o.kind == dev.qqregions.market.Offer.Kind.SALE ? "продажа" : "аренда",
+                            "region", o.region,
+                            "world", o.world,
+                            "status", o.status.name().toLowerCase(java.util.Locale.ROOT),
+                            "price", plugin.market().economy().format(o.price),
+                            "who", who,
+                            "id", o.id.toString().substring(0, 8));
+                }
+                return;
+            }
+            dev.qqregions.market.Offer o = plugin.market().byId(offerId);
+            if (o == null) {
+                lang(p, "market.not-found");
+                return;
+            }
+            String res;
+            if (action.equals("accept")) {
+                res = plugin.market().accept(o, p);
+                if ("ok".equals(res)) {
+                    lang(p, "market.accepted-" + sub, "region", o.region);
+                } else {
+                    lang(p, "market.error-" + res, "region", o.region);
+                }
+            } else if (action.equals("decline")) {
+                res = plugin.market().decline(o, p);
+                lang(p, "ok".equals(res) ? "market.declined" : "market.error-" + res, "region", o.region);
+            } else if (action.equals("cancel")) {
+                res = plugin.market().cancel(o, p);
+                lang(p, "ok".equals(res) ? "market.cancelled" : "market.error-" + res, "region", o.region);
+            }
+            return;
+        }
+
+        // найдём регион (по аргументу или текущий под игроком)
+        String regionName = null;
+        if (sub.equals("sell") || sub.equals("rent")) {
+            if (args.length < 3) {
+                lang(p, "general.usage",
+                        "usage", label + " " + sub + " <ник> <сумма>"
+                                + (sub.equals("rent") ? " <время>" : "") + " [регион]");
+                return;
+            }
+            regionName = args.length > (sub.equals("rent") ? 4 : 3)
+                    ? args[sub.equals("rent") ? 4 : 3] : null;
+        } else {
+            regionName = args.length > 1 ? args[1] : null;
+        }
+        ProtectedRegion region = resolveRegion(p, regionName);
+        if (region == null) {
+            lang(p, "market.no-region");
+            return;
+        }
+        if (!sub.equals("buy") && !sub.equals("tenant") && !plugin.wg().owns(region, p)
+                && !adminPerm(p, "qqregions.admin")) {
+            lang(p, "market.not-owner", "region", region.getId());
+            return;
+        }
+        double price;
+        long periodMillis;
+        switch (sub) {
+            case "sell": {
+                price = parsePrice(args[2]);
+                if (price <= 0) {
+                    lang(p, "market.bad-price");
+                    return;
+                }
+                boolean ok = plugin.market().createSale(p, args[1], price, p.getWorld(), region, false);
+                if (ok) {
+                    lang(p, "market.sale-offer-made", "target", args[1],
+                            "region", region.getId(), "price", plugin.market().economy().format(price));
+                } else {
+                    lang(p, "market.already-offer", "region", region.getId());
+                }
+                break;
+            }
+            case "rent": {
+                if (args.length < 4) {
+                    lang(p, "general.usage", "usage", label + " rent <ник> <сумма> <время> [регион]");
+                    return;
+                }
+                price = parsePrice(args[2]);
+                periodMillis = parsePeriod(args[3]);
+                if (price <= 0 || periodMillis <= 0) {
+                    lang(p, "market.bad-args");
+                    return;
+                }
+                boolean ok = plugin.market().createRent(p, args[1], price, periodMillis,
+                        p.getWorld(), region, false);
+                if (ok) {
+                    lang(p, "market.rent-offer-made", "target", args[1],
+                            "region", region.getId(),
+                            "price", plugin.market().economy().format(price));
+                } else {
+                    lang(p, "market.already-offer", "region", region.getId());
+                }
+                break;
+            }
+            case "buy": {
+                boolean ok = plugin.market().createSale(p, firstOwnerName(region), 0,
+                        p.getWorld(), region, true);
+                if (ok) {
+                    lang(p, "market.buy-request-made", "region", region.getId());
+                } else {
+                    lang(p, "market.already-offer", "region", region.getId());
+                }
+                break;
+            }
+            case "tenant": {
+                long dur = 1000L * 60L * 60L * 24L * 7L; // 1 неделя по умолчанию
+                boolean ok = plugin.market().createRent(p, firstOwnerName(region),
+                        0, dur, p.getWorld(), region, true);
+                if (ok) {
+                    lang(p, "market.tenant-request-made", "region", region.getId());
+                } else {
+                    lang(p, "market.already-offer", "region", region.getId());
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    private static String firstOwnerName(ProtectedRegion region) {
+        for (java.util.UUID u : region.getOwners().getUniqueIds()) {
+            OfflinePlayer op = Bukkit.getOfflinePlayer(u);
+            return op.getName() != null ? op.getName() : u.toString();
+        }
+        return "";
+    }
+
+    private static double parsePrice(String s) {
+        try {
+            return Double.parseDouble(s.replace(',', '.'));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Время аренды: 1d=сутки, 1w=неделя, 1m=месяц, 1y=год, 30 = 30 минут, 2h=часы. */
+    private static long parsePeriod(String s) {
+        if (s == null || s.isEmpty()) {
+            return -1;
+        }
+        String t = s.trim().toLowerCase(Locale.ROOT);
+        try {
+            if (t.endsWith("d")) {
+                return Long.parseLong(t.substring(0, t.length() - 1)) * 24L * 3600_000L;
+            }
+            if (t.endsWith("w")) {
+                return Long.parseLong(t.substring(0, t.length() - 1)) * 7L * 24L * 3600_000L;
+            }
+            if (t.endsWith("m")) {
+                return Long.parseLong(t.substring(0, t.length() - 1)) * 30L * 24L * 3600_000L;
+            }
+            if (t.endsWith("y")) {
+                return Long.parseLong(t.substring(0, t.length() - 1)) * 365L * 24L * 3600_000L;
+            }
+            if (t.endsWith("h")) {
+                return Long.parseLong(t.substring(0, t.length() - 1)) * 3600_000L;
+            }
+            return Long.parseLong(t) * 60_000L;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     // ---------- вспомогательное ----------
@@ -481,7 +695,7 @@ public class RegionCommand {
             }
         }
         if (sub.equals("visible") || sub.equals("view")) {
-            // /region visible [название|off|type] [particles|blocks]
+            // /region visible [название|off|type] [particles|blocks|territory]
             if (args.length == 2) {
                 List<String> opts = new ArrayList<>(List.of("off", "type"));
                 opts.addAll(plugin.wg().visibleNames(p.getWorld(), p));
@@ -489,9 +703,31 @@ public class RegionCommand {
                 return out;
             }
             if (args.length == 3 && args[1].equalsIgnoreCase("type")) {
-                out.addAll(filtered(List.of("particles", "blocks"), args, 2));
+                out.addAll(filtered(HIGHLIGHT_TYPES, args, 2));
                 return out;
             }
+            return filtered(out, args, args.length - 1);
+        }
+        if (sub.equals("sell") || sub.equals("rent") || sub.equals("buy")
+                || sub.equals("tenant") || sub.equals("market")) {
+            // /region sell|rent|buy|tenant [акция] [регион]
+            List<String> opts;
+            if (sub.equals("sell") || sub.equals("rent")) {
+                opts = new ArrayList<>(List.of("accept", "decline", "cancel", "list"));
+            } else if (sub.equals("buy") || sub.equals("tenant")) {
+                opts = new ArrayList<>(List.of("accept", "decline", "list"));
+            } else {
+                opts = new ArrayList<>(List.of("open", "list"));
+            }
+            if (args.length == 2) {
+                out.addAll(filtered(opts, args, 1));
+                return out;
+            }
+            if (args.length == 3) {
+                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 2));
+                return out;
+            }
+            return filtered(out, args, args.length - 1);
         }
         return filtered(out, args, args.length - 1);
     }

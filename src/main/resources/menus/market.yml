@@ -1,0 +1,76 @@
+# ============================================================
+#  QQRegions — меню рынка (/region market)
+#  Список живых предложений: продажа/аренда регионов.
+#  Открывается командой /region market и кнопками меню владельца.
+#
+#  Динамические кнопки строятся из market.yml (предложения):
+#    {market-type} {market-region} {market-world} {market-price}
+#    {market-who} {market-owner} {market-status}
+#  ЛКМ — принять предложение, ПКМ — отменить своё.
+#
+#  Рынок требует Vault (softdepend) и market.enabled: true в config.yml.
+# ============================================================
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Рынок регионов"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "info":
+        slot: 45
+        material: PAPER
+        name: "&eПомощь рынка"
+        lore:
+          - "&7/region sell <ник> <сумма> — продать"
+          - "&7/region rent <ник> <сумма> <время> — сдать"
+          - "&7/region buy [регион] — запрос на покупку"
+          - "&7/region tenant [регион] — запрос аренды"
+        commands:
+          - "close"
+    menu-slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        slot: 47
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        slot: 51

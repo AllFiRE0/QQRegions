@@ -22,6 +22,8 @@ public class Lang {
 
     private final QQRegions plugin;
     private FileConfiguration cfg;
+    /** Встроенные переводы из jar — опора для пустых/битых значений файла. */
+    private FileConfiguration defs;
 
     public Lang(QQRegions plugin) {
         this.plugin = plugin;
@@ -54,12 +56,30 @@ public class Lang {
         if (loaded == null || loaded.getKeys(false).isEmpty()) {
             // битый/пустой файл — работаем на встроенных переводах, чтобы
             // сообщения не были пустыми; файл игрока не перезаписываем.
-            cfg = defs;
+            cfg = defsLocal(defs);
+            this.defs = defs;
             return;
         }
         cfg = loaded;
         cfg.setDefaults(defs);
         cfg.options().copyDefaults(true);
+        // Лечим пустые значения: если в файле игрока строка пустая, а во
+        // встроенном переводе не пустая — восстанавливаем (иначе в чате
+        // оставался бы только префикс [QQRegions]).
+        for (String key : defs.getKeys(true)) {
+            if (!defs.isString(key)) {
+                continue;
+            }
+            String dv = defs.getString(key, "");
+            if (dv.isEmpty()) {
+                continue;
+            }
+            String own = cfg.getString(key, null);
+            if (own == null || own.isEmpty()) {
+                cfg.set(key, dv);
+            }
+        }
+        this.defs = defs;
         try {
             cfg.save(file);
         } catch (IOException e) {
@@ -67,8 +87,27 @@ public class Lang {
         }
     }
 
+    /** Копия дефолтов: get(..) может мутировать конфиг при copyDefaults. */
+    private static FileConfiguration defsLocal(FileConfiguration in) {
+        FileConfiguration copy = new YamlConfiguration();
+        for (String key : in.getKeys(true)) {
+            copy.set(key, in.get(key));
+        }
+        return copy;
+    }
+
     public String get(String key) {
         String v = cfg.getString(key);
+        if (v == null || v.isEmpty()) {
+            // Файл игрока пуст/сломан — подстраховываемся встроенным переводом.
+            if (defs != null) {
+                String d = defs.getString(key, "");
+                if (!d.isEmpty()) {
+                    return d;
+                }
+            }
+            plugin.dbg("no lang value for '" + key + "'");
+        }
         return v == null ? "" : v;
     }
 

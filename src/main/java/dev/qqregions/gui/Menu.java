@@ -45,6 +45,7 @@ public class Menu {
 
     private final DynamicFlags dyn;
     private final DynamicPlayers dynPlayers;
+    private final List<Integer> extraSlots = new ArrayList<>();
     private MenuItem navPrev;
     private MenuItem navNext;
 
@@ -109,9 +110,10 @@ public class Menu {
         return dynPlayers;
     }
 
-    /** Есть ли активная динамическая секция (флаги или игроки). */
+    /** Есть ли активная динамическая секция (флаги, игроки или menu-slots). */
     private boolean dynamicEnabled() {
-        return (dyn != null && dyn.enabled) || (dynPlayers != null && dynPlayers.enabled);
+        return (dyn != null && dyn.enabled) || (dynPlayers != null && dynPlayers.enabled)
+                || !extraSlots.isEmpty();
     }
 
     /** Пул слотов под динамические кнопки (из активной секции). */
@@ -121,6 +123,9 @@ public class Menu {
         }
         if (dynPlayers != null && dynPlayers.enabled) {
             return dynPlayers.slots;
+        }
+        if (!extraSlots.isEmpty()) {
+            return extraSlots;
         }
         return java.util.List.of(9);
     }
@@ -157,8 +162,9 @@ public class Menu {
     // ---------- динамические кнопки флагов ----------
 
     /**
-     * Строит список кнопок флагов (флаг x группа) из реестра WorldGuard
-     * (WG + WGEFP + любые другие плагины).
+     * Строит список кнопок флагов — ОДНА кнопка на флаг (устраняет дубли 5x).
+     * Кнопка показывает текущую группу флага; ЛКМ = переключить значение
+     * (для текущей группы), ПКМ = сменить группу (см. MenuManager.onClick).
      */
     public List<MenuItem> dynamicFlags(QQRegions plugin, Player player, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
@@ -173,6 +179,7 @@ public class Menu {
         } catch (Throwable ignored) {
         }
 
+        boolean admin = player.hasPermission("qqregions.admin") || player.isOp();
         for (Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
             String key = id == null ? "" : id.toLowerCase(Locale.ROOT);
@@ -180,51 +187,66 @@ public class Menu {
                 continue;
             }
             // право на флаг: qqregions.flags.<flag> (выдаётся в LuckPerms);
-            // пустой префикс = флаг доступен всем
+            // админы видят все флаги; пустой префикс = флаг доступен всем
             String perm = dyn.permissionPrefix + key;
-            if (!dyn.permissionPrefix.isEmpty() && !player.hasPermission(perm)) {
+            if (!dyn.permissionPrefix.isEmpty() && !admin && !player.hasPermission(perm)) {
                 continue;
             }
             boolean state = flag instanceof StateFlag;
-            for (String group : dyn.groups) {
-                String flagGroup = group.equalsIgnoreCase("all") ? id : id + ":" + group;
-                // У флага ОДНА группа: значение видно только на кнопке той
-                // группы, которая сейчас стоит у флага (для остальных "").
-                String value = (world != null && region != null)
-                        ? plugin.wg().flagValueFor(world, region, flag, group)
-                        : "";
-                String currentGroup = (world != null && region != null)
-                        ? plugin.wg().flagGroup(world, region, flag)
-                        : "all";
-                String currentMark = currentGroup.equalsIgnoreCase(group) ? " &a✓" : "";
-                String groupLabel = plugin.replace().resolve("flag-groups", group);
-                String currentGroupLabel = plugin.replace().resolve("flag-groups", currentGroup);
-                String valueLabel = value.isEmpty()
-                        ? "&7не задано"
-                        : plugin.replace().resolve("flag-values", value);
 
-                Map<String, String> fc = new LinkedHashMap<>(ctx);
-                fc.put("flag", id);
-                fc.put("flag-value", value);
-                fc.put("flag-value-label", valueLabel);
-                fc.put("group", group);
-                fc.put("group-label", groupLabel);
-                fc.put("group-current", currentMark);
-                fc.put("flag-group", currentGroup);
-                fc.put("flag-group-label", currentGroupLabel);
-                fc.put("flag-with-group", flagGroup);
+            String currentGroup = (world != null && region != null)
+                    ? plugin.wg().flagGroup(world, region, flag)
+                    : "all";
+            String group = currentGroup == null || currentGroup.isEmpty() ? "all" : currentGroup;
+            String value = (world != null && region != null)
+                    ? plugin.wg().flagValueFor(world, region, flag, group)
+                    : "";
+            String groupLabel = plugin.replace().resolve("flag-groups", group);
+            String valueLabel = value.isEmpty()
+                    ? "&7не задано"
+                    : plugin.replace().resolve("flag-values", value);
+            // компактный список групп для подсказки ПКМ: текущая выделена ✓
+            String groupsList = groupsList(plugin, group);
 
-                String name = bake(fc, dyn.name);
-                List<String> lore = bakeList(fc, dyn.lore);
-                List<String> commands = bakeList(fc, dyn.commands);
+            Map<String, String> fc = new LinkedHashMap<>(ctx);
+            fc.put("flag", id);
+            fc.put("flag-value", value);
+            fc.put("flag-value-label", valueLabel);
+            fc.put("group", group);
+            fc.put("group-label", groupLabel);
+            fc.put("group-current", "");
+            fc.put("groups-list", groupsList);
+            fc.put("flag-group", group);
+            fc.put("flag-group-label", groupLabel);
+            fc.put("flag-with-group", id);
 
-                String mat = dyn.materials.getOrDefault(id, dyn.material);
-                List<String> states = state ? dyn.states : dyn.customStates;
-                out.add(new MenuItem(mat, 1, null, name, lore, commands, "",
-                        id, group, states, state));
-            }
+            String name = bake(fc, dyn.name);
+            List<String> lore = bakeList(fc, dyn.lore);
+            List<String> commands = bakeList(fc, dyn.commands);
+
+            String mat = dyn.materials.getOrDefault(id, dyn.material);
+            List<String> states = state ? dyn.states : dyn.customStates;
+            out.add(new MenuItem(mat, 1, null, name, lore, commands, "",
+                    id, group, states, state));
         }
         return out;
+    }
+
+    /** Список групп для подсказки «ПКМ — сменить группу», текущая отмечена. */
+    private String groupsList(QQRegions plugin, String currentGroup) {
+        StringBuilder sb = new StringBuilder();
+        for (String g : dyn.groups) {
+            if (sb.length() > 0) {
+                sb.append("&7, ");
+            }
+            String label = plugin.replace().resolve("flag-groups", g);
+            if (g.equalsIgnoreCase(currentGroup)) {
+                sb.append("&a").append(label).append("&r&7");
+            } else {
+                sb.append("&7").append(label);
+            }
+        }
+        return sb.toString();
     }
 
     private static String bake(Map<String, String> ctx, String text) {
@@ -395,6 +417,15 @@ public class Menu {
                         b.getStringList("commands").isEmpty() ? null : b.getStringList("commands"),
                         b.getString("permission", ""));
                 menu.addButton(slot, item);
+            }
+        }
+
+        // Слоты под динамические кнопки без dynamic-flags/dynamic-players
+        // (например меню рынка): menu-slots: [10,11,...]
+        for (String s : g.getStringList("menu-slots")) {
+            try {
+                menu.extraSlots.add(Integer.parseInt(s.trim()));
+            } catch (NumberFormatException ignored) {
             }
         }
 

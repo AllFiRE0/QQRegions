@@ -49,10 +49,11 @@ public class MenuManager implements Listener {
         File dir = new File(plugin.getDataFolder(), "menus");
         if (!dir.exists()) {
             dir.mkdirs();
-            plugin.saveResource("menus/flags.yml", false);
-            plugin.saveResource("menus/info.yml", false);
-            plugin.saveResource("menus/players.yml", false);
         }
+        saveMissingResource("menus/flags.yml", dir);
+        saveMissingResource("menus/info.yml", dir);
+        saveMissingResource("menus/players.yml", dir);
+        saveMissingResource("menus/market.yml", dir);
         File[] files = dir.listFiles((d, n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
         if (files != null) {
             for (File f : files) {
@@ -60,6 +61,14 @@ public class MenuManager implements Listener {
                 parsed.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
                 menus.put(f.getName().replaceFirst("\\.yml$", ""), parsed);
             }
+        }
+    }
+
+    /** Скопировать дефолтный файл меню из jar, если его ещё нет на диске. */
+    private void saveMissingResource(String path, File dir) {
+        File target = new File(dir, path.substring(path.indexOf('/') + 1));
+        if (!target.exists()) {
+            plugin.saveResource(path, false);
         }
     }
 
@@ -137,7 +146,7 @@ public class MenuManager implements Listener {
 
     /** Чем заполняются динамические слоты меню. */
     private enum Kind {
-        FLAGS, PLAYERS
+        FLAGS, PLAYERS, MARKET
     }
 
     private static long regionArea(ProtectedRegion region) {
@@ -182,7 +191,11 @@ public class MenuManager implements Listener {
         if ("info".equalsIgnoreCase(menuName)) {
             enrichInfoContext(ctx);
         }
-        Kind kind = "players".equalsIgnoreCase(menuName) ? Kind.PLAYERS : Kind.FLAGS;
+        Kind kind = switch (menuName.toLowerCase(java.util.Locale.ROOT)) {
+            case "players" -> Kind.PLAYERS;
+            case "market" -> Kind.MARKET;
+            default -> Kind.FLAGS;
+        };
         return render(player, best, ctx, page, role, kind);
     }
 
@@ -201,6 +214,17 @@ public class MenuManager implements Listener {
         ctx.put("volume", String.valueOf(region.volume()));
         ctx.put("priority", String.valueOf(safePriority(region)));
         ctx.put("status", statusOf(region));
+    }
+
+    /** Меню рынка: продажа/аренда регионов. */
+    public boolean openMarket(Player player) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", player.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", player.getName());
+        ctx.put("role", "other");
+        Menu best = pick(player, "market", null);
+        return best != null && render(player, best, ctx, 0, null, Kind.MARKET);
     }
 
     /** Шаблон меню с наибольшим приоритетом, подходящий роли и игроку. */
@@ -222,9 +246,14 @@ public class MenuManager implements Listener {
 
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
-        List<MenuItem> dynItems = kind == Kind.PLAYERS
-                ? playerItems(menu, ctx)
-                : menu.dynamicFlags(plugin, player, ctx);
+        List<MenuItem> dynItems;
+        if (kind == Kind.PLAYERS) {
+            dynItems = playerItems(menu, ctx);
+        } else if (kind == Kind.MARKET) {
+            dynItems = marketItems(menu, ctx);
+        } else {
+            dynItems = menu.dynamicFlags(plugin, player, ctx);
+        }
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
         Map<Integer, MenuItem> slotMap = new HashMap<>();
@@ -297,6 +326,28 @@ public class MenuManager implements Listener {
             return;
         }
 
+        // Кнопка флага: ПКМ = сменить группу флага (без переключения значения),
+        // ЛКМ = сменить значение для текущей группы.
+        if (item.isDynamic() && item.flag() != null && !item.flag().isEmpty()
+                && (e.isRightClick() || e.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)) {
+            cycleFlagGroup(p, om, item);
+            return;
+        }
+        // Меню рынка: ЛКМ = принять, ПКМ = отменить предложение.
+        if (om.kind == Kind.MARKET && cmds != null && !cmds.isEmpty()
+                && (e.isRightClick() || e.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)) {
+            for (String c : cmds) {
+                if (c.startsWith("@market:")) {
+                    String body = c.substring("@market:".length()).trim();
+                    String[] parts = body.split(":", 2);
+                    if (parts.length == 2) {
+                        marketAction(p, "cancel:" + parts[1]);
+                    }
+                }
+            }
+            return;
+        }
+
         // динамическая кнопка флага: подставляем следующий статус
         if (item.isDynamic()) {
             cmds = new ArrayList<>(cmds);
@@ -347,6 +398,10 @@ public class MenuManager implements Listener {
                     om.ctx.put("_filter", f);
                     render(p, om.menu, om.ctx, om.page, om.role, om.kind);
                 }
+                continue;
+            }
+            if (c.startsWith("@market:")) {
+                marketAction(p, c.substring("@market:".length()).trim());
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -468,6 +523,49 @@ public class MenuManager implements Listener {
         }
     }
 
+    /** ПКМ по кнопке флага: циклически переключает группу (region group) флага.
+     *  Значение флага сохраняется (переносится на новую группу), затем меню
+     *  перерисовывается с новой текущей группой. */
+    private void cycleFlagGroup(Player p, OpenMenu om, MenuItem item) {
+        String worldName = om.ctx.get("world");
+        org.bukkit.World world = worldName == null ? null : org.bukkit.Bukkit.getWorld(worldName);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
+        Flag<?> flag = region == null ? null : plugin.wg().flag(item.flag());
+        if (world == null || region == null || flag == null) {
+            return;
+        }
+        Menu.DynamicFlags dyn = om.menu.dynamicFlags();
+        if (dyn == null || dyn.groups == null || dyn.groups.isEmpty()) {
+            return;
+        }
+        String current = plugin.wg().flagGroup(world, region, flag);
+        if (current == null || current.isEmpty()) {
+            current = "all";
+        }
+        String next = null;
+        for (int i = 0; i < dyn.groups.size(); i++) {
+            if (dyn.groups.get(i).equalsIgnoreCase(current)) {
+                next = dyn.groups.get((i + 1) % dyn.groups.size());
+                break;
+            }
+        }
+        if (next == null) {
+            next = dyn.groups.get(0);
+        }
+        if (next.equalsIgnoreCase(current)) {
+            return;
+        }
+        boolean ok = plugin.wg().setFlagGroup(world, region, flag, next);
+        String label = plugin.replace().resolve("flag-groups", next);
+        p.sendMessage(dev.qqregions.util.Msg.color(
+                (ok ? "&a" : "&c") + "Флаг &f" + flag.getName() + "&r: группа &f" + label
+                        + (ok ? "&a." : "&c (не удалось сменить).")));
+        OpenMenu live = open.get(p.getUniqueId());
+        if (live != null) {
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        }
+    }
+
     /** Кнопки списка участников (dynamic-players): владельцы, затем участники.
      * Имя/lore берутся из конфига меню; PAPI резолвится на КОНКРЕТНОГО игрока
      * (например %vault_eco_balance%). Владельцу шаблон задаёт команду
@@ -531,6 +629,88 @@ public class MenuManager implements Listener {
             out.add(new MenuItem(mat.name(), 1, null, name, lore, cmds, ""));
         }
         return out;
+    }
+
+    /** Кнопки меню рынка: все живые предложения (PENDING/ACTIVE) на регионы.
+     *  ЛКМ — контрагент принимает (@market:accept:<id>), ПКМ-инициатор отменяет. */
+    private List<MenuItem> marketItems(Menu menu, Map<String, String> ctx) {
+        List<MenuItem> out = new ArrayList<>();
+        MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        for (dev.qqregions.market.Offer o : plugin.market().offers()) {
+            if (o.status != dev.qqregions.market.Offer.Status.PENDING
+                    && o.status != dev.qqregions.market.Offer.Status.ACTIVE) {
+                continue;
+            }
+            boolean sale = o.kind == dev.qqregions.market.Offer.Kind.SALE;
+            String type = sale ? "продажа" : "аренда";
+            String who = sale
+                    ? plugin.market().nameOf(o.buyer)
+                    : plugin.market().nameOf(o.tenant);
+            String owner = plugin.market().nameOf(o.owner != null ? o.owner : o.seller);
+            Map<String, String> pc = new HashMap<>(ctx);
+            pc.put("market-type", type);
+            pc.put("market-region", o.region);
+            pc.put("market-world", o.world);
+            pc.put("market-price", plugin.market().economy().format(o.price));
+            pc.put("market-who", who);
+            pc.put("market-owner", owner);
+            pc.put("market-status", o.status == dev.qqregions.market.Offer.Status.ACTIVE
+                    ? (sale ? "активна" : "аренда") : "ожидает");
+
+            String name = tpl.process(plugin, null, pc, 
+                    "&f{market-type} &8· &7{market-region}");
+            List<String> lore = new ArrayList<>();
+            lore.add(tpl.process(plugin, null, pc, "&7Цена: &f{market-price}"));
+            lore.add(tpl.process(plugin, null, pc,
+                    sale ? "&7Покупатель: &f{market-who}" : "&7Арендатор: &f{market-who}"));
+            lore.add(tpl.process(plugin, null, pc, "&7Статус: &f{market-status}"));
+            lore.add("&9ЛКМ — принять • &eПКМ — отменить");
+
+            List<String> cmds = List.of("@market:accept:" + o.id);
+            out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore, cmds, ""));
+        }
+        return out;
+    }
+
+    /** Обработчик @market:<accept|decline|cancel>:<id> из кнопок меню рынка. */
+    private void marketAction(Player p, String spec) {
+        String[] parts = spec.split(":", 2);
+        if (parts.length < 2) {
+            return;
+        }
+        String action = parts[0].trim().toLowerCase(java.util.Locale.ROOT);
+        dev.qqregions.market.Offer o = plugin.market().byId(parts[1].trim());
+        if (o == null) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cПредложение не найдено."));
+            return;
+        }
+        String res;
+        switch (action) {
+            case "accept":
+                res = plugin.market().accept(o, p);
+                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
+                        ? "&aПринято: &f" + o.region
+                        : "&cНе удалось принять: &f" + res));
+                break;
+            case "decline":
+                res = plugin.market().decline(o, p);
+                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
+                        ? "&eОтклонено: &f" + o.region
+                        : "&cНе удалось отклонить: &f" + res));
+                break;
+            case "cancel":
+                res = plugin.market().cancel(o, p);
+                p.sendMessage(dev.qqregions.util.Msg.color("ok".equals(res)
+                        ? "&eОтменено: &f" + o.region
+                        : "&cНе удалось отменить: &f" + res));
+                break;
+            default:
+                return;
+        }
+        if (open.containsKey(p.getUniqueId())) {
+            OpenMenu live = open.get(p.getUniqueId());
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        }
     }
 
     /** Кнопка входа на псевдокоманды меню игроков. */

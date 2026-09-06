@@ -13,6 +13,7 @@ softdepend:
   - PlaceholderAPI
   - WorldGuardExtraFlagsPlus
   - LuckPerms
+  - Vault
 
 permissions:
   qqregions.use:
@@ -42,6 +43,9 @@ permissions:
   qqregions.visible:
     description: Подсветка границ регионов (/region visible)
     default: true
+  qqregions.market:
+    description: Рынок регионов (sell/rent/buy/tenant/market)
+    default: true
   qqregions.admin:
     description: Полный доступ, включая регионы чужих игроков
     default: op
@@ -54,6 +58,7 @@ permissions:
       qqregions.manage: true
       qqregions.flags: true
       qqregions.visible: true
+      qqregions.market: true
   qqregions.bypass.selection-limits:
     description: Игнорировать max-blocks/min-blocks в шаблонах прав
     default: op

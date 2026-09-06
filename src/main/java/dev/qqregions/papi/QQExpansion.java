@@ -83,9 +83,83 @@ public class QQExpansion extends PlaceholderExpansion {
                 }
                 var region = plugin.wg().current(p);
                 return region == null ? "" : region.getId();
+            case "eco_balance":
+                return economy() ? plugin.market().economy().format(plugin.market().economy().balance(offline.getUniqueId())) : "";
+            case "eco_balance_raw":
+                return economy() ? String.valueOf(plugin.market().economy().balance(offline.getUniqueId())) : "";
+            case "market_listings":
+                return String.valueOf(plugin.market().offers().stream()
+                        .filter(o -> o.status == dev.qqregions.market.Offer.Status.PENDING
+                                || o.status == dev.qqregions.market.Offer.Status.ACTIVE)
+                        .count());
             default:
-                return null;
+                break;
         }
+        if (params.startsWith("eco_has_")) {
+            try {
+                double amt = Double.parseDouble(params.substring("eco_has_".length()));
+                return economy() ? yesNo(plugin.market().economy().has(offline.getUniqueId(), amt)) : "no";
+            } catch (NumberFormatException e) {
+                return "no";
+            }
+        }
+        if (params.startsWith("region_price_")) {
+            return priceOf(params.substring("region_price_".length()));
+        }
+        if (params.startsWith("region_for_sale_")) {
+            return yesNo(null != activeOn(params.substring("region_for_sale_".length()), true));
+        }
+        if (params.startsWith("region_for_rent_")) {
+            return yesNo(null != activeOn(params.substring("region_for_rent_".length()), false));
+        }
+        if (params.startsWith("region_owner_")) {
+            return ownerOf(params.substring("region_owner_".length()));
+        }
+        return null;
+    }
+
+    private boolean economy() {
+        return plugin.market().enabled();
+    }
+
+    private String priceOf(String key) {
+        dev.qqregions.market.Offer o = activeOn(key, null);
+        if (o == null) {
+            return "0";
+        }
+        return plugin.market().economy().format(o.price);
+    }
+
+    private String ownerOf(String key) {
+        dev.qqregions.market.Offer o = activeOn(key, null);
+        if (o != null) {
+            return plugin.market().nameOf(o.owner != null ? o.owner : o.seller);
+        }
+        String[] parts = key.split(":", 2);
+        if (parts.length < 2) {
+            return "";
+        }
+        org.bukkit.World w = org.bukkit.Bukkit.getWorld(parts[0]);
+        com.sk89q.worldguard.protection.regions.ProtectedRegion r = w == null ? null : plugin.wg().byName(w, parts[1]);
+        return w == null || r == null ? "" : plugin.wg().owners(r);
+    }
+
+    /** "мир:регион" -> активный оффер (или по типу kind). */
+    private dev.qqregions.market.Offer activeOn(String key, Boolean saleWant) {
+        String[] parts = key.split(":", 2);
+        if (parts.length < 2) {
+            return null;
+        }
+        org.bukkit.World w = org.bukkit.Bukkit.getWorld(parts[0]);
+        com.sk89q.worldguard.protection.regions.ProtectedRegion r = w == null ? null : plugin.wg().byName(w, parts[1]);
+        if (w == null || r == null) {
+            return null;
+        }
+        dev.qqregions.market.Offer o = plugin.market().activeOn(w, r);
+        if (o == null || (saleWant != null && (o.kind == dev.qqregions.market.Offer.Kind.SALE) != saleWant)) {
+            return null;
+        }
+        return o;
     }
 
     private static boolean isOnline(OfflinePlayer p) {

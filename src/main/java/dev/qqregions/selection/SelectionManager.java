@@ -226,6 +226,13 @@ public class SelectionManager implements Listener {
                 continue;
             }
             Config cfg = plugin.config();
+            if (cfg.viewHideDistance() > 0 && farFromSelection(p, sel, cfg.viewHideDistance())) {
+                SelectionView far = views.remove(id);
+                if (far != null) {
+                    far.cleanup();
+                }
+                continue;
+            }
             SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
             if (cfg.blockView()) {
                 v.update(sel, cfg.pointStyle(2).highlight, cfg.pointStyle(2).block, null);
@@ -233,6 +240,18 @@ public class SelectionManager implements Listener {
                 v.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
             }
         }
+    }
+
+    /** true, если игрок дальше blocks от центра выделения (2D-радиус).
+     *  Предназначено для view-hide-distance в config.yml. */
+    private boolean farFromSelection(Player p, Selection sel, int blocks) {
+        BlockVector3 mn = sel.min();
+        BlockVector3 mx = sel.max();
+        double cx = (mn.getBlockX() + mx.getBlockX()) / 2.0;
+        double cz = (mn.getBlockZ() + mx.getBlockZ()) / 2.0;
+        double dx = p.getLocation().getX() - cx;
+        double dz = p.getLocation().getZ() - cz;
+        return (dx * dx + dz * dz) > ((double) blocks * blocks);
     }
 
     // ---------- события ----------

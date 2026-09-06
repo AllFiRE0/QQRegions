@@ -50,9 +50,9 @@ public class Wg {
 
     /**
      * Регистрация кастомного флага territory-visible в реестре WorldGuard.
-     * Вызывается в onEnable до загрузки данных регионов, чтобы флаг
-     * корректно сохранялся/загружался. Если флаг уже зарегистрирован другой
-     * плагином — берём существующий (StateFlag по имени).
+     * Вызывается в onLoad ДО активации WorldGuard — после неё FlagRegistry
+     * блокируется (register кидает IllegalStateException). Если флаг уже
+     * зарегистрирован другой плагином — берём существующий (StateFlag).
      */
     public void registerFlags() {
         try {
@@ -60,17 +60,26 @@ public class Wg {
             try {
                 territoryVisible = new StateFlag("territory-visible", false);
                 registry.register(territoryVisible);
+                plugin.getLogger().info("Зарегистрирован флаг territory-visible (StateFlag, дефолт deny).");
             } catch (FlagConflictException | IllegalArgumentException | IllegalStateException e) {
                 Flag<?> existing = registry.get("territory-visible");
                 if (existing instanceof StateFlag) {
                     territoryVisible = (StateFlag) existing;
+                    plugin.getLogger().info("Флаг territory-visible уже был зарегистрирован — использую существующий.");
                 } else {
                     territoryVisible = null;
+                    plugin.getLogger().warning("Флаг territory-visible зарегистрирован с типом "
+                            + (existing == null ? "null" : existing.getClass().getSimpleName())
+                            + " (ожидался StateFlag) — флаг подсветки не будет работать.");
                 }
             }
         } catch (Throwable t) {
             plugin.getLogger().warning("Не удалось зарегистрировать флаг territory-visible: " + t.getMessage());
             territoryVisible = null;
+        }
+        if (territoryVisible == null) {
+            plugin.getLogger().severe("Флаг territory-visible НЕ зарегистрирован. Вход в регионы "
+                    + "не будет подсвечиваться (команда /region visible продолжит работать).");
         }
     }
 
@@ -514,6 +523,61 @@ public class Wg {
                 }
             }
             region.setFlag((Flag) flag, parsed);
+            RegionManager rm = manager(world);
+            if (rm != null) {
+                rm.save();
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Сменить группу (region group) флага БЕЗ изменения значения.
+     * group = all|members|owners|nonmembers|nonowners. Возвращает true при успехе.
+     */
+    public boolean setFlagGroup(World world, ProtectedRegion region, Flag<?> flag, String group) {
+        if (region == null || world == null || flag == null) {
+            return false;
+        }
+        RegionGroup rg = parseGroup(group);
+        RegionGroupFlag groupFlag = flag.getRegionGroupFlag();
+        if (rg == null || groupFlag == null) {
+            return false;
+        }
+        try {
+            region.setFlag((Flag) groupFlag, rg);
+            RegionManager rm = manager(world);
+            if (rm != null) {
+                rm.save();
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Полная передача владения регионом: продавец и все прочие владельцы
+     * удаляются, покупатель становится единственным владельцем. Участники
+     * сохраняются. Сохраняет регион.
+     */
+    public boolean transferOwnership(World world, ProtectedRegion region, UUID buyer, UUID seller) {
+        if (region == null || world == null || buyer == null) {
+            return false;
+        }
+        try {
+            DefaultDomain owners = region.getOwners();
+            for (UUID u : new ArrayList<>(owners.getUniqueIds())) {
+                if (!u.equals(buyer)) {
+                    owners.removePlayer(u);
+                }
+            }
+            for (String name : new ArrayList<>(owners.getPlayers())) {
+                owners.removePlayer(name);
+            }
+            owners.addPlayer(buyer);
             RegionManager rm = manager(world);
             if (rm != null) {
                 rm.save();

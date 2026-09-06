@@ -6,6 +6,7 @@ import dev.qqregions.config.Lang;
 import dev.qqregions.config.ReplaceManager;
 import dev.qqregions.gui.MenuManager;
 import dev.qqregions.highlight.HighlightManager;
+import dev.qqregions.market.MarketManager;
 import dev.qqregions.papi.QQExpansion;
 import dev.qqregions.selection.InteractListener;
 import dev.qqregions.selection.SelectionManager;
@@ -35,6 +36,7 @@ public final class QQRegions extends JavaPlugin {
     private CommandManager commands;
     private InteractListener interactListener;
     private HighlightManager highlight;
+    private MarketManager market;
 
     public static QQRegions get() {
         return instance;
@@ -65,6 +67,7 @@ public final class QQRegions extends JavaPlugin {
 
         this.interactListener = new InteractListener(this);
         this.highlight = new HighlightManager(this);
+        this.market = new MarketManager(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
@@ -89,6 +92,18 @@ public final class QQRegions extends JavaPlugin {
         selections.tick();
         menus.tick();
         highlight.tick();
+        marketTick();
+    }
+
+    private int marketTickTimer = 0;
+
+    private void marketTick() {
+        marketTickTimer += 5;
+        if (marketTickTimer < 20 * 60) {
+            return;
+        }
+        marketTickTimer = 0;
+        market.tick();
     }
 
     @Override
@@ -101,6 +116,9 @@ public final class QQRegions extends JavaPlugin {
         }
         if (highlight != null) {
             highlight.clearAll();
+        }
+        if (market != null) {
+            market.save();
         }
         if (commands != null) {
             commands.unregister();
@@ -143,6 +161,10 @@ public final class QQRegions extends JavaPlugin {
 
     public HighlightManager highlight() {
         return highlight;
+    }
+
+    public MarketManager market() {
+        return market;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */

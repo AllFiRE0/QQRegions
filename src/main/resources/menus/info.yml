@@ -81,6 +81,15 @@ Menus:
           - "&7Открыть редактор флагов"
         commands:
           - "@menu:flags"
+      "market":
+        slot: 24
+        material: GOLD_INGOT
+        name: "&eРынок"
+        lore:
+          - "&7Продать регион или сдать в аренду"
+        permission: qqregions.market
+        commands:
+          - "@menu:market"
       "players":
         slot: 21
         material: PLAYER_HEAD

@@ -8,6 +8,7 @@ import dev.qqregions.util.BoxOutline;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.BlockDisplay;
@@ -55,6 +56,10 @@ public class HighlightManager implements Listener {
     private final Map<UUID, Map<String, List<Entity>>> blockViews = new HashMap<>();
     /** Тип подсветки по умолчанию (/region visible type) на игрока. */
     private final Map<UUID, String> defaultType = new HashMap<>();
+    /** Кэш точек terrain-подсветки: "world:region" -> верхние точки столбцов. */
+    private final Map<String, List<BlockVector3>> terrainCache = new HashMap<>();
+    /** Флаг-регионы, подсвеченные входом/выходом и ещё НЕ вышедшие (для hide-on-exit). */
+    private final Map<UUID, Set<String>> flagShown = new HashMap<>();
 
     private int scanTimer = 0;
     private int renderTimer = 0;
@@ -107,16 +112,48 @@ public class HighlightManager implements Listener {
             if (plugin.config().isWorldDisabled(p.getWorld())) {
                 continue;
             }
+            java.util.Set<String> cur = new java.util.HashSet<>();
+            List<ProtectedRegion> under = new ArrayList<>();
             for (ProtectedRegion r : plugin.wg().at(p.getWorld(), p.getLocation())) {
                 if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
                     continue;
                 }
+                cur.add(key(p.getWorld(), r));
+                under.add(r);
+            }
+            // hide-on-exit: если региона больше нет под игроком — скрываем.
+            if (h.hideOnExit) {
+                Set<String> prev = flagShown.get(p.getUniqueId());
+                if (prev != null) {
+                    for (String k : new ArrayList<>(prev)) {
+                        if (!cur.contains(k)) {
+                            prev.remove(k);
+                            cooldownRemove(p, k);
+                            if (isActive(p, k)) {
+                                removeActive(p, k);
+                            }
+                        }
+                    }
+                }
+            }
+            for (ProtectedRegion r : under) {
                 String key = key(p.getWorld(), r);
                 if (onCooldown(p, key, now)) {
                     continue;
                 }
                 markCooldown(p, key, now);
+                flagShown.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>()).add(key);
                 show(p, p.getWorld(), r, h.type);
+            }
+        }
+    }
+
+    private void cooldownRemove(Player p, String key) {
+        Map<String, Long> m = cooldown.get(p.getUniqueId());
+        if (m != null) {
+            m.remove(key);
+            if (m.isEmpty()) {
+                cooldown.remove(p.getUniqueId());
             }
         }
     }
@@ -208,6 +245,21 @@ public class HighlightManager implements Listener {
         if (world == null || r == null) {
             return;
         }
+        if ("TERRITORY".equals(s.type)) {
+            // TERRITORY: частицы над верхними блоками вдоль границы (по рельефу).
+            List<BlockVector3> pts = terrainPoints(world, r);
+            int budget = Math.min(h.particles.maxPoints, pts.size());
+            for (int i = 0; i < budget; i++) {
+                BlockVector3 pt = pts.get(i);
+                int cx = pt.getBlockX() >> 4;
+                int cz = pt.getBlockZ() >> 4;
+                if (!world.isChunkLoaded(cx, cz)) {
+                    continue;
+                }
+                spawnParticle(world, h.particles, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5);
+            }
+            return;
+        }
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
         for (BlockVector3 pt : BoxOutline.points(mn, mx, h.particles.maxPoints)) {
@@ -218,6 +270,60 @@ public class HighlightManager implements Listener {
             }
             spawnParticle(world, h.particles, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5);
         }
+    }
+
+    // ---------- TERRITORY (террейн-подсветка вдоль границы) ----------
+
+    /**
+     * Верхние точки столбцов вдоль периметра региона: для каждой колонки
+     * (x,z) периметра ищется верхний не-воздушный блок — в обычном мире это
+     * поверхность рельефа, под землёй — потолок пещеры/камень. Результат
+     * кэшируется на "world:region" и пересчитывается при пересоздании.
+     */
+    private List<BlockVector3> terrainPoints(World world, ProtectedRegion r) {
+        String ck = world.getName() + ":" + r.getId();
+        List<BlockVector3> cached = terrainCache.get(ck);
+        if (cached != null) {
+            return cached;
+        }
+        List<BlockVector3> out = new ArrayList<>();
+        try {
+            BlockVector3 mn = r.getMinimumPoint();
+            BlockVector3 mx = r.getMaximumPoint();
+            int minY = Math.max(world.getMinHeight(), mn.y());
+            int maxY = Math.min(world.getMaxHeight() - 1, mx.y());
+            Set<Long> seen = new HashSet<>();
+            for (BlockVector3 pt : BoxOutline.points(mn, mx, 4000)) {
+                long col = ((long) pt.getBlockX() << 32) | (pt.getBlockZ() & 0xffffffffL);
+                if (!seen.add(col)) {
+                    continue;
+                }
+                int cx = pt.getBlockX() >> 4;
+                int cz = pt.getBlockZ() >> 4;
+                if (!world.isChunkLoaded(cx, cz)) {
+                    continue;
+                }
+                int top = topNonAirY(world, pt.getBlockX(), pt.getBlockZ(), minY, maxY);
+                if (top >= 0) {
+                    out.add(BlockVector3.at(pt.getBlockX(), top + 1, pt.getBlockZ()));
+                }
+            }
+        } catch (Throwable t) {
+            plugin.dbg("terrainPoints error: " + t.getMessage());
+        }
+        terrainCache.put(ck, out);
+        return out;
+    }
+
+    /** Самый верхний блок колонки (не воздух) в диапазоне высот; -1 если нет. */
+    private int topNonAirY(World world, int x, int z, int minY, int maxY) {
+        for (int y = maxY; y >= minY; y--) {
+            Material type = world.getBlockAt(x, y, z).getType();
+            if (type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR) {
+                return y;
+            }
+        }
+        return -1;
     }
 
     private void spawnParticle(World world, Config.ParticleOptions po, double x, double y, double z) {
@@ -326,6 +432,7 @@ public class HighlightManager implements Listener {
         active.remove(uid);
         cooldown.remove(uid);
         defaultType.remove(uid);
+        flagShown.remove(uid);
     }
 
     /** Полная очистка всех (выключение плагина / highlight.enabled=false). */
@@ -341,6 +448,8 @@ public class HighlightManager implements Listener {
         active.clear();
         cooldown.clear();
         defaultType.clear();
+        flagShown.clear();
+        terrainCache.clear();
     }
 
     @EventHandler
@@ -359,6 +468,9 @@ public class HighlightManager implements Listener {
     }
 
     private static String normalizeType(String type) {
+        if (type != null && "TERRITORY".equalsIgnoreCase(type)) {
+            return "TERRITORY";
+        }
         return type != null && "BLOCKS".equalsIgnoreCase(type) ? "BLOCKS" : "PARTICLES";
     }
 }

@@ -53,10 +53,12 @@ public class Config {
     private int viewDotsPerEdge = 16;
     private boolean commandSelectionView = true;
     private int viewHideAfter = 5;
+    private int viewHideDistance = 0;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
     private HighlightOptions highlight;
+    private MarketOptions market;
 
     public Config(QQRegions plugin) {
         this.plugin = plugin;
@@ -109,6 +111,7 @@ public class Config {
         viewDotsPerEdge = Math.max(2, cfg.getInt("interactive.view-dots-per-edge", 16));
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
         viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 5));
+        viewHideDistance = Math.max(0, cfg.getInt("interactive.view-hide-distance", 0));
 
         buttonMaterials.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
@@ -124,6 +127,7 @@ public class Config {
         particles = new ParticleOptions(cfg.getConfigurationSection("particles"));
         bossbar = new BossBarOptions(cfg.getConfigurationSection("bossbar"));
         highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
+        market = new MarketOptions(cfg.getConfigurationSection("market"));
     }
 
     private static List<String> lower(List<String> in) {
@@ -245,6 +249,16 @@ public class Config {
         return viewHideAfter;
     }
 
+    /** Дистанция в блоках, дальше которой подсветка скрывается (0 = не использовать). */
+    public int viewHideDistance() {
+        return viewHideDistance;
+    }
+
+    /** Настройки рынка / аренды (Vault + sell/rent/buy). */
+    public MarketOptions market() {
+        return market;
+    }
+
     /** viewHideAfter в «вызовах» тика плагина (тик раз в 5 серверных тиков). */
     public int viewHideAfterCalls() {
         return viewHideAfter <= 0 ? 0 : viewHideAfter * 4;
@@ -337,6 +351,8 @@ public class Config {
         public final long cooldownMillis;
         public final float blockScale;
         public final Material block;
+        /** Скрывать подсветку при выходе игрока из региона (вход/выход по флагу). */
+        public final boolean hideOnExit;
         public final ParticleOptions particles;
 
         HighlightOptions(ConfigurationSection s) {
@@ -350,6 +366,7 @@ public class Config {
                 cooldownMillis = 10_000L;
                 blockScale = 0.35f;
                 block = Material.GLASS;
+                hideOnExit = true;
                 particles = new ParticleOptions(null);
                 return;
             }
@@ -364,6 +381,7 @@ public class Config {
             String mat = s.getString("block", "GLASS");
             Material m = Material.matchMaterial(mat);
             block = m == null ? Material.GLASS : m;
+            hideOnExit = s.getBoolean("hide-on-exit", true);
             particles = new ParticleOptions(s.getConfigurationSection("particles"));
         }
     }
@@ -400,6 +418,88 @@ public class Config {
             conflictColor = Colors.bar(s.getString("conflict.color", "YELLOW"), BarColor.YELLOW);
             conflictText = s.getString("conflict.text", "&eВыделение пересекает чужой регион!");
             valueColor = s.getString("value-color", "&f");
+        }
+    }
+
+    /**
+     * Рынок: продажа и аренда регионов через Vault.
+     *   economy.enabled        — использовать Vault
+     *   economy.symbol         — знак валюты (например ₽, $)
+     *   economy.symbol-position — BEFORE | AFTER
+     *   economy.decimal-places — сколько знаков после запятой (0-2)
+     *   economy.grouping       — группировать разряды (1000 -> 1 000)
+     *   economy.group-separator — разделитель разрядов ("," / "." / " ")
+     *   economy.decimal-separator — разделитель дробной части ("." / ",")
+     *   rent.grant             — MEMBER (арендатор участник) | OWNER (владелец)
+     *   rent.charge            — ONCE (платёж один раз за срок) | PERIOD (списывать каждый период)
+     *   rent.period-minutes    — период списания/перепроверки (при PERIOD)
+     */
+    public static class MarketOptions {
+        public final boolean enabled;
+        public final boolean economyEnabled;
+        public final String symbol;
+        public final SymbolPosition symbolPosition;
+        public final int decimalPlaces;
+        public final boolean grouping;
+        public final String groupSeparator;
+        public final String decimalSeparator;
+        public final RentGrant rentGrant;
+        public final RentCharge rentCharge;
+        public final long periodMillis;
+
+        public enum SymbolPosition { BEFORE, AFTER }
+
+        public enum RentGrant { MEMBER, OWNER }
+
+        public enum RentCharge { ONCE, PERIOD }
+
+        MarketOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = false;
+                economyEnabled = true;
+                symbol = "₽";
+                symbolPosition = SymbolPosition.AFTER;
+                decimalPlaces = 0;
+                grouping = true;
+                groupSeparator = ",";
+                decimalSeparator = ".";
+                rentGrant = RentGrant.MEMBER;
+                rentCharge = RentCharge.PERIOD;
+                periodMillis = 1440L * 60_000L;
+                return;
+            }
+            enabled = s.getBoolean("enabled", true);
+            ConfigurationSection e = s.getConfigurationSection("economy");
+            economyEnabled = e == null || e.getBoolean("enabled", true);
+            symbol = e == null ? "₽" : e.getString("symbol", "₽");
+            SymbolPosition sp;
+            try {
+                sp = SymbolPosition.valueOf(e == null ? "AFTER" : e.getString("symbol-position", "AFTER"));
+            } catch (IllegalArgumentException ex) {
+                sp = SymbolPosition.AFTER;
+            }
+            symbolPosition = sp;
+            decimalPlaces = e == null ? 0 : Math.max(0, Math.min(2, e.getInt("decimal-places", 0)));
+            grouping = e == null || e.getBoolean("grouping", true);
+            groupSeparator = e == null ? "," : e.getString("group-separator", ",");
+            decimalSeparator = e == null ? "." : e.getString("decimal-separator", ".");
+
+            ConfigurationSection r = s.getConfigurationSection("rent");
+            RentGrant rg;
+            try {
+                rg = RentGrant.valueOf(r == null ? "MEMBER" : r.getString("grant", "MEMBER"));
+            } catch (IllegalArgumentException ex) {
+                rg = RentGrant.MEMBER;
+            }
+            rentGrant = rg;
+            RentCharge rc;
+            try {
+                rc = RentCharge.valueOf(r == null ? "PERIOD" : r.getString("charge", "PERIOD"));
+            } catch (IllegalArgumentException ex) {
+                rc = RentCharge.PERIOD;
+            }
+            rentCharge = rc;
+            periodMillis = Math.max(1, r == null ? 1440 : r.getInt("period-minutes", 1440)) * 60_000L;
         }
     }
 }
