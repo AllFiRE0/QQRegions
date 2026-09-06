@@ -35,3 +35,39 @@
     replacement: '&aвкл'
   - placeholder: 'ELSE'
     replacement: '&7{value}'
+
+# [QQRegions] Переводы групп флагов (WorldGuard region groups).
+# Используются кнопками меню флагов (dynamic-flags.groups в flags.yml).
+# Клик по кнопке группы ставит значение флага ДЛЯ этой группы
+# (эквивалент /rg flag -g <группа> <флаг> <значение>).
+# Переменная {value} в replacement = исходный ключ группы.
+# Переменные меню: {group-label} — перевод группы кнопки,
+# {flag-group-label} — перевод текущей группы флага.
+flag-groups:
+  - placeholder: 'all'
+    replacement: 'все'
+  - placeholder: 'members'
+    replacement: 'участники'
+  - placeholder: 'owners'
+    replacement: 'владельцы'
+  - placeholder: 'nonmembers'
+    replacement: 'не участники'
+  - placeholder: 'nonowners'
+    replacement: 'не владельцы'
+  - placeholder: 'ELSE'
+    replacement: '{value}'
+
+# [QQRegions] Переводы значений флагов для меню (сырые значения из API WG:
+# allow/deny для state-флагов, true/false для boolean-флагов).
+# Используется в {flag-value-label} (flags.yml). {value} = сырое значение.
+flag-values:
+  - placeholder: 'allow'
+    replacement: '&aвключено'
+  - placeholder: 'deny'
+    replacement: '&cвыключено'
+  - placeholder: 'true'
+    replacement: '&aда'
+  - placeholder: 'false'
+    replacement: '&7нет'
+  - placeholder: 'ELSE'
+    replacement: '{value}'

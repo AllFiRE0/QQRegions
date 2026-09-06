@@ -57,13 +57,16 @@ public class ReplaceManager {
             Map<?, ?> m = (Map<?, ?>) o;
             String ph = m.get("placeholder") == null ? null : String.valueOf(m.get("placeholder"));
             String rep = m.get("replacement") == null ? rawValue : String.valueOf(m.get("replacement"));
+            if (rep != null) {
+                rep = rep.replace("{value}", rawValue);
+            }
             if (ph == null) {
                 continue;
             }
             if (ph.equalsIgnoreCase("ELSE")) {
-                fallback = rep == null ? rawValue : rep;
+                fallback = rep;
             } else if (ph.equalsIgnoreCase(rawValue)) {
-                return rep == null ? rawValue : rep;
+                return rep;
             }
         }
         return fallback == null ? rawValue : fallback;

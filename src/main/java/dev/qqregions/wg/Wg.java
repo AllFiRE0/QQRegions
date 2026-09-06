@@ -10,6 +10,8 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.flags.BooleanFlag;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.FlagContext;
+import com.sk89q.worldguard.protection.flags.RegionGroup;
+import com.sk89q.worldguard.protection.flags.RegionGroupFlag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.managers.RemovalStrategy;
@@ -27,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Бэкенд WorldGuard: создание/удаление регионов, участники, владельцы,
@@ -167,15 +170,29 @@ public class Wg {
         return out;
     }
 
+    /** Чарсет ID региона WorldGuard: [0-9A-Za-z_\-,.]+ (кириллица запрещена).
+     *  Дублирует проверку ProtectedRegion, чтобы показывать дружелюбную
+     *  ошибку, а не ловить IllegalArgumentException. */
+    private static final Pattern REGION_ID = Pattern.compile("[0-9A-Za-z_\\-,.]+");
+
     public void create(Selection selection, String name, Player owner) throws RegionException {
         RegionManager rm = manager(selection.getWorld());
         if (rm == null) {
             throw new RegionException("create.fail", "error", "RegionManager недоступен");
         }
+        if (name == null || !REGION_ID.matcher(name).matches()) {
+            throw new RegionException("create.invalid-id", "charset", REGION_ID.pattern());
+        }
         if (rm.hasRegion(name)) {
             throw new RegionException("create.already-exists", "region", name);
         }
-        ProtectedCuboidRegion region = new ProtectedCuboidRegion(name, selection.min(), selection.max());
+        ProtectedCuboidRegion region;
+        try {
+            region = new ProtectedCuboidRegion(name, selection.min(), selection.max());
+        } catch (IllegalArgumentException e) {
+            // Страховка: если WorldGuard ужесточит правила ID/длины.
+            throw new RegionException("create.invalid-id", "charset", REGION_ID.pattern());
+        }
         region.getOwners().addPlayer(owner.getUniqueId());
         rm.addRegion(region);
         try {
@@ -286,12 +303,77 @@ public class Wg {
         }
     }
 
-    /** Текущее значение флага для региона (с учётом дефолта мира) в виде строки.
-     * Для групп используйте заполнитель WorldGuard "%worldguard_region_has_flag_<флаг>:<группа>%".
-     */
+    /** Текущее значение флага для региона (с учётом дефолта мира) в виде строки. */
     public String flagValue(World world, ProtectedRegion region, Flag<?> flag) {
         Object value = region == null ? null : region.getFlag(flag);
         return value == null ? "" : value.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /** Текущая группа (region group) флага. Если группа не задана явно —
+     *  считается "all" (приближение для меню; у entry/exit/spawn дефолт
+     *  другой, но явно заданной группы нет). */
+    public String flagGroup(World world, ProtectedRegion region, Flag<?> flag) {
+        if (region == null || flag == null) {
+            return "all";
+        }
+        try {
+            RegionGroupFlag groupFlag = flag.getRegionGroupFlag();
+            if (groupFlag == null) {
+                return "all";
+            }
+            RegionGroup g = region.getFlag(groupFlag);
+            if (g == null || g == RegionGroup.NONE) {
+                return "all";
+            }
+            switch (g) {
+                case MEMBERS:
+                    return "members";
+                case OWNERS:
+                    return "owners";
+                case NON_MEMBERS:
+                    return "nonmembers";
+                case NON_OWNERS:
+                    return "nonowners";
+                default:
+                    return g.name().toLowerCase(java.util.Locale.ROOT);
+            }
+        } catch (Throwable t) {
+            return "all";
+        }
+    }
+
+    /**
+     * Значение флага применительно к группе кнопки меню.
+     * У флага может быть только ОДНА группа (см. доки WorldGuard), поэтому:
+     *  - группа кнопки == текущая группа флага → возвращается значение;
+     *  - иначе "" = «не задано для этой группы».
+     */
+    public String flagValueFor(World world, ProtectedRegion region, Flag<?> flag, String group) {
+        String eff = flagGroup(world, region, flag);
+        if (!eff.equalsIgnoreCase(group == null ? "all" : group)) {
+            return "";
+        }
+        return flagValue(world, region, flag);
+    }
+
+    private RegionGroup parseGroup(String name) {
+        if (name == null) {
+            return null;
+        }
+        switch (name.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "all":
+                return RegionGroup.ALL;
+            case "members":
+                return RegionGroup.MEMBERS;
+            case "owners":
+                return RegionGroup.OWNERS;
+            case "nonmembers":
+                return RegionGroup.NON_MEMBERS;
+            case "nonowners":
+                return RegionGroup.NON_OWNERS;
+            default:
+                return null;
+        }
     }
 
     /**
@@ -299,6 +381,15 @@ public class Wg {
      * Return true при успехе. Сохраняет регион.
      */
     public boolean setFlagValue(World world, ProtectedRegion region, Flag<?> flag, String rawValue) {
+        return setFlagValue(world, region, flag, rawValue, null);
+    }
+
+    /**
+     * Установить значение флага + группы (region group) региона.
+     * group = all|members|owners|nonmembers|nonowners ("" / null — не трогать).
+     * Эквивалентно /rg flag -g <группа> <флаг> <значение>.
+     */
+    public boolean setFlagValue(World world, ProtectedRegion region, Flag<?> flag, String rawValue, String group) {
         if (region == null || world == null || flag == null) {
             return false;
         }
@@ -320,6 +411,13 @@ public class Wg {
             return false;
         }
         try {
+            if (group != null && !group.isEmpty()) {
+                RegionGroup rg = parseGroup(group);
+                RegionGroupFlag groupFlag = flag.getRegionGroupFlag();
+                if (rg != null && groupFlag != null) {
+                    region.setFlag((Flag) groupFlag, rg);
+                }
+            }
             region.setFlag((Flag) flag, parsed);
             RegionManager rm = manager(world);
             if (rm != null) {

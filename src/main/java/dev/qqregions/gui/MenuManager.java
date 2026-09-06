@@ -5,6 +5,7 @@ import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -32,8 +33,10 @@ public class MenuManager implements Listener {
     /** файл (без .yml) -> упорядоченные по приоритету шаблоны */
     private final Map<String, List<Menu>> menus = new HashMap<>();
     private final Map<UUID, OpenMenu> open = new HashMap<>();
-    /** ожидание ввода ника для добавления: UUID -> "owner"|"member" */
-    private final Map<UUID, String> pendingAdd = new ConcurrentHashMap<>();
+    /** ожидание ввода ника для добавления: UUID -> контекст промпта.
+     *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
+     *  чистит open), но промпт должен пережить это и обработать сообщение. */
+    private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
     private final QQRegions plugin;
 
     public MenuManager(QQRegions plugin) {
@@ -327,7 +330,7 @@ public class MenuManager implements Listener {
                 continue;
             }
             if (c.startsWith("@flag:")) {
-                setFlag(p, om.ctx, c.substring("@flag:".length()).trim());
+                setFlag(p, om, c.substring("@flag:".length()).trim(), item.group());
                 continue;
             }
             if (c.startsWith("@player-del:")) {
@@ -351,35 +354,25 @@ public class MenuManager implements Listener {
     }
 
     /**
-     * Текущее значение флага для группы кнопки.
-     * Для группы "all" читаем напрямую из API региона (работает без PAPI);
-     * для остальных групп — через заполнитель WorldGuard.
+     * Текущее (сырое) значение флага для группы кнопки. Считается локально
+     * через API WG (без WGEFP/PAPI): значение хранится одно на флаг и видно
+     * только на кнопке текущей группы; для остальных групп — "".
      */
     private String currentValue(OpenMenu om, MenuItem item) {
         String id = item.flag();
         String group = item.group();
-        if (group == null || group.equalsIgnoreCase("all")) {
-            String worldName = om.ctx.get("world");
-            if (worldName != null) {
-                org.bukkit.World w = org.bukkit.Bukkit.getWorld(worldName);
-                ProtectedRegion region = w == null ? null : plugin.wg().byName(w, om.ctx.get("region"));
-                Flag<?> flag = region == null ? null : plugin.wg().flag(id);
-                if (w != null && region != null && flag != null) {
-                    String v = plugin.wg().flagValue(w, region, flag);
-                    if (v != null && !v.isEmpty()) {
-                        return v.trim().toLowerCase(java.util.Locale.ROOT);
-                    }
-                }
-            }
-        }
-        String ph = (group == null || group.equalsIgnoreCase("all"))
-                ? "%worldguard_region_has_flag_" + id + "%"
-                : "%worldguard_region_has_flag_" + id + ":" + group + "%";
-        String value = dev.qqregions.util.Papi.set(om.player, ph);
-        if (value == null || value.isBlank() || value.contains("%")) {
+        String worldName = om.ctx.get("world");
+        if (id == null || worldName == null) {
             return "";
         }
-        return value.trim().toLowerCase(java.util.Locale.ROOT);
+        org.bukkit.World w = org.bukkit.Bukkit.getWorld(worldName);
+        ProtectedRegion region = w == null ? null : plugin.wg().byName(w, om.ctx.get("region"));
+        Flag<?> flag = region == null ? null : plugin.wg().flag(id);
+        if (w == null || region == null || flag == null) {
+            return "";
+        }
+        String v = plugin.wg().flagValueFor(w, region, flag, group);
+        return v == null ? "" : v.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Следующее значение в цикле states (или allow&lt;-&gt;deny для StateFlag). */
@@ -400,7 +393,14 @@ public class MenuManager implements Listener {
 
     @EventHandler
     public void onClose(InventoryCloseEvent e) {
-        open.remove(e.getPlayer().getUniqueId());
+        UUID id = e.getPlayer().getUniqueId();
+        open.remove(id);
+        // Закрытие инвентаря случается и при открытии чата («введите ник») —
+        // тогда промпт должен ПЕРЕЖИТЬ закрытие. Но если игрок просто закрыл
+        // меню, ждём 5 сек и убираем промпт, чтобы не глотать следующий чат.
+        if (pendingAdd.containsKey(id)) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingAdd.remove(id), 100L);
+        }
     }
 
     /** Телепорт в центр региона (только админ и владелец). */
@@ -430,11 +430,13 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Установить флаг региона через API WG: @flag:<имя>:{значение} (значение allow/deny/true/false). */
-    private void setFlag(Player p, Map<String, String> ctx, String spec) {
-        String worldName = ctx.get("world");
+    /** Установить флаг региона через API WG: @flag:<имя>:{значение}
+     *  (значение allow/deny/true/false). group — группа кнопки
+     *  (all/members/owners/nonmembers/nonowners), ставится вместе со значением. */
+    private void setFlag(Player p, OpenMenu om, String spec, String group) {
+        String worldName = om.ctx.get("world");
         org.bukkit.World world = worldName == null ? null : org.bukkit.Bukkit.getWorld(worldName);
-        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, ctx.get("region"));
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
         if (world == null || region == null) {
             return;
         }
@@ -454,11 +456,15 @@ public class MenuManager implements Listener {
         } else if (flag instanceof BooleanFlag) {
             value = String.valueOf(allow);
         }
-        plugin.wg().setFlagValue(world, region, flag, value);
-        OpenMenu om = open.get(p.getUniqueId());
-        if (om != null) {
+        if (group == null || group.isEmpty() || group.equalsIgnoreCase("all")) {
+            plugin.wg().setFlagValue(world, region, flag, value, "all");
+        } else {
+            plugin.wg().setFlagValue(world, region, flag, value, group);
+        }
+        OpenMenu live = open.get(p.getUniqueId());
+        if (live != null) {
             // сохраняем текущую страницу (не сбрасываем на первую)
-            render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
         }
     }
 
@@ -558,7 +564,8 @@ public class MenuManager implements Listener {
         if (!"owner".equalsIgnoreCase(kind) && !"member".equalsIgnoreCase(kind)) {
             return;
         }
-        pendingAdd.put(p.getUniqueId(), kind.toLowerCase(java.util.Locale.ROOT));
+        pendingAdd.put(p.getUniqueId(),
+                new AddPrompt(om, kind.toLowerCase(java.util.Locale.ROOT)));
         p.sendMessage(dev.qqregions.util.Msg.color(
                 "&eВведите в чат ник игрока, которого добавить "
                         + ("owner".equalsIgnoreCase(kind) ? "&bвладельцем&e" : "&eучастником")
@@ -568,40 +575,43 @@ public class MenuManager implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncPlayerChatEvent e) {
         UUID id = e.getPlayer().getUniqueId();
-        if (!pendingAdd.containsKey(id)) {
+        AddPrompt pr = pendingAdd.get(id);
+        if (pr == null) {
             return;
         }
         e.setCancelled(true);
         final String text = e.getMessage().trim();
-        final String kind = pendingAdd.remove(id);
+        pendingAdd.remove(id);
         final UUID pid = id;
-        plugin.getServer().getScheduler().runTask(plugin, () -> addPlayerFromChat(pid, kind, text));
+        plugin.getServer().getScheduler().runTask(plugin, () -> addPlayerFromChat(pid, pr, text));
     }
 
-    private void addPlayerFromChat(UUID id, String kind, String name) {
-        OpenMenu om = open.get(id);
-        if (om == null) {
-            Player p = plugin.getServer().getPlayer(id);
-            if (p != null && p.isOnline()) {
-                p.sendMessage(dev.qqregions.util.Msg.color("&cМеню закрыто — добавление отменено."));
-            }
+    private void addPlayerFromChat(UUID id, AddPrompt pr, String name) {
+        Player p = pr.om.player;
+        if (!p.isOnline()) {
             return;
         }
-        Player p = om.player;
         if (name.isEmpty() || name.equalsIgnoreCase("отмена") || name.equalsIgnoreCase("cancel")) {
             p.sendMessage(dev.qqregions.util.Msg.color("&7Добавление отменено."));
             return;
         }
-        org.bukkit.World world = worldFrom(om.ctx);
-        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
+        org.bukkit.World world = worldFrom(pr.om.ctx);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, pr.om.ctx.get("region"));
         if (world == null || region == null) {
             p.sendMessage(dev.qqregions.util.Msg.color("&cРегион не найден."));
             return;
         }
-        plugin.wg().addPlayerByName(world, region, name, "owner".equalsIgnoreCase(kind));
+        plugin.wg().addPlayerByName(world, region, name, "owner".equalsIgnoreCase(pr.kind));
         p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок &f" + name + " &aдобавлен"
-                + ("owner".equalsIgnoreCase(kind) ? " как владелец." : " как участник.")));
-        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+                + ("owner".equalsIgnoreCase(pr.kind) ? " как владелец." : " как участник.")));
+        // Меню мог закрыться, когда игрок открыл чат (клиент закрывает инвентарь).
+        // Если закрыто — переоткрываем список игроков, чтобы было видно результат.
+        if (open.containsKey(id)) {
+            OpenMenu live = open.get(id);
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        } else {
+            open(p, "players", pr.om.ctx, 0, pr.om.role);
+        }
     }
 
     private static org.bukkit.World worldFrom(Map<String, String> ctx) {
@@ -646,6 +656,18 @@ public class MenuManager implements Listener {
             this.maxPages = maxPages;
             this.role = role;
             this.slotMap = slotMap;
+            this.kind = kind;
+        }
+    }
+
+    /** Контекст промпта «введите ник»: копия OpenMenu + роль добавления
+     *  ("owner"/"member"). Переживает закрытие меню открытием чата. */
+    private static class AddPrompt {
+        final OpenMenu om;
+        final String kind;
+
+        AddPrompt(OpenMenu om, String kind) {
+            this.om = om;
             this.kind = kind;
         }
     }

@@ -236,11 +236,13 @@ public class InteractSession {
         resetWheelAcc();
         PlayerInventory inv = player.getInventory();
         String uuid = player.getUniqueId().toString();
-        // При смерти инвентарь не восстанавливаем: сервер и так очищает/дропает
-        // содержимое, иначе предметы «откатились» бы — дубль. Снимок на диске
-        // оставляем — он вернётся на респавне (см. InteractListener.onRespawn).
+        // При смерти инвентарь не восстанавливаем на месте: дроп в этой
+        // точке уже собран сервером (иначе предметы «откатились» бы = дубль).
+        // Снимок остаётся на диске и обрабатывается в InteractListener.onDeath:
+        // при keepInventory=false вещи выпадают из игрока (как обычная смерть),
+        // при keepInventory=true возвращаются в инвентарь.
         if (player.isDead()) {
-            plugin.dbg("session end (death): " + player.getName() + " — инвентарь вернётся на респавне");
+            plugin.dbg("session end (death): " + player.getName() + " — снимок обработает onDeath");
         } else {
             inv.clear();
             inv.setArmorContents(armor);

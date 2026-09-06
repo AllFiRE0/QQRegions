@@ -14,10 +14,20 @@
 #  видит и может менять все флаги.
 #
 #  Переменные: {region} {world} {player} {role} {flag} {group}
-#              {flag-with-group} {flag-value} {next-state}
+#              {group-label} {group-current} {flag-group} {flag-group-label}
+#              {flag-with-group} {flag-value} {flag-value-label} {next-state}
 #  Пагинация: слоты из dynamic-flags.slots; навигация блок navigation.
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @teleport,
 #                 @flag:<имя>:allow|deny, asConsole!..., close
+#
+#  Группы флагов (WorldGuard region groups): у флага может быть ТОЛЬКО
+#  одна группа (как в /rg flag -g <группа> <флаг> <значение>): all,
+#  members, owners, nonmembers, nonowners. dynamic-flags.groups — какие
+#  кнопки-группы показывать для каждого флага; клик по кнопке ставит
+#  значение ДЛЯ этой группы и переключает её. Текущая группа помечается
+#  {group-current} (✓), значение видно только на кнопке текущей группы
+#  ({flag-value-label}; для остальных — «не задано»).
+#  Переводы групп и значений — в replace.yml (блоки flag-groups/flag-values).
 # ============================================================
 update_interval: 20
 
@@ -91,14 +101,18 @@ Menus:
         - 43
       groups:
         - all
+        - members
+        - owners
+        - nonmembers
+        - nonowners
       # игрок видит флаг только при наличии права <префикс><флаг>
       flag-permission-prefix: "qqregions.flags."
       ignore-flags: []            # какие флаги не показывать (по имени)
       material: MAP
-      name: "&f{flag}"
+      name: "&f{flag} &8· {group-label}{group-current}"
       lore:
-        - "Включено: {flag-value}"
-        - "&9ЛКМ — переключить"
+        - "&7Значение: &f{flag-value-label}"
+        - "&9ЛКМ — включить/выключить для этой группы"
       states:
         - allow
         - deny
@@ -220,13 +234,17 @@ Menus:
         - 43
       groups:
         - all
+        - members
+        - owners
+        - nonmembers
+        - nonowners
       flag-permission-prefix: "qqregions.flags."
       ignore-flags: []
       material: MAP
-      name: "&f{flag}"
+      name: "&f{flag} &8· {group-label}{group-current}"
       lore:
-        - "Включено: {flag-value}"
-        - "&9ЛКМ — переключить"
+        - "&7Значение: &f{flag-value-label}"
+        - "&9ЛКМ — включить/выключить для этой группы"
       states:
         - allow
         - deny
@@ -298,13 +316,17 @@ Menus:
         - 25
       groups:
         - all
+        - members
+        - owners
+        - nonmembers
+        - nonowners
       flag-permission-prefix: "qqregions.flags."
       ignore-flags: []
       material: MAP
-      name: "&f{flag}"
+      name: "&f{flag} &8· {group-label}{group-current}"
       lore:
-        - "Включено: {flag-value}"
-        - "&9ЛКМ — переключить"
+        - "&7Значение: &f{flag-value-label}"
+        - "&9ЛКМ — включить/выключить для этой группы"
       states:
         - allow
         - deny
@@ -375,13 +397,17 @@ Menus:
         - 25
       groups:
         - all
+        - members
+        - owners
+        - nonmembers
+        - nonowners
       flag-permission-prefix: "qqregions.flags."
       ignore-flags: []
       material: MAP
-      name: "&f{flag}"
+      name: "&f{flag} &8· {group-label}{group-current}"
       lore:
-        - "Включено: {flag-value}"
-        - "&9ЛКМ — переключить"
+        - "&7Значение: &f{flag-value-label}"
+        - "&9ЛКМ — включить/выключить для этой группы"
       states:
         - allow
         - deny

@@ -1,10 +1,13 @@
 package dev.qqregions.selection;
 
 import dev.qqregions.QQRegions;
+import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.util.Arrays;
@@ -113,6 +116,47 @@ public class SessionStore {
     /** Есть ли незакрытый снимок (краш/рестарт/долгое отсутствие). */
     public boolean has(String uuid) {
         return file(uuid).exists();
+    }
+
+    /**
+     * Смерть во время сессии, обычная смерть (keepInventory=false):
+     * настоящие предметы ВЫПАДАЮТ из игрока, как при обычной смерти.
+     * Кнопки сессии из дропа убираются (это не вещи игрока), вместо них в
+     * дроп добавляются содержимое и оффхенд из снимка. Броня уже в дропе
+     * (она была надета, сессия её не трогала) — не дублируем.
+     * Снимок после этого удаляется: вещи могли потеряться в дропе — это
+     * нормальная смерть, а не «защита инвентаря».
+     */
+    public void spillToDrops(String uuid, PlayerDeathEvent e) {
+        File f = file(uuid);
+        if (!f.exists()) {
+            return;
+        }
+        try {
+            YamlConfiguration yml = YamlConfiguration.loadConfiguration(f);
+            List<ItemStack> drops = e.getDrops();
+            drops.removeIf(this::isSessionButton);
+            for (ItemStack it : toStackArray(yml.getList("contents", List.of()))) {
+                if (it != null) {
+                    drops.add(it);
+                }
+            }
+            ItemStack offhand = yml.getItemStack("offhand");
+            if (offhand != null) {
+                drops.add(offhand);
+            }
+            delete(uuid);
+        } catch (Exception ex) {
+            plugin.dbg("session store spill to drops failed for " + uuid + ": " + ex);
+        }
+    }
+
+    private boolean isSessionButton(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(new NamespacedKey(plugin, InteractSession.BTN_TAG_KEY), PersistentDataType.STRING);
     }
 
     /** Удаляет снимок (после успешного восстановления или нормального выхода). */

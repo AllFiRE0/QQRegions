@@ -192,10 +192,29 @@ public class InteractListener implements Listener {
         }
     }
 
-    /** Смерть — выделение сбрасывается, сессия закрывается. */
+    /** Смерть — сессия закрывается, выделение сбрасывается.
+     *  Настоящие вещи при этом НЕ подлежат «защите»: при обычной смерти
+     *  (keepInventory=false) они выпадают из игрока, как обычно; при
+     *  keepInventory=true остаются в инвентаре. Иначе игроки стали бы
+     *  входить в сессию перед боем, чтобы застраховать вещи от смерти. */
     @EventHandler
     public void onDeath(PlayerDeathEvent e) {
-        plugin.selections().endSession(e.getPlayer());
+        Player p = e.getPlayer();
+        String uuid = p.getUniqueId().toString();
+        plugin.selections().endSession(p);
+        if (!plugin.store().has(uuid)) {
+            return;
+        }
+        if (e.getKeepInventory()) {
+            // keepInventory=true: вещи не выпадают, возвращаем в инвентарь.
+            if (plugin.store().restore(uuid, p)) {
+                plugin.dbg("death during session (keepInventory): inventory restored, " + p.getName());
+            }
+        } else {
+            // обычная смерть: настоящие вещи выпадают как обычно (кнопки убраны).
+            plugin.store().spillToDrops(uuid, e);
+            plugin.dbg("death during session: real items dropped, " + p.getName());
+        }
     }
 
     /** Кик — сессия закрывается, инвентарь восстанавливается. */
@@ -213,9 +232,8 @@ public class InteractListener implements Listener {
         restoreIfNeeded(e.getPlayer());
     }
 
-    /** Респавн после смерти ВО время сессии: снимок вернули при end() (death),
-     *  теперь возвращаем предметы. Это даёт 100% сохранность: смерть не рушит
-     *  вещи, а дроп при смерти содержит только кнопки сессии — дубля нет. */
+    /** Респавн — страховка: если снимок по какой-то причине не был обработан
+     *  в onDeath (крэш между событиями), вернём его здесь как фолбэк. */
     @EventHandler
     public void onRespawn(PlayerRespawnEvent e) {
         restoreIfNeeded(e.getPlayer());

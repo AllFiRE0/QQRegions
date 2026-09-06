@@ -188,15 +188,31 @@ public class Menu {
             boolean state = flag instanceof StateFlag;
             for (String group : dyn.groups) {
                 String flagGroup = group.equalsIgnoreCase("all") ? id : id + ":" + group;
-                String value = group.equalsIgnoreCase("all") && region != null && world != null
-                        ? plugin.wg().flagValue(world, region, flag)
-                        : "%worldguard_region_has_flag_" + flagGroup + "%";
+                // У флага ОДНА группа: значение видно только на кнопке той
+                // группы, которая сейчас стоит у флага (для остальных "").
+                String value = (world != null && region != null)
+                        ? plugin.wg().flagValueFor(world, region, flag, group)
+                        : "";
+                String currentGroup = (world != null && region != null)
+                        ? plugin.wg().flagGroup(world, region, flag)
+                        : "all";
+                String currentMark = currentGroup.equalsIgnoreCase(group) ? " &a✓" : "";
+                String groupLabel = plugin.replace().resolve("flag-groups", group);
+                String currentGroupLabel = plugin.replace().resolve("flag-groups", currentGroup);
+                String valueLabel = value.isEmpty()
+                        ? "&7не задано"
+                        : plugin.replace().resolve("flag-values", value);
 
                 Map<String, String> fc = new LinkedHashMap<>(ctx);
                 fc.put("flag", id);
-                fc.put("group", group);
-                fc.put("flag-with-group", flagGroup);
                 fc.put("flag-value", value);
+                fc.put("flag-value-label", valueLabel);
+                fc.put("group", group);
+                fc.put("group-label", groupLabel);
+                fc.put("group-current", currentMark);
+                fc.put("flag-group", currentGroup);
+                fc.put("flag-group-label", currentGroupLabel);
+                fc.put("flag-with-group", flagGroup);
 
                 String name = bake(fc, dyn.name);
                 List<String> lore = bakeList(fc, dyn.lore);
