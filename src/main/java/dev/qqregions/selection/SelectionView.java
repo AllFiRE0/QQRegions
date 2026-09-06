@@ -167,26 +167,57 @@ public class SelectionView {
             wanted.add(blockKey(p));
         }
 
-        viewBlocks.entrySet().removeIf(e -> {
-            if (!wanted.contains(e.getKey())) {
-                e.getValue().remove();
-                return true;
-            }
-            return false;
-        });
-
+        // Переиспользуем старые сущности: при движении точки кадр смещается на
+        // 1-2 блока — блоки НЕ пересоздаются, а ТЕЛЕПОРТИРУЮТСЯ на новые места.
+        // Полная пересборка (destroy+spawn сотен сущностей каждый щелчок колеса)
+        // вешала клиент: «тянется только угол, остальное стоит на месте».
+        List<BlockVector3> need = new ArrayList<>();
+        List<Long> spare = new ArrayList<>();
         for (BlockVector3 p : inRange) {
-            long key = blockKey(p);
-            if (viewBlocks.containsKey(key) || viewBlocks.size() >= maxBlocks) {
-                continue;
+            if (!viewBlocks.containsKey(blockKey(p))) {
+                need.add(p);
             }
-            viewBlocks.put(key, spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale()));
+        }
+        for (Long key : new ArrayList<>(viewBlocks.keySet())) {
+            if (!wanted.contains(key)) {
+                spare.add(key);
+            }
+        }
+        int si = 0;
+        boolean changed = false;
+        for (BlockVector3 p : need) {
+            Entity ent = null;
+            while (si < spare.size()) {
+                Entity c = viewBlocks.remove(spare.get(si++));
+                if (c != null && c.isValid()) {
+                    ent = c;
+                    break;
+                }
+            }
+            if (ent == null) {
+                viewBlocks.put(blockKey(p), spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale()));
+            } else {
+                ent.teleport(displayLoc(world, p));
+                viewBlocks.put(blockKey(p), ent);
+            }
+            changed = true;
+        }
+        for (; si < spare.size(); si++) {
+            Entity removed = viewBlocks.remove(spare.get(si));
+            if (removed != null) {
+                removed.remove();
+            }
+            changed = true;
         }
 
-        for (Entity e : viewBlocks.values()) {
-            if (e instanceof BlockDisplay bd) {
-                bd.setBlock(blockMat.createBlockData());
-                bd.setGlowColorOverride(color);
+        // Блок/свечение обновляем ТОЛЬКО когда кадр реально менялся — не гоняем
+        // глянец по всем дисплеям каждый тик (лишний поток NBT-пакетов клиенту).
+        if (changed) {
+            for (Entity e : viewBlocks.values()) {
+                if (e instanceof BlockDisplay bd) {
+                    bd.setBlock(blockMat.createBlockData());
+                    bd.setGlowColorOverride(color);
+                }
             }
         }
 
