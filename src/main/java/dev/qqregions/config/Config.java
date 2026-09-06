@@ -462,10 +462,8 @@ public class Config {
             block = m == null ? Material.GLASS : m;
             hideOnExit = s.getBoolean("hide-on-exit", true);
             terrainCacheSeconds = Math.max(1, s.getInt("terrain-cache-seconds", 3));
-            terrainDisplay = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
-            if (!"BLOCKS".equals(terrainDisplay) && !"PARTICLES".equals(terrainDisplay)) {
-                terrainDisplay = "PARTICLES";
-            }
+            String td = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
+            terrainDisplay = ("BLOCKS".equals(td) || "PARTICLES".equals(td)) ? td : "PARTICLES";
             fence = new TerrainFenceOptions(s.getConfigurationSection("territory.fence"));
             particles = new ParticleOptions(s.getConfigurationSection("particles"));
         }

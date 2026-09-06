@@ -495,6 +495,27 @@ public class HighlightManager implements Listener {
         return list;
     }
 
+    /** Создать одиночный BlockDisplay. glow == null — без свечения. */
+    private BlockDisplay spawnDisplay(World world, double x, double y, double z,
+                                      org.bukkit.block.data.BlockData data, Vector3f scale, Color glow) {
+        try {
+            BlockDisplay d = world.spawn(new Location(world, x, y, z), BlockDisplay.class);
+            d.setBlock(data);
+            d.setTransformation(new Transformation(
+                    new Vector3f(), new Quaternionf(), scale, new Quaternionf()));
+            d.setInterpolationDelay(0);
+            d.setInterpolationDuration(0);
+            if (glow != null) {
+                d.setGlowColorOverride(glow);
+            }
+            d.setInvulnerable(true);
+            return d;
+        } catch (Throwable t) {
+            plugin.dbg("spawnDisplay error: " + t.getMessage());
+            return null;
+        }
+    }
+
     /**
      * «Забор» TERRITORY: для каждой из 4 сторон прямоугольника региона идём
      * по колонкам, находим верхний блок, и группируем подряд идущие колонки
