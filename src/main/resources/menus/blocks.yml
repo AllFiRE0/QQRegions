@@ -45,7 +45,7 @@ Menus:
         commands:
           - "@menu:myflags"
       "help":
-        slot: 44
+        slot: 50
         material: BOOK
         name: "&eПомощь"
         lore:

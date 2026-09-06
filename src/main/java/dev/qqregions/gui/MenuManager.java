@@ -6,6 +6,15 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
+import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.registry.data.dialog.ActionButton;
+import io.papermc.paper.registry.data.dialog.DialogBase;
+import io.papermc.paper.registry.data.dialog.action.DialogAction;
+import io.papermc.paper.registry.data.dialog.body.DialogBody;
+import io.papermc.paper.registry.data.dialog.input.DialogInput;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickCallback;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -27,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -45,8 +55,8 @@ public class MenuManager implements Listener {
      *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
      *  чистит open), но промпт должен пережить это и обработать сообщение. */
     private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
-    /** Ожидание поискового запроса в чат: value = "flag" | "market". */
-    private final Map<UUID, String> pendingSearch = new ConcurrentHashMap<>();
+    /** Ожидание поискового запроса в чат: значение = SearchPrompt(kind: flag|market). */
+    private final Map<UUID, SearchPrompt> pendingSearch = new ConcurrentHashMap<>();
     /** История переходов между меню для кнопки @back. */
     private final Map<UUID, Deque<NavState>> history = new HashMap<>();
     private final QQRegions plugin;
@@ -582,6 +592,12 @@ public class MenuManager implements Listener {
         if (pendingAdd.containsKey(id)) {
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingAdd.remove(id), 100L);
         }
+        // поисковый промпт живёт 5 сек после закрытия меню, потом перестаёт
+        // глотать чат (если игрок не ввёл запрос — просто отменяется),
+        // но при вводе до истечения срока меню переоткроется с результатом.
+        if (pendingSearch.containsKey(id)) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingSearch.remove(id), 100L);
+        }
     }
 
     /** Телепорт в центр региона (только админ и владелец). */
@@ -1111,9 +1127,20 @@ public class MenuManager implements Listener {
         render(p, om.menu, om.ctx, om.page, om.role, om.kind);
     }
 
-    /** Начать поиск флагов по названию (по id И переводу {flag-name}). */
+    /** Начать поиск флагов по названию (по id И переводу {flag-name}).
+     *  При поддержке сервером нового диалогового API значение вводится через
+     *  диалоговое окно, иначе — через обычный чат. */
     private void startSearchPrompt(Player p, OpenMenu om, String kind) {
-        pendingSearch.put(p.getUniqueId(), kind);
+        boolean market = "market".equalsIgnoreCase(kind);
+        if (tryInputDialog(p,
+                dev.qqregions.util.Msg.color(market ? "&eПоиск по рынку" : "&eПоиск флагов"),
+                dev.qqregions.util.Msg.color(market
+                        ? "&7Введите название региона для поиска."
+                        : "&7Введите название флага или его перевод."),
+                query -> onSearchResult(p.getUniqueId(), new SearchPrompt(om, kind), query))) {
+            return;
+        }
+        pendingSearch.put(p.getUniqueId(), new SearchPrompt(om, kind));
         p.sendMessage(plugin.lang().comp("market.search-prompt"));
         p.sendMessage(plugin.lang().comp("market.search-cancel"));
     }
@@ -1131,8 +1158,8 @@ public class MenuManager implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onSearchChat(AsyncPlayerChatEvent e) {
         UUID id = e.getPlayer().getUniqueId();
-        String kind = pendingSearch.get(id);
-        if (kind == null) {
+        SearchPrompt pr = pendingSearch.get(id);
+        if (pr == null) {
             return;
         }
         e.setCancelled(true);
@@ -1149,29 +1176,50 @@ public class MenuManager implements Listener {
         }
         final String q = text;
         final UUID pid = id;
-        plugin.getServer().getScheduler().runTask(plugin, () -> applySearch(pid, kind, q));
+        plugin.getServer().getScheduler().runTask(plugin, () -> applySearch(pid, pr, q));
     }
 
-    private void applySearch(UUID id, String kind, String query) {
+    private void applySearch(UUID id, SearchPrompt pr, String query) {
         Player p = plugin.getServer().getPlayer(id);
         if (p == null || !p.isOnline()) {
             return;
         }
-        OpenMenu om = open.get(id);
-        if (om == null) {
-            return;
-        }
-        if ("market".equals(kind)) {
-            om.ctx.put("_marketsearch", query);
-            p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+        boolean market = "market".equalsIgnoreCase(pr.kind);
+        String key = market ? "_marketsearch" : "_flagsearch";
+        p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+        OpenMenu live = open.get(id);
+        if (live != null) {
+            // меню ещё открыто — кладём фильтр в ЖИВОЙ контекст и перерисовываем
+            live.ctx.put(key, query);
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
         } else {
-            om.ctx.put("_flagsearch", query);
-            p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+            // меню закрылось во время ввода (клиент закрывает инвентарь при
+            // открытии чата/диалога) — кладём фильтр в сохранённый контекст и
+            // переоткрываем, чтобы результат был виден
+            pr.om.ctx.put(key, query);
+            open(p, market ? "market" : "flags", pr.om.ctx, 0, pr.om.role, false);
         }
-        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
     }
 
-    /** Начать ввод ника в чат для добавления владельца/участника. */
+    /** Результат поиска из диалогового окна (запускается на главном потоке). */
+    private void onSearchResult(UUID id, SearchPrompt pr, String raw) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline()) {
+                return;
+            }
+            String q = raw == null ? "" : raw.trim();
+            if (q.isEmpty() || q.equalsIgnoreCase("cancel") || q.equalsIgnoreCase("отмена")
+                    || q.equalsIgnoreCase("сброс") || q.equalsIgnoreCase("off")) {
+                p.sendMessage(plugin.lang().comp("market.search-off"));
+                return;
+            }
+            applySearch(id, pr, q);
+        });
+    }
+
+    /** Начать ввод ника в чат для добавления владельца/участника.
+     *  При поддержке сервером диалогового API ник вводится через окно, иначе — чатом. */
     private void startPrompt(Player p, OpenMenu om, String kind) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
             p.sendMessage(dev.qqregions.util.Msg.color("&cУправление участниками доступно только владельцам."));
@@ -1180,12 +1228,52 @@ public class MenuManager implements Listener {
         if (!"owner".equalsIgnoreCase(kind) && !"member".equalsIgnoreCase(kind)) {
             return;
         }
-        pendingAdd.put(p.getUniqueId(),
-                new AddPrompt(om, kind.toLowerCase(java.util.Locale.ROOT)));
+        String k = kind.toLowerCase(java.util.Locale.ROOT);
+        boolean ownerRole = "owner".equalsIgnoreCase(k);
+        if (tryInputDialog(p,
+                dev.qqregions.util.Msg.color(ownerRole ? "&eДобавление владельца" : "&eДобавление участника"),
+                dev.qqregions.util.Msg.color("&7Введите ник игрока, которого "
+                        + (ownerRole ? "сделать владельцем региона." : "добавить участником региона.")),
+                name -> onAddResult(p.getUniqueId(), new AddPrompt(om, k), name))) {
+            return;
+        }
+        pendingAdd.put(p.getUniqueId(), new AddPrompt(om, k));
         p.sendMessage(dev.qqregions.util.Msg.color(
                 "&eВведите в чат ник игрока, которого добавить "
-                        + ("owner".equalsIgnoreCase(kind) ? "&bвладельцем&e" : "&eучастником")
+                        + (ownerRole ? "&bвладельцем&e" : "&eучастником")
                         + ". Напишите &cотмена&e, чтобы отменить."));
+    }
+
+    /** Результат диалога «добавить игрока» (запускается на главном потоке). */
+    private void onAddResult(UUID id, AddPrompt pr, String name) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> addPlayerFromChat(id, pr, name));
+    }
+
+    /** Показать диалоговое окно с текстовым полем (Paper Dialog API).
+     *  Возвращает false, если API недоступно — вызывающий переключается на чат. */
+    private boolean tryInputDialog(Player p, Component title, Component label, Consumer<String> onResult) {
+        try {
+            Dialog dialog = Dialog.create(builder -> builder.empty()
+                    .base(DialogBase.builder(title)
+                            .body(List.of(DialogBody.plainMessage(label)))
+                            .inputs(List.of(DialogInput.text("value", 300, label, true, "", 64, null)))
+                            .canCloseWithEscape(true)
+                            .build())
+                    .type(DialogType.confirmation(
+                            ActionButton.create(Component.text("OK"), null, 100,
+                                    DialogAction.customClick((response, audience) -> {
+                                        if (audience instanceof Player pl) {
+                                            String value = response.getText("value");
+                                            onResult.accept(value == null ? "" : value);
+                                        }
+                                    }, ClickCallback.Options.builder().uses(1)
+                                            .lifetime(ClickCallback.DEFAULT_LIFETIME).build())),
+                            ActionButton.create(Component.text("Отмена"), null, 100, null))));
+            p.showDialog(dialog);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -1283,6 +1371,19 @@ public class MenuManager implements Listener {
         final String kind;
 
         AddPrompt(OpenMenu om, String kind) {
+            this.om = om;
+            this.kind = kind;
+        }
+    }
+
+    /** Контекст поискового промпта: копия OpenMenu + вид поиска
+     *  ("market"/"flag"). Позволяет применить поиск, даже если меню
+     *  закрылось за время ввода, и переоткрыть его с результатом. */
+    private static class SearchPrompt {
+        final OpenMenu om;
+        final String kind;
+
+        SearchPrompt(OpenMenu om, String kind) {
             this.om = om;
             this.kind = kind;
         }

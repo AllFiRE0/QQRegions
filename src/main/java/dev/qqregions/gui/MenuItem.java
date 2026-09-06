@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
@@ -126,6 +127,11 @@ public class MenuItem {
         ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
+            // скрыть служебные строки предметов (урон меча, эффекты зелий,
+            // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_POTION_EFFECTS,
+                    ItemFlag.HIDE_DYE, ItemFlag.HIDE_ARMOR_TRIM,
+                    ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
             meta.displayName(Msg.color(process(plugin, player, ctx, name == null ? "" : name)));
             List<Component> lines = new ArrayList<>();
             if (lore != null) {

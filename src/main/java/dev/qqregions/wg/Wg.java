@@ -255,6 +255,10 @@ public class Wg {
         return region != null && (contains(region.getOwners(), uuid) || contains(region.getMembers(), uuid));
     }
 
+    public boolean isMember(ProtectedRegion region, Player player) {
+        return region != null && (contains(region.getOwners(), player) || contains(region.getMembers(), player));
+    }
+
     /** UUID всех владельцев региона. */
     public Set<UUID> ownerUuids(ProtectedRegion region) {
         Set<UUID> out = new HashSet<>();

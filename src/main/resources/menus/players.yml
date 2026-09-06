@@ -106,7 +106,7 @@ Menus:
         commands:
           - "@pf:all"
       "back":
-        slot: 35
+        slot: 40
         material: ARROW
         name: "&eНазад"
         lore:

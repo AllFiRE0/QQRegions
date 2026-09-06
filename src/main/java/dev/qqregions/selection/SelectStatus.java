@@ -90,13 +90,17 @@ public final class SelectStatus {
         return p.getLocation().getBlockY() - sel.min().getBlockY();
     }
 
-    /** Чужие регионы (не принадлежащие игроку), пересекающие выделение. */
+    /** Чужие регионы (не принадлежащие игроку), пересекающие выделение.
+     *  Используется прямое владение/участие (isMember), а НЕ role(): последняя
+     *  для админа/op возвращает OWNER для всех регионов, и конфликт с чужой
+     *  областью превращался бы в 0. Админ тоже должен видеть чужие области. */
     public static List<ProtectedRegion> foreignIntersecting(QQRegions plugin, Selection sel, Player p) {
         List<ProtectedRegion> out = new ArrayList<>();
         for (ProtectedRegion r : plugin.wg().intersecting(sel)) {
-            if (plugin.wg().role(r, p) == Wg.RegionRole.NONE) {
-                out.add(r);
+            if (plugin.wg().isMember(r, p)) {
+                continue;
             }
+            out.add(r);
         }
         return out;
     }
