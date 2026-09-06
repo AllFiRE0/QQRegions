@@ -3,7 +3,6 @@ package dev.qqregions.selection;
 import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
-import org.bukkit.Brightness;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -194,7 +193,6 @@ public class SelectionView {
                 new Quaternionf()));
         d.setInterpolationDelay(0);
         d.setInterpolationDuration(0);
-        d.setBrightness(new Brightness(15, 15));
         d.setGlowColorOverride(glow);
         d.setInvulnerable(true);
         return d;
