@@ -105,6 +105,14 @@ Menus:
           - "&7Показать всех владельцев и участников"
         commands:
           - "@pf:all"
+      "back":
+        slot: 35
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-players:
       enabled: true
       slots:
@@ -179,6 +187,14 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "back":
+        slot: 46
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-players:
       enabled: true
       slots:

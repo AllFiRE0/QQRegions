@@ -68,6 +68,14 @@ Menus:
           - "&7Управление участниками и владельцами"
         commands:
           - "@menu:players"
+      "back":
+        slot: 52
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-flags:
       enabled: true
       slots:
@@ -214,6 +222,14 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "back":
+        slot: 52
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-flags:
       enabled: true
       slots:
@@ -310,6 +326,14 @@ ignore-flags:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "back":
+        slot: 52
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-flags:
       enabled: true
       slots:
@@ -404,6 +428,14 @@ ignore-flags:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "back":
+        slot: 52
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
     dynamic-flags:
       enabled: true
       slots:

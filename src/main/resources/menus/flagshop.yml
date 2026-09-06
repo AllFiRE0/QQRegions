@@ -26,11 +26,11 @@ Menus:
       "back":
         slot: 49
         material: BARRIER
-        name: "&cЗакрыть"
+        name: "&cНазад"
         lore:
-          - "&7Закрыть меню"
+          - "&7Вернуться в предыдущее меню"
         commands:
-          - "close"
+          - "@back"
       "search":
         slot: 4
         material: PAPER

@@ -843,7 +843,14 @@ public class MenuManager implements Listener {
             p.sendMessage(dev.qqregions.util.Msg.color("&cУ вас нет права на рейд."));
             return;
         }
-        String res = plugin.raid().start(p);
+        String res;
+        org.bukkit.World w = worldFrom(ctx);
+        ProtectedRegion r = w == null ? null : plugin.wg().byName(w, ctx.get("region"));
+        if (w != null && r != null) {
+            res = plugin.raid().start(p, r);
+        } else {
+            res = plugin.raid().start(p);
+        }
         if (res != null) {
             p.sendMessage(dev.qqregions.util.Msg.color("&c" + res));
         } else {

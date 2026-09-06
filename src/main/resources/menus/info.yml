@@ -132,6 +132,24 @@ Menus:
         permission: qqregions.delete
         commands:
           - "asConsole! rg delete -w {world} {region}"
+      "raid":
+        slot: 47
+        material: NETHERITE_SWORD
+        name: "&cРейд клана"
+        lore:
+          - "&7Запустить рейд на регион &f{region}"
+          - "&7Требует клан (JustTeams)"
+        permission: qqregions.raid
+        commands:
+          - "@raid:start"
+      "back":
+        slot: 53
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
   "member":
     role-required: member
     priority: 20
@@ -211,6 +229,24 @@ Menus:
           - "&7Команды плагина"
         commands:
           - "@menu:help"
+      "raid":
+        slot: 47
+        material: NETHERITE_SWORD
+        name: "&cРейд клана"
+        lore:
+          - "&7Запустить рейд на регион &f{region}"
+          - "&7Требует клан (JustTeams)"
+        permission: qqregions.raid
+        commands:
+          - "@raid:start"
+      "back":
+        slot: 53
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
   "other":
     role-required: other
     priority: 10
@@ -294,3 +330,11 @@ Menus:
         permission: qqregions.raid
         commands:
           - "@raid:start"
+      "back":
+        slot: 53
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
