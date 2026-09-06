@@ -1,0 +1,167 @@
+# ============================================================
+#  QQRegions — меню игроков региона (управление участниками)
+#
+#  Список владельцев/участников заполняется кодом плагина в
+#  секции dynamic-flags.slots ниже: алмазы = владельцы,
+#  золото = участники. ЛКМ по игроку — убрать из региона.
+#
+#  Кнопки добавления:
+#    "@add:owner"  — владелец (ввод ника в чат)
+#    "@add:member" — участник (ввод ника в чат)
+#  Управление доступно владельцам региона и админам
+#  (qqregions.admin). У остальных ролей — только просмотр.
+#
+#  Переменные: {region} {world} {player} {role}
+#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @add:owner|member,
+#                 @player-del:<uuid|ник>:owner|member, close
+# ============================================================
+update_interval: 20
+
+Menus:
+  "owner":
+    role-required: owner
+    priority: 30
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Игроки ({region}) ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "info":
+        slot: 45
+        material: PAPER
+        name: "&eИнформация"
+        lore:
+          - "&7Назад к информации о регионе"
+        commands:
+          - "@menu:info"
+      "flags":
+        slot: 46
+        material: REDSTONE_TORCH
+        name: "&eФлаги"
+        lore:
+          - "&7Открыть редактор флагов"
+        commands:
+          - "@menu:flags"
+      "add-owner":
+        slot: 48
+        material: EMERALD
+        name: "&b+ Владелец"
+        lore:
+          - "&7Нажмите, затем введите ник в чат"
+        commands:
+          - "@add:owner"
+      "add-member":
+        slot: 50
+        material: PLAYER_HEAD
+        name: "&e+ Участник"
+        lore:
+          - "&7Нажмите, затем введите ник в чат"
+        commands:
+          - "@add:member"
+    dynamic-flags:
+      # тут задаются только слоты под список игроков
+      enabled: true
+      slots:
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 28
+        - 29
+        - 30
+        - 31
+        - 32
+        - 33
+        - 34
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Предыдущая страница"
+        slot: 47
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        lore:
+          - "&7Следующая страница"
+        slot: 52
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Игроки ({region}) ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "info":
+        slot: 45
+        material: PAPER
+        name: "&eИнформация"
+        lore:
+          - "&7Назад к информации о регионе"
+        commands:
+          - "@menu:info"
+    dynamic-flags:
+      enabled: true
+      slots:
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Предыдущая страница"
+        slot: 47
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        lore:
+          - "&7Следующая страница"
+        slot: 52

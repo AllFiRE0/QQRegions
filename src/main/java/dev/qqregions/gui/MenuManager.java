@@ -5,12 +5,14 @@ import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 
 import java.io.File;
@@ -19,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Менеджер GUI-меню. Загружает файлы из папки menus/, хранит открытые
@@ -29,6 +32,8 @@ public class MenuManager implements Listener {
     /** файл (без .yml) -> упорядоченные по приоритету шаблоны */
     private final Map<String, List<Menu>> menus = new HashMap<>();
     private final Map<UUID, OpenMenu> open = new HashMap<>();
+    /** ожидание ввода ника для добавления: UUID -> "owner"|"member" */
+    private final Map<UUID, String> pendingAdd = new ConcurrentHashMap<>();
     private final QQRegions plugin;
 
     public MenuManager(QQRegions plugin) {
@@ -43,6 +48,7 @@ public class MenuManager implements Listener {
             dir.mkdirs();
             plugin.saveResource("menus/flags.yml", false);
             plugin.saveResource("menus/info.yml", false);
+            plugin.saveResource("menus/players.yml", false);
         }
         File[] files = dir.listFiles((d, n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
         if (files != null) {
@@ -77,6 +83,21 @@ public class MenuManager implements Listener {
         return WgRoleHolder.OTHER.key;
     }
 
+    /** Меню игроков региона: список владельцев/участников (клик = убрать),
+     * кнопки добавления владельца/участника через ввод ника в чат. */
+    public boolean openPlayers(Player player, org.bukkit.World world, ProtectedRegion region) {
+        String role = roleOf(player, region);
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("region", region.getId());
+        ctx.put("world", world.getName());
+        ctx.put("player", player.getName());
+        ctx.put("role", role);
+        ctx.put("owners", plugin.wg().owners(region));
+        ctx.put("members", plugin.wg().members(region));
+        Menu best = pick(player, "players", role);
+        return best != null && render(player, best, ctx, 0, role, Kind.PLAYERS);
+    }
+
     /** Информационное меню региона с учётом роли игрока (owner/member/other). */
     public boolean openInfo(Player player, org.bukkit.World world, ProtectedRegion region) {
         WgRoleHolder r;
@@ -109,6 +130,11 @@ public class MenuManager implements Listener {
         WgRoleHolder(String key) {
             this.key = key;
         }
+    }
+
+    /** Чем заполняются динамические слоты меню. */
+    private enum Kind {
+        FLAGS, PLAYERS
     }
 
     private static long regionArea(ProtectedRegion region) {
@@ -146,35 +172,42 @@ public class MenuManager implements Listener {
     }
 
     public boolean open(Player player, String menuName, Map<String, String> ctx, int page, String role) {
-        List<Menu> candidates = menus.get(menuName.toLowerCase(java.util.Locale.ROOT));
-        if (candidates == null) {
+        Menu best = pick(player, menuName, role);
+        if (best == null) {
             return false;
         }
-        Menu best = null;
+        Kind kind = "players".equalsIgnoreCase(menuName) ? Kind.PLAYERS : Kind.FLAGS;
+        return render(player, best, ctx, page, role, kind);
+    }
+
+    /** Шаблон меню с наибольшим приоритетом, подходящий роли и игроку. */
+    private Menu pick(Player player, String menuName, String role) {
+        List<Menu> candidates = menus.get(menuName.toLowerCase(java.util.Locale.ROOT));
+        if (candidates == null) {
+            return null;
+        }
         for (Menu m : candidates) {
             if (!m.roleMatches(role)) {
                 continue;
             }
             if (m.matches(player)) {
-                best = m;
-                break;
+                return m;
             }
         }
-        if (best == null) {
-            return false;
-        }
-        return render(player, best, ctx, page, role);
+        return null;
     }
 
-    /** Перерендерить инвентарь меню. */
-    private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role) {
-        List<MenuItem> dynItems = menu.dynamicFlags(plugin, player, ctx);
+    /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
+    private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
+        List<MenuItem> dynItems = kind == Kind.PLAYERS
+                ? playerItems(ctx)
+                : menu.dynamicFlags(plugin, player, ctx);
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
         Map<Integer, MenuItem> slotMap = new HashMap<>();
         Inventory inv = menu.build(plugin, player, ctx, safePage, maxPages, dynItems, slotMap);
         player.openInventory(inv);
-        open.put(player.getUniqueId(), new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap));
+        open.put(player.getUniqueId(), new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap, kind));
         return true;
     }
 
@@ -189,7 +222,7 @@ public class MenuManager implements Listener {
                 if (!om.player.isOnline()) {
                     continue;
                 }
-                render(om.player, om.menu, om.ctx, om.page, om.role);
+                render(om.player, om.menu, om.ctx, om.page, om.role, om.kind);
             }
         }
     }
@@ -258,9 +291,9 @@ public class MenuManager implements Listener {
             if (c.startsWith("@page:")) {
                 String arg = c.substring("@page:".length()).trim();
                 if (arg.equalsIgnoreCase("prev") && om.page > 0) {
-                    render(p, om.menu, om.ctx, om.page - 1, om.role);
+                    render(p, om.menu, om.ctx, om.page - 1, om.role, om.kind);
                 } else if (arg.equalsIgnoreCase("next") && om.page < om.maxPages - 1) {
-                    render(p, om.menu, om.ctx, om.page + 1, om.role);
+                    render(p, om.menu, om.ctx, om.page + 1, om.role, om.kind);
                 }
                 continue;
             }
@@ -275,6 +308,14 @@ public class MenuManager implements Listener {
             }
             if (c.startsWith("@flag:")) {
                 setFlag(p, om.ctx, c.substring("@flag:".length()).trim());
+                continue;
+            }
+            if (c.startsWith("@player-del:")) {
+                removeParticipant(p, om, c.substring("@player-del:".length()).trim());
+                continue;
+            }
+            if (c.startsWith("@add:")) {
+                startPrompt(p, om, c.substring("@add:".length()).trim());
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -389,8 +430,117 @@ public class MenuManager implements Listener {
         OpenMenu om = open.get(p.getUniqueId());
         if (om != null) {
             // сохраняем текущую страницу (не сбрасываем на первую)
-            render(p, om.menu, om.ctx, om.page, om.role);
+            render(p, om.menu, om.ctx, om.page, om.role, om.kind);
         }
+    }
+
+    /** Кнопки списка участников для меню PLAYERS (владельцы, затем участники). */
+    private List<MenuItem> playerItems(Map<String, String> ctx) {
+        List<MenuItem> out = new ArrayList<>();
+        String worldName = ctx.get("world");
+        if (worldName == null) {
+            return out;
+        }
+        org.bukkit.World w = org.bukkit.Bukkit.getWorld(worldName);
+        ProtectedRegion region = w == null ? null : plugin.wg().byName(w, ctx.get("region"));
+        if (w == null || region == null) {
+            return out;
+        }
+        for (dev.qqregions.wg.Wg.Participant part : plugin.wg().participants(region)) {
+            String label = part.name() != null ? part.name() : part.uuid().toString().substring(0, 8);
+            Material mat = part.owner() ? Material.DIAMOND : Material.GOLD_INGOT;
+            String display = dev.qqregions.util.Msg.color(
+                    (part.owner() ? "&b" : "&e") + label);
+            List<String> lore = new ArrayList<>(List.of(
+                    dev.qqregions.util.Msg.color("&7Роль: " + (part.owner() ? "&bВладелец" : "&eУчастник")),
+                    dev.qqregions.util.Msg.color("&cЛКМ — убрать из региона")));
+            String key = part.uuid() != null ? part.uuid().toString() : part.name();
+            List<String> cmds = List.of("@player-del:" + key + ":" + (part.owner() ? "owner" : "member"));
+            out.add(new MenuItem(mat.name(), 1, null, display, lore, cmds, ""));
+        }
+        return out;
+    }
+
+    /** Кнопка входа на псевдокоманды меню игроков. */
+    private void removeParticipant(Player p, OpenMenu om, String spec) {
+        if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cУправление участниками доступно только владельцам."));
+            return;
+        }
+        String[] parts = spec.split(":", 2);
+        if (parts.length < 2) {
+            return;
+        }
+        String id = parts[0].trim();
+        boolean owner = "owner".equalsIgnoreCase(parts[1].trim());
+        org.bukkit.World world = worldFrom(om.ctx);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
+        if (world == null || region == null) {
+            return;
+        }
+        plugin.wg().removePlayerId(world, region, id, owner);
+        p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок убран из региона."));
+        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+    }
+
+    /** Начать ввод ника в чат для добавления владельца/участника. */
+    private void startPrompt(Player p, OpenMenu om, String kind) {
+        if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cУправление участниками доступно только владельцам."));
+            return;
+        }
+        if (!"owner".equalsIgnoreCase(kind) && !"member".equalsIgnoreCase(kind)) {
+            return;
+        }
+        pendingAdd.put(p.getUniqueId(), kind.toLowerCase(java.util.Locale.ROOT));
+        p.sendMessage(dev.qqregions.util.Msg.color(
+                "&eВведите в чат ник игрока, которого добавить "
+                        + ("owner".equalsIgnoreCase(kind) ? "&bвладельцем&e" : "&eучастником")
+                        + ". Напишите &cотмена&e, чтобы отменить."));
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onChat(AsyncPlayerChatEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        if (!pendingAdd.containsKey(id)) {
+            return;
+        }
+        e.setCancelled(true);
+        final String text = e.getMessage().trim();
+        final String kind = pendingAdd.remove(id);
+        final UUID pid = id;
+        plugin.getServer().getScheduler().runTask(plugin, () -> addPlayerFromChat(pid, kind, text));
+    }
+
+    private void addPlayerFromChat(UUID id, String kind, String name) {
+        OpenMenu om = open.get(id);
+        if (om == null) {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p != null && p.isOnline()) {
+                p.sendMessage(dev.qqregions.util.Msg.color("&cМеню закрыто — добавление отменено."));
+            }
+            return;
+        }
+        Player p = om.player;
+        if (name.isEmpty() || name.equalsIgnoreCase("отмена") || name.equalsIgnoreCase("cancel")) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&7Добавление отменено."));
+            return;
+        }
+        org.bukkit.World world = worldFrom(om.ctx);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
+        if (world == null || region == null) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cРегион не найден."));
+            return;
+        }
+        plugin.wg().addPlayerByName(world, region, name, "owner".equalsIgnoreCase(kind));
+        p.sendMessage(dev.qqregions.util.Msg.color("&aИгрок &f" + name + " &aдобавлен"
+                + ("owner".equalsIgnoreCase(kind) ? " как владелец." : " как участник.")));
+        render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+    }
+
+    private static org.bukkit.World worldFrom(Map<String, String> ctx) {
+        String name = ctx.get("world");
+        return name == null ? null : org.bukkit.Bukkit.getWorld(name);
     }
 
     private String applyContext(Map<String, String> ctx, List<String> cmds) {
@@ -417,10 +567,11 @@ public class MenuManager implements Listener {
         final String role;
         final int page;
         final int maxPages;
+        final Kind kind;
         int ticks;
 
         OpenMenu(Player player, Inventory inv, Menu menu, Map<String, String> ctx,
-                 int page, int maxPages, String role, Map<Integer, MenuItem> slotMap) {
+                 int page, int maxPages, String role, Map<Integer, MenuItem> slotMap, Kind kind) {
             this.player = player;
             this.inv = inv;
             this.menu = menu;
@@ -429,6 +580,7 @@ public class MenuManager implements Listener {
             this.maxPages = maxPages;
             this.role = role;
             this.slotMap = slotMap;
+            this.kind = kind;
         }
     }
 }

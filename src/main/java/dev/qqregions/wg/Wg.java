@@ -23,7 +23,9 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -215,6 +217,46 @@ public class Wg {
         saveQuiet(world, region);
     }
 
+    /** Удалить участника по UUID или имени (владелец/участник). */
+    public void removePlayerId(World world, ProtectedRegion region, String id, boolean owner) {
+        if (id == null || id.trim().isEmpty()) {
+            return;
+        }
+        String v = id.trim();
+        DefaultDomain set = owner ? region.getOwners() : region.getMembers();
+        UUID uuid = null;
+        try {
+            uuid = UUID.fromString(v);
+        } catch (IllegalArgumentException ignored) {
+        }
+        if (uuid != null) {
+            set.removePlayer(uuid);
+        } else {
+            set.removePlayer(v);
+        }
+        saveQuiet(world, region);
+    }
+
+    /** Добавить участника по нику (резолвит UUID через сервер, иначе — имя). */
+    public void addPlayerByName(World world, ProtectedRegion region, String name, boolean owner) {
+        if (name == null || name.trim().isEmpty()) {
+            return;
+        }
+        String n = name.trim();
+        DefaultDomain set = owner ? region.getOwners() : region.getMembers();
+        UUID uuid = null;
+        try {
+            uuid = Bukkit.getOfflinePlayer(n).getUniqueId();
+        } catch (Throwable ignored) {
+        }
+        if (uuid != null) {
+            set.addPlayer(uuid);
+        } else {
+            set.addPlayer(n);
+        }
+        saveQuiet(world, region);
+    }
+
     private void saveQuiet(World world, ProtectedRegion region) {
         RegionManager rm = manager(world);
         if (rm == null) {
@@ -344,6 +386,68 @@ public class Wg {
 
     public String members(ProtectedRegion region) {
         return names(region.getMembers());
+    }
+
+    /** Список участников для меню: владельцы сначала, потом участники. */
+    public List<Participant> participants(ProtectedRegion region) {
+        List<Participant> out = new ArrayList<>();
+        Set<UUID> seenUuids = new HashSet<>();
+        Set<String> seenNames = new HashSet<>();
+        if (region != null) {
+            addDomain(region.getOwners(), true, out, seenUuids, seenNames);
+            addDomain(region.getMembers(), false, out, seenUuids, seenNames);
+        }
+        return out;
+    }
+
+    private void addDomain(DefaultDomain set, boolean owner, List<Participant> out,
+                           Set<UUID> seenUuids, Set<String> seenNames) {
+        try {
+            for (UUID u : set.getUniqueIds()) {
+                if (!seenUuids.add(u)) {
+                    continue;
+                }
+                String n = nameOf(u);
+                seenNames.add(n.toLowerCase(java.util.Locale.ROOT));
+                out.add(new Participant(u, n, owner));
+            }
+            for (String name : set.getPlayers()) {
+                String lc = name.toLowerCase(java.util.Locale.ROOT);
+                if (seenNames.contains(lc)) {
+                    continue;
+                }
+                UUID u = null;
+                try {
+                    u = UUID.fromString(name);
+                } catch (IllegalArgumentException ignored) {
+                }
+                if (u != null) {
+                    if (!seenUuids.add(u)) {
+                        continue;
+                    }
+                    out.add(new Participant(u, nameOf(u), owner));
+                    seenNames.add(nameOf(u).toLowerCase(java.util.Locale.ROOT));
+                } else {
+                    out.add(new Participant(null, name, owner));
+                    seenNames.add(lc);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private String nameOf(UUID uuid) {
+        try {
+            org.bukkit.OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+            String n = op.getName();
+            return n != null ? n : uuid.toString().substring(0, 8);
+        } catch (Throwable t) {
+            return uuid == null ? "?" : uuid.toString().substring(0, 8);
+        }
+    }
+
+    /** Пара «игрок региона» для меню партисипантов. */
+    public record Participant(UUID uuid, String name, boolean owner) {
     }
 
     /** Роль игрока в регионе. */
