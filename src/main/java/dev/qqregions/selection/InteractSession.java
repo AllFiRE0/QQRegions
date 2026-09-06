@@ -12,7 +12,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -205,6 +204,7 @@ public class InteractSession {
 
     public void end() {
         namePrompt = false;
+        resetWheelAcc();
         PlayerInventory inv = player.getInventory();
         inv.clear();
         inv.setArmorContents(armor);
@@ -242,6 +242,7 @@ public class InteractSession {
 
     public void setActivePoint(int point) {
         activePoint = point;
+        resetWheelAcc();
         renderSelectHotbar();
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
                 "point", plugin.lang().fmt("select.point-" + activePoint)));
@@ -272,12 +273,15 @@ public class InteractSession {
         if (sel == null) {
             return;
         }
-        boolean forward = plugin.config().invertWheel() != scrollUp;
+        boolean forward = plugin.config().invertWheel() == scrollUp;
         BlockVector3 cur = sel.getPos(activePoint);
-        BlockVector3 next = computeMove(cur, player.getLocation(), forward);
+        BlockVector3 next = computeMove(cur, forward);
         if (next == null) {
             player.sendMessage(plugin.lang().compPrefixed("select.point-locked"));
             return;
+        }
+        if (next == cur) {
+            return; // крошечный шаг округлился в 0 — состояние не меняется
         }
         plugin.selections().set(player, plugin.selections().clampToWorld(sel.withPoint(activePoint, next)));
         syncWorldEdit();
@@ -290,47 +294,62 @@ public class InteractSession {
         plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next);
     }
 
-    private BlockVector3 computeMove(BlockVector3 cur, Location eye, boolean forward) {
-        int angle = plugin.config().lookAngle();
-        float pitch = eye.getPitch();
-        if (pitch > angle) {
-            return moveY(cur, forward ? -1 : 1);
-        }
-        if (pitch < -angle) {
-            return moveY(cur, forward ? 1 : -1);
-        }
-        return moveHoriz(cur, eye, forward);
+    /**
+     * Движение активной точки ТОЛЬКО по направлению взгляда (все оси).
+     * За одно деление колеса точка проходит
+     * wheel-distance * (shift-множитель) / wheel-slots блоков; дробные остатки
+     * копятся в wheelAcc, чтобы медленные значения не терялись.
+     */
+    private final double[] wheelAcc = new double[3];
+
+    private void resetWheelAcc() {
+        wheelAcc[0] = wheelAcc[1] = wheelAcc[2] = 0;
     }
 
-    private BlockVector3 moveY(BlockVector3 cur, int direction) {
-        int step = plugin.config().wheelStep();
-        int ny = cur.getBlockY() + direction * step;
-        World w = player.getWorld();
-        ny = clamp(ny, w.getMinHeight(), w.getMaxHeight() - 1);
-        Selection sel = plugin.selections().get(player);
-        if (sel != null) {
-            BlockVector3 other = sel.getPos(activePoint == 1 ? 2 : 1);
-            if (activePoint == 1) {
-                ny = Math.max(ny, other.getBlockY());
-            } else {
-                ny = Math.min(ny, other.getBlockY());
-            }
-            if (ny == cur.getBlockY()) {
-                return null;
-            }
+    private BlockVector3 computeMove(BlockVector3 cur, boolean forward) {
+        Config cfg = plugin.config();
+        double per = cfg.wheelDistance()
+                * (player.isSneaking() ? cfg.wheelShiftSpeed() : 1.0)
+                / cfg.wheelSlots();
+        if (!forward) {
+            per = -per;
         }
-        return BlockVector3.at(cur.getBlockX(), ny, cur.getBlockZ());
+        org.bukkit.util.Vector dir = player.getLocation().getDirection();
+        double[] dv = {dir.getX() * per, dir.getY() * per, dir.getZ() * per};
+
+        int x = cur.getBlockX();
+        int y = cur.getBlockY();
+        int z = cur.getBlockZ();
+        BlockVector3 next = BlockVector3.at(
+                x + moveAxis(wheelAcc, 0, dv[0]),
+                y + moveAxis(wheelAcc, 1, dv[1]),
+                z + moveAxis(wheelAcc, 2, dv[2]));
+
+        int minY = player.getWorld().getMinHeight();
+        int maxY = player.getWorld().getMaxHeight() - 1;
+        BlockVector3 clamped = next;
+        if (next.getBlockY() < minY) {
+            clamped = clamped.withY(minY);
+        } else if (next.getBlockY() > maxY) {
+            clamped = clamped.withY(maxY);
+        }
+        // Совсем не сдвинулось (дробный шаг округлился в 0) — без сообщений.
+        if (next.equals(cur)) {
+            return cur;
+        }
+        // Хотели сдвинуться, но упёрлись в границу мира — сообщение.
+        if (clamped.equals(cur)) {
+            return null;
+        }
+        return clamped;
     }
 
-    private BlockVector3 moveHoriz(BlockVector3 cur, Location eye, boolean forward) {
-        double rad = Math.toRadians(eye.getYaw());
-        double dx = -Math.sin(rad);
-        double dz = Math.cos(rad);
-        int step = plugin.config().wheelStep();
-        int steps = forward ? step : -step;
-        int nx = cur.getBlockX() + (int) Math.round(dx * steps);
-        int nz = cur.getBlockZ() + (int) Math.round(dz * steps);
-        return BlockVector3.at(nx, cur.getBlockY(), nz);
+    /** Прибавляет дробный сдвиг к аккумулятору оси и возвращает целое число блоков. */
+    private int moveAxis(double[] acc, int axis, double delta) {
+        acc[axis] += delta;
+        int step = (int) Math.round(acc[axis]);
+        acc[axis] -= step;
+        return step;
     }
 
     // ---------- ввод названия ----------
@@ -499,10 +518,6 @@ public class InteractSession {
         return BlockVector3.at(p.getLocation().getBlockX(),
                 p.getLocation().getBlockY(),
                 p.getLocation().getBlockZ());
-    }
-
-    private static int clamp(int v, int lo, int hi) {
-        return Math.max(lo, Math.min(hi, v));
     }
 
     private static String fmt(long v) {

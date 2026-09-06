@@ -35,9 +35,10 @@ public class Config {
 
     private final List<SelectionTemplate> templates = new ArrayList<>();
 
-    private int wheelStep;
+    private int wheelSlots;
+    private double wheelDistance;
+    private int wheelShiftSpeed;
     private boolean invertWheel;
-    private int lookAngle;
     private final Map<String, Material> buttonMaterials = new HashMap<>();
     private List<String> blockedCommands = new ArrayList<>();
     private boolean syncWorldEdit = true;
@@ -84,9 +85,10 @@ public class Config {
         }
         templates.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
 
-        wheelStep = cfg.getInt("interactive.wheel-step", 1);
+        wheelSlots = Math.max(1, cfg.getInt("interactive.wheel-slots", 2));
+        wheelDistance = Math.max(0.1, cfg.getDouble("interactive.wheel-distance", 1));
+        wheelShiftSpeed = Math.max(1, cfg.getInt("interactive.wheel-shift-speed", 4));
         invertWheel = cfg.getBoolean("interactive.invert-wheel", false);
-        lookAngle = cfg.getInt("interactive.look-angle-for-vertical", 60);
         blockedCommands = new ArrayList<>(lower(cfg.getStringList("interactive.blocked-commands")));
         syncWorldEdit = cfg.getBoolean("interactive.sync-worldedit", true);
         debug = cfg.getBoolean("debug", false);
@@ -171,16 +173,20 @@ public class Config {
         return templates.isEmpty() ? new SelectionTemplate("default", 1, 10000, 100, 16, "", "") : templates.get(templates.size() - 1);
     }
 
-    public int wheelStep() {
-        return wheelStep;
+    public int wheelSlots() {
+        return wheelSlots;
+    }
+
+    public double wheelDistance() {
+        return wheelDistance;
+    }
+
+    public int wheelShiftSpeed() {
+        return wheelShiftSpeed;
     }
 
     public boolean invertWheel() {
         return invertWheel;
-    }
-
-    public int lookAngle() {
-        return lookAngle;
     }
 
     public List<String> blockedCommands() {
