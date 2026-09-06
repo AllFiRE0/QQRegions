@@ -44,7 +44,7 @@ public class RegionCommand {
                 doReload(sender);
                 return true;
             case "select":
-                if (requirePlayer(sender)) {
+                if (!requirePlayer(sender)) {
                     selectCommand.run((Player) sender, label, Arrays.copyOfRange(args, 1, args.length));
                 }
                 return true;
@@ -319,11 +319,8 @@ public class RegionCommand {
             lang(p, "info.none");
             return;
         }
-        // Меню флагов открывается только владельцу (или админу).
-        if (!plugin.wg().owns(region, p)) {
-            lang(p, "flags.not-owner");
-            return;
-        }
+        // Меню флагов: доступ по праву qqregions.flags.<флаг> / роли; сам
+        // показ и клики фильтруются внутри меню (см. dynamic-flags).
         boolean opened = plugin.menus().openFlags(p, p.getWorld(), region);
         if (!opened) {
             lang(p, "flags.menu-disabled");

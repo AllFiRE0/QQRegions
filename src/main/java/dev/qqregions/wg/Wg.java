@@ -7,8 +7,10 @@ import com.sk89q.worldguard.domains.DefaultDomain;
 import com.sk89q.worldguard.internal.platform.WorldGuardPlatform;
 import com.sk89q.worldguard.protection.ApplicableRegionSet;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
+import com.sk89q.worldguard.protection.flags.BooleanFlag;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.FlagContext;
+import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.managers.RemovalStrategy;
 import com.sk89q.worldguard.protection.managers.storage.StorageException;
@@ -242,13 +244,48 @@ public class Wg {
         }
     }
 
-    /**
-     * Текущее значение флага для региона (с учётом дефолта мира) в виде строки.
+    /** Текущее значение флага для региона (с учётом дефолта мира) в виде строки.
      * Для групп используйте заполнитель WorldGuard "%worldguard_region_has_flag_<флаг>:<группа>%".
      */
     public String flagValue(World world, ProtectedRegion region, Flag<?> flag) {
         Object value = region == null ? null : region.getFlag(flag);
         return value == null ? "" : value.toString().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * Установить значение флага региона напрямую через API WorldGuard.
+     * Return true при успехе. Сохраняет регион.
+     */
+    public boolean setFlagValue(World world, ProtectedRegion region, Flag<?> flag, String rawValue) {
+        if (region == null || world == null || flag == null) {
+            return false;
+        }
+        Object parsed;
+        try {
+            String s = rawValue == null ? "" : rawValue.trim();
+            if (flag instanceof StateFlag) {
+                parsed = "deny".equalsIgnoreCase(s) ? StateFlag.State.DENY : StateFlag.State.ALLOW;
+            } else if (flag instanceof BooleanFlag) {
+                parsed = Boolean.parseBoolean(s);
+            } else {
+                parsed = flag.parseString(s);
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+        if (parsed == null) {
+            return false;
+        }
+        try {
+            region.setFlag((Flag) flag, parsed);
+            RegionManager rm = manager(world);
+            if (rm != null) {
+                rm.save();
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /** Регионы, с которыми пересекается выделение (для сигнала конфликта). */

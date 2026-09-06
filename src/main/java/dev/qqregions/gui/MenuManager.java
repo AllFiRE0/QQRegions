@@ -1,5 +1,8 @@
 package dev.qqregions.gui;
 
+import com.sk89q.worldguard.protection.flags.BooleanFlag;
+import com.sk89q.worldguard.protection.flags.Flag;
+import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import org.bukkit.entity.Player;
@@ -51,29 +54,38 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Открыть лучшее подходящее меню flags для владельца региона. */
+    /** Открыть меню флагов региона с учётом роли игрока (owner/member/other). */
     public boolean openFlags(Player player, org.bukkit.World world, ProtectedRegion region) {
         String w = world.getName();
+        String r = roleOf(player, region);
         Map<String, String> ctx = new HashMap<>();
         ctx.put("region", region.getId());
         ctx.put("world", w);
         ctx.put("player", player.getName());
-        ctx.put("role", "owner");
-        return open(player, "flags", ctx, 0, "owner");
+        ctx.put("role", r);
+        return open(player, "flags", ctx, 0, r);
+    }
+
+    /** Роль игрока в регионе: owner / member / other (админ всегда owner). */
+    private String roleOf(Player player, ProtectedRegion region) {
+        if (player.hasPermission("qqregions.admin") || plugin.wg().isOwner(region, player.getUniqueId())) {
+            return WgRoleHolder.OWNER.key;
+        }
+        if (plugin.wg().isMember(region, player.getUniqueId())) {
+            return WgRoleHolder.MEMBER.key;
+        }
+        return WgRoleHolder.OTHER.key;
     }
 
     /** Информационное меню региона с учётом роли игрока (owner/member/other). */
     public boolean openInfo(Player player, org.bukkit.World world, ProtectedRegion region) {
         WgRoleHolder r;
-        if (plugin.wg().isOwner(region, player.getUniqueId())) {
+        if (player.hasPermission("qqregions.admin") || plugin.wg().isOwner(region, player.getUniqueId())) {
             r = WgRoleHolder.OWNER;
         } else if (plugin.wg().isMember(region, player.getUniqueId())) {
             r = WgRoleHolder.MEMBER;
         } else {
             r = WgRoleHolder.OTHER;
-        }
-        if (player.hasPermission("qqregions.admin")) {
-            r = WgRoleHolder.OWNER;
         }
         Map<String, String> ctx = new HashMap<>();
         ctx.put("region", region.getId());
@@ -156,7 +168,7 @@ public class MenuManager implements Listener {
 
     /** Перерендерить инвентарь меню. */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role) {
-        List<MenuItem> dynItems = menu.dynamicItems(plugin, player, ctx);
+        List<MenuItem> dynItems = menu.dynamicFlags(plugin, player, ctx);
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
         Map<Integer, MenuItem> slotMap = new HashMap<>();
@@ -215,6 +227,15 @@ public class MenuManager implements Listener {
                 && !p.hasPermission("qqregions.admin") && !p.hasPermission(item.permission())) {
             return;
         }
+        // флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix)
+        Menu.DynamicFlags dyn = om.menu.dynamicFlags();
+        String flagPermPrefix = dyn == null ? null : dyn.permissionPrefix;
+        if (item.isDynamic() && item.flag() != null && !item.flag().isEmpty()
+                && flagPermPrefix != null && !flagPermPrefix.isEmpty()
+                && !p.hasPermission("qqregions.admin")
+                && !p.hasPermission(flagPermPrefix + item.flag().toLowerCase(java.util.Locale.ROOT))) {
+            return;
+        }
         List<String> cmds = item.commands();
         if (cmds == null) {
             return;
@@ -250,6 +271,10 @@ public class MenuManager implements Listener {
             }
             if (c.equalsIgnoreCase("@teleport")) {
                 teleportToRegion(p, om.ctx, om.role);
+                continue;
+            }
+            if (c.startsWith("@flag:")) {
+                setFlag(p, om.ctx, c.substring("@flag:".length()).trim());
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -312,6 +337,37 @@ public class MenuManager implements Listener {
             p.teleport(new org.bukkit.Location(world, cx + 0.5, y, cz + 0.5));
         } catch (Throwable t) {
             p.sendMessage(dev.qqregions.util.Msg.color("&cНе удалось телепортироваться."));
+        }
+    }
+
+    /** Установить флаг региона через API WG: @flag:<имя>:{значение} (значение allow/deny/true/false). */
+    private void setFlag(Player p, Map<String, String> ctx, String spec) {
+        String worldName = ctx.get("world");
+        org.bukkit.World world = worldName == null ? null : Bukkit.getWorld(worldName);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, ctx.get("region"));
+        if (world == null || region == null) {
+            return;
+        }
+        String[] parts = spec.split(":", 2);
+        if (parts.length < 2) {
+            return;
+        }
+        String flagName = parts[0].trim();
+        String value = parts[1].trim();
+        Flag<?> flag = plugin.wg().flag(flagName);
+        if (flag == null) {
+            return;
+        }
+        String allow = "allow".equalsIgnoreCase(value);
+        if (flag instanceof StateFlag) {
+            value = allow ? "allow" : "deny";
+        } else if (flag instanceof BooleanFlag) {
+            value = String.valueOf(allow);
+        }
+        plugin.wg().setFlagValue(world, region, flag, value);
+        OpenMenu om = open.get(p.getUniqueId());
+        if (om != null) {
+            render(p, om.menu, om.ctx, 0, om.role);
         }
     }
 

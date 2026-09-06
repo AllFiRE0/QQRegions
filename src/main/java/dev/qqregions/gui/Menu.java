@@ -135,7 +135,7 @@ public class Menu {
      * Строит список кнопок флагов (флаг x группа) из реестра WorldGuard
      * (WG + WGEFP + любые другие плагины).
      */
-    public List<MenuItem> dynamicItems(QQRegions plugin, Player player, Map<String, String> ctx) {
+    public List<MenuItem> dynamicFlags(QQRegions plugin, Player player, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         if (dyn == null || !dyn.enabled) {
             return out;
@@ -150,7 +150,14 @@ public class Menu {
 
         for (Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
-            if (id == null || dyn.ignore.contains(id.toLowerCase(Locale.ROOT))) {
+            String key = id == null ? "" : id.toLowerCase(Locale.ROOT);
+            if (key.isEmpty() || dyn.ignore.contains(key)) {
+                continue;
+            }
+            // право на флаг: qqregions.flags.<flag> (выдаётся в LuckPerms);
+            // пустой префикс = флаг доступен всем
+            String perm = dyn.permissionPrefix + key;
+            if (!dyn.permissionPrefix.isEmpty() && !player.hasPermission(perm)) {
                 continue;
             }
             boolean state = flag instanceof StateFlag;
@@ -392,11 +399,13 @@ public class Menu {
         public final List<String> customStates;
         public final Set<String> ignore;
         public final Map<String, String> materials;
+        /** префикс права на флаг: показывается только если игрок имеет <prefix><флаг> */
+        public final String permissionPrefix;
 
         DynamicFlags(boolean enabled, List<Integer> slots, String material, String name,
                      List<String> lore, List<String> commands, List<String> groups,
                      List<String> states, List<String> customStates, Set<String> ignore,
-                     Map<String, String> materials) {
+                     Map<String, String> materials, String permissionPrefix) {
             this.enabled = enabled;
             this.slots = slots;
             this.material = material;
@@ -408,6 +417,7 @@ public class Menu {
             this.customStates = customStates;
             this.ignore = ignore;
             this.materials = materials;
+            this.permissionPrefix = permissionPrefix;
         }
 
         public static DynamicFlags parse(ConfigurationSection d) {
@@ -456,7 +466,8 @@ public class Menu {
                     groups,
                     List.of("allow", "deny"),
                     d.getStringList("states"),
-                    ignore, materials);
+                    ignore, materials,
+                    d.getString("flag-permission-prefix", ""));
         }
     }
 }
