@@ -423,6 +423,12 @@ public class Config {
         public final Material block;
         /** Скрывать подсветку при выходе игрока из региона (вход/выход по флагу). */
         public final boolean hideOnExit;
+        /** Как часто пере-сканировать рельеф территории (сек) при показе TERRITORY. */
+        public final int terrainCacheSeconds;
+        /** Отображение TERRITORY: PARTICLES — частицы над блоками, BLOCKS — дисплей-«забор». */
+        public final String terrainDisplay;
+        /** Параметры «забора» (terrainDisplay: BLOCKS). */
+        public final TerrainFenceOptions fence;
         public final ParticleOptions particles;
 
         HighlightOptions(ConfigurationSection s) {
@@ -437,6 +443,9 @@ public class Config {
                 blockScale = 0.35f;
                 block = Material.GLASS;
                 hideOnExit = true;
+                terrainCacheSeconds = 3;
+                terrainDisplay = "PARTICLES";
+                fence = new TerrainFenceOptions(null);
                 particles = new ParticleOptions(null);
                 return;
             }
@@ -452,7 +461,43 @@ public class Config {
             Material m = Material.matchMaterial(mat);
             block = m == null ? Material.GLASS : m;
             hideOnExit = s.getBoolean("hide-on-exit", true);
+            terrainCacheSeconds = Math.max(1, s.getInt("terrain-cache-seconds", 3));
+            terrainDisplay = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
+            if (!"BLOCKS".equals(terrainDisplay) && !"PARTICLES".equals(terrainDisplay)) {
+                terrainDisplay = "PARTICLES";
+            }
+            fence = new TerrainFenceOptions(s.getConfigurationSection("territory.fence"));
             particles = new ParticleOptions(s.getConfigurationSection("particles"));
+        }
+    }
+
+    /**
+     * Параметры дисплей-«забора» по периметру региона (highlight.territory.fence,
+     * работает при type: TERRITORY и territory.display: BLOCKS). Забор повторяет
+     * рельеф: для каждого сплошного участка границы одинаковой высоты создаётся
+     * один BlockDisplay с масштабом: вдоль границы = длина участка * width,
+     * вверх = height, поперёк = thickness.
+     */
+    public static class TerrainFenceOptions {
+        public final Material material;
+        /** Высота забора (по Y, в блоках). 1.0 = один блок от вершины рельефа. */
+        public final double height;
+        /** Длина сегмента вдоль границы (в блоках); 1.0 = сплошной забор. */
+        public final double width;
+        /** Толщина поперёк границы (в блоках). 0.2 = тонкая стенка. */
+        public final double thickness;
+        /** Светиться ли (glow) в цвет highlight.particles.dust-color. */
+        public final boolean glow;
+
+        TerrainFenceOptions(ConfigurationSection s) {
+            String def = "OAK_FENCE";
+            String matName = (s == null || s.getString("material") == null) ? def : s.getString("material");
+            Material m = Material.matchMaterial(matName);
+            material = m == null ? Material.OAK_FENCE : m;
+            height = Math.max(0.05, s == null ? 1.0 : s.getDouble("height", 1.0));
+            width = Math.max(0.05, s == null ? 1.0 : s.getDouble("width", 1.0));
+            thickness = Math.max(0.05, s == null ? 0.2 : s.getDouble("thickness", 0.2));
+            glow = s == null || s.getBoolean("glow", true);
         }
     }
 

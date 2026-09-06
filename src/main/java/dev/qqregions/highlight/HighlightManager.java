@@ -17,6 +17,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -24,6 +25,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,8 +60,8 @@ public class HighlightManager implements Listener {
     private final Map<UUID, Map<String, List<Entity>>> blockViews = new HashMap<>();
     /** Тип подсветки по умолчанию (/region visible type) на игрока. */
     private final Map<UUID, String> defaultType = new HashMap<>();
-    /** Кэш точек terrain-подсветки: "world:region" -> верхние точки столбцов. */
-    private final Map<String, List<BlockVector3>> terrainCache = new HashMap<>();
+    /** Кэш точек terrain-подсветки: "world:region" -> (точки + время скана). */
+    private final Map<String, TerrainEntry> terrainCache = new HashMap<>();
     /** Флаг-регионы, подсвеченные входом/выходом и ещё НЕ вышедшие (для hide-on-exit). */
     private final Map<UUID, Set<String>> flagShown = new HashMap<>();
 
@@ -77,6 +79,18 @@ public class HighlightManager implements Listener {
             this.type = type;
             this.world = world;
             this.name = name;
+        }
+    }
+
+    private static final class TerrainEntry {
+        final List<BlockVector3> points;
+        final long scannedAt;
+        final long version;
+
+        TerrainEntry(List<BlockVector3> points, long scannedAt, long version) {
+            this.points = points;
+            this.scannedAt = scannedAt;
+            this.version = version;
         }
     }
 
@@ -100,6 +114,37 @@ public class HighlightManager implements Listener {
             renderTimer = 0;
             render();
         }
+    }
+
+    long terrainVersion = 0; // растёт при каждом полном пересканировании terrain
+
+    /** Когда последний раз пересканировалась территория (для TERRITORY-показов). */
+    private long lastTerrainRescan = 0;
+
+    /** Пересчитать точки территории и пересобрать «заборы» активных TERRITORY-подсветок. */
+    private void rescanActiveTerrain() {
+        for (UUID uid : new ArrayList<>(active.keySet())) {
+            Player p = Bukkit.getPlayer(uid);
+            if (p == null) {
+                continue;
+            }
+            Map<String, RegionShow> map = active.get(uid);
+            if (map == null) {
+                continue;
+            }
+            for (Map.Entry<String, RegionShow> e : new ArrayList<>(map.entrySet())) {
+                RegionShow s = e.getValue();
+                terrainCache.remove(s.world + ":" + s.name);
+                if (isFence(s.type)) {
+                    World w = Bukkit.getWorld(s.world);
+                    ProtectedRegion r = w == null ? null : plugin.wg().byName(w, s.name);
+                    if (w != null && r != null && w.getName().equals(p.getWorld().getName())) {
+                        spawnBlocks(p, w, r, e.getKey(), "TERRITORY");
+                    }
+                }
+            }
+        }
+        terrainVersion++;
     }
 
     // ---------- флаг territory-visible ----------
@@ -179,8 +224,17 @@ public class HighlightManager implements Listener {
         long until = System.currentTimeMillis() + plugin.config().highlight().showMillis;
         active.computeIfAbsent(p.getUniqueId(), k -> new HashMap<>())
                 .put(key, new RegionShow(until, t, world.getName(), r.getId()));
-        if (isBlocks(t) && world.getName().equals(p.getWorld().getName())) {
-            spawnBlocks(p, world, r, key);
+        if (!world.getName().equals(p.getWorld().getName())) {
+            return;
+        }
+        if ("BLOCKS".equals(t)) {
+            spawnBlocks(p, world, r, key, "BLOCKS");
+        } else if ("TERRITORY".equals(t)) {
+            // повторный запуск = свежий скан (новые блоки на границе видны сразу)
+            terrainCache.remove(key);
+            if (isFence(t)) {
+                spawnBlocks(p, world, r, key, "TERRITORY");
+            }
         }
     }
 
@@ -219,6 +273,7 @@ public class HighlightManager implements Listener {
 
     private void render() {
         long now = System.currentTimeMillis();
+        boolean hasTerrainActive = false;
         for (UUID uid : new ArrayList<>(active.keySet())) {
             Player p = Bukkit.getPlayer(uid);
             if (p == null) {
@@ -230,9 +285,23 @@ public class HighlightManager implements Listener {
                 RegionShow s = e.getValue();
                 if (now >= s.until) {
                     removeActive(p, e.getKey());
+                    terrainCache.remove(s.world + ":" + s.name);
+                } else if ("TERRITORY".equals(s.type)) {
+                    hasTerrainActive = true;
+                    if (!isFence(s.type)) {
+                        renderTerrainParticles(p, s);
+                    }
+                    // забор пересобирается в rescanActiveTerrain() по истечении TTL
                 } else if (!isBlocks(s.type)) {
                     renderParticles(p, s);
                 }
+            }
+        }
+        if (hasTerrainActive) {
+            int ttl = plugin.config().highlight().terrainCacheSeconds;
+            if (ttl > 0 && now - lastTerrainRescan >= ttl * 1000L) {
+                lastTerrainRescan = now;
+                rescanActiveTerrain();
             }
         }
     }
@@ -248,18 +317,7 @@ public class HighlightManager implements Listener {
             return;
         }
         if ("TERRITORY".equals(s.type)) {
-            // TERRITORY: частицы над верхними блоками вдоль границы (по рельефу).
-            List<BlockVector3> pts = terrainPoints(world, r);
-            int budget = Math.min(h.particles.maxPoints, pts.size());
-            for (int i = 0; i < budget; i++) {
-                BlockVector3 pt = pts.get(i);
-                int cx = pt.getBlockX() >> 4;
-                int cz = pt.getBlockZ() >> 4;
-                if (!world.isChunkLoaded(cx, cz)) {
-                    continue;
-                }
-                spawnParticle(world, h.particles, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5);
-            }
+            renderTerrainParticles(world, r, h.particles);
             return;
         }
         BlockVector3 mn = r.getMinimumPoint();
@@ -274,6 +332,30 @@ public class HighlightManager implements Listener {
         }
     }
 
+    /** TERRITORY-частицы над блоками по периметру (для одного показа). */
+    private void renderTerrainParticles(Player p, RegionShow s) {
+        World world = Bukkit.getWorld(s.world);
+        ProtectedRegion r = world == null ? null : plugin.wg().byName(world, s.name);
+        if (world == null || r == null) {
+            return;
+        }
+        renderTerrainParticles(world, r, plugin.config().highlight().particles);
+    }
+
+    private void renderTerrainParticles(World world, ProtectedRegion r, Config.ParticleOptions po) {
+        List<BlockVector3> pts = terrainPoints(world, r, terrainVersion);
+        int budget = Math.min(po.maxPoints, pts.size());
+        for (int i = 0; i < budget; i++) {
+            BlockVector3 pt = pts.get(i);
+            int cx = pt.getBlockX() >> 4;
+            int cz = pt.getBlockZ() >> 4;
+            if (!world.isChunkLoaded(cx, cz)) {
+                continue;
+            }
+            spawnParticle(world, po, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5);
+        }
+    }
+
     // ---------- TERRITORY (террейн-подсветка вдоль границы) ----------
 
     /**
@@ -281,13 +363,19 @@ public class HighlightManager implements Listener {
      * собираются ВЕРХИ всех пластов (каждый Y-уровень, где блок не воздух,
      * а над ним воздух) и НИЗЫ (блок не воздух, а под ним воздух — своды
      * пещер и выступы). Так деревья больше не «съедают» границу: светятся
-     * и трава, и кроны, и потолки пещер. Результат кэшируется на "world:region".
+     * и трава, и кроны, и потолки пещер.
+     *
+     * Кэш "world:region" ограничен по времени (terrain-cache-seconds) и
+     * инвалидируется: по событиям загрузки чанков (живое появление новых
+     * кусков границы), по истечении TTL (подтягиваются свежие блоки) и
+     * на каждый повторный запуск подсветки (show()). Внутри одного окна
+     * показа пересканирование не чаще раза в TTL секунд.
      */
-    private List<BlockVector3> terrainPoints(World world, ProtectedRegion r) {
+    private List<BlockVector3> terrainPoints(World world, ProtectedRegion r, long version) {
         String ck = world.getName() + ":" + r.getId();
-        List<BlockVector3> cached = terrainCache.get(ck);
-        if (cached != null) {
-            return cached;
+        TerrainEntry en = terrainCache.get(ck);
+        if (en != null && en.version == version && !expired(en)) {
+            return en.points;
         }
         List<BlockVector3> out = new ArrayList<>();
         try {
@@ -311,8 +399,13 @@ public class HighlightManager implements Listener {
         } catch (Throwable t) {
             plugin.dbg("terrainPoints error: " + t.getMessage());
         }
-        terrainCache.put(ck, out);
+        terrainCache.put(ck, new TerrainEntry(out, System.currentTimeMillis(), version));
         return out;
+    }
+
+    private boolean expired(TerrainEntry en) {
+        int ttl = plugin.config().highlight().terrainCacheSeconds;
+        return ttl > 0 && System.currentTimeMillis() - en.scannedAt > ttl * 1000L;
     }
 
     /** Дополняет out точками всех «слоёв» одной колонки (верхи + пещерные низы). */
@@ -348,12 +441,39 @@ public class HighlightManager implements Listener {
 
     // ---------- BLOCKS ----------
 
-    private void spawnBlocks(Player p, World world, ProtectedRegion r, String key) {
+    /**
+     * Спавн блок-дисплеев по контуру региона.
+     * type == BLOCKS   — миниатюрные дисплеи scale block-scale по рёбрам объёма.
+     * type == TERRITORY (fence) — «забор»: BlockDisplay по периметру, повторяющий
+     * рельеф, с размерами из highlight.territory.fence.
+     * На повторный вызов старые дисплеи пересобираются (отражают свежие блоки).
+     */
+    private void spawnBlocks(Player p, World world, ProtectedRegion r, String key, String type) {
         Config.HighlightOptions h = plugin.config().highlight();
         Map<String, List<Entity>> perPlayer = blockViews.computeIfAbsent(p.getUniqueId(), k -> new HashMap<>());
-        if (perPlayer.containsKey(key)) {
-            return;
+        List<Entity> old = perPlayer.remove(key);
+        if (old != null) {
+            for (Entity e : old) {
+                e.remove();
+            }
         }
+        List<Entity> list;
+        if ("TERRITORY".equals(type)) {
+            list = fenceEntities(world, r, h);
+            if (list == null) {
+                if (perPlayer.isEmpty()) {
+                    blockViews.remove(p.getUniqueId());
+                }
+                return;
+            }
+        } else {
+            list = boxBlocks(world, r, h);
+        }
+        perPlayer.put(key, list);
+    }
+
+    /** Точки-кубики BLOCKS по рёбрам объёма. */
+    private List<Entity> boxBlocks(World world, ProtectedRegion r, Config.HighlightOptions h) {
         int budget = Math.min(h.particles.maxPoints, 600);
         List<Entity> list = new ArrayList<>(budget);
         BlockVector3 mn = r.getMinimumPoint();
@@ -364,20 +484,126 @@ public class HighlightManager implements Listener {
             if (!world.isChunkLoaded(cx, cz)) {
                 continue;
             }
-            BlockDisplay d = world.spawn(
-                    new Location(world, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5),
-                    BlockDisplay.class);
-            d.setBlock(h.block.createBlockData());
-            d.setTransformation(new Transformation(
-                    new Vector3f(), new Quaternionf(),
-                    new Vector3f(h.blockScale, h.blockScale, h.blockScale), new Quaternionf()));
-            d.setInterpolationDelay(0);
-            d.setInterpolationDuration(0);
-            d.setGlowColorOverride(h.particles.dustColor);
-            d.setInvulnerable(true);
+            BlockDisplay d = spawnDisplay(world, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5,
+                    h.block.createBlockData(),
+                    new Vector3f(h.blockScale, h.blockScale, h.blockScale),
+                    h.particles.dustColor);
+            if (d != null) {
+                list.add(d);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * «Забор» TERRITORY: для каждой из 4 сторон прямоугольника региона идём
+     * по колонкам, находим верхний блок, и группируем подряд идущие колонки
+     * одинаковой высоты в один BlockDisplay (`length участка × width` вдоль
+     * границы, `height` вверх, `thickness` поперёк). На ровной местности —
+     * один дисплей на сторону, на рельефе — по числу перепадов высоты.
+     */
+    private List<Entity> fenceEntities(World world, ProtectedRegion r, Config.HighlightOptions h) {
+        Config.TerrainFenceOptions f = h.fence;
+        BlockVector3 mn = r.getMinimumPoint();
+        BlockVector3 mx = r.getMaximumPoint();
+        int minX = mn.getBlockX(), maxX = mx.getBlockX();
+        int minZ = mn.getBlockZ(), maxZ = mx.getBlockZ();
+        int minY = Math.max(world.getMinHeight(), mn.getBlockY());
+        int maxY = Math.min(world.getMaxHeight() - 1, mx.getBlockY());
+        List<Entity> list = new ArrayList<>(16);
+        // Стороны, параллельные X (z фиксирован): забор вытянут вдоль X.
+        edgeFence(world, list, f, minX, maxX, minY, maxY,
+                minZ, true, h);
+        edgeFence(world, list, f, minX, maxX, minY, maxY,
+                maxZ, true, h);
+        // Стороны, параллельные Z (x фиксирован): забор вытянут вдоль Z.
+        edgeFence(world, list, f, minZ, maxZ, minY, maxY,
+                minX, false, h);
+        edgeFence(world, list, f, minZ, maxZ, minY, maxY,
+                maxX, false, h);
+        return list;
+    }
+
+    /**
+     * Один край региона. При alongX=true колонки идут по X при фиксированном
+     * fixed=Z; сегмент забора получает scale (len*width, height, thickness).
+     * При alongX=false колонки идут по Z при фиксированном fixed=X; сегмент —
+     * (thickness, height, len*width).
+     */
+    private void edgeFence(World world, List<Entity> list, Config.TerrainFenceOptions f,
+                           int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
+                           Config.HighlightOptions h) {
+        int runStart = -1;
+        int runTop = 0;
+        for (int i = lo; i <= hi; i++) {
+            boolean loaded;
+            int top;
+            if (alongX) {
+                loaded = world.isChunkLoaded(i >> 4, fixed >> 4);
+                top = loaded ? topSolid(world, i, fixed, minY, maxY) : Integer.MIN_VALUE;
+            } else {
+                loaded = world.isChunkLoaded(fixed >> 4, i >> 4);
+                top = loaded ? topSolid(world, fixed, i, minY, maxY) : Integer.MIN_VALUE;
+            }
+            if (!loaded || top == Integer.MIN_VALUE) {
+                flushEdgeRun(world, list, f, alongX, runStart, i - 1, runTop, fixed, h);
+                runStart = -1;
+                continue;
+            }
+            if (runStart == -1) {
+                runStart = i;
+                runTop = top;
+            } else if (top != runTop) {
+                flushEdgeRun(world, list, f, alongX, runStart, i - 1, runTop, fixed, h);
+                runStart = i;
+                runTop = top;
+            }
+        }
+        if (runStart != -1) {
+            flushEdgeRun(world, list, f, alongX, runStart, hi, runTop, fixed, h);
+        }
+    }
+
+    /** Самый верхний не-воздух в колонке (y+не найден — Integer.MIN_VALUE). */
+    private int topSolid(World world, int x, int z, int minY, int maxY) {
+        Material type = world.getBlockAt(x, maxY, z).getType();
+        if (type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR) {
+            return maxY;
+        }
+        for (int y = maxY - 1; y >= minY; y--) {
+            Material m = world.getBlockAt(x, y, z).getType();
+            if (m != Material.AIR && m != Material.CAVE_AIR && m != Material.VOID_AIR) {
+                return y;
+            }
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    /** Создать один сегмент забора на участке [from..to] одной высоты. */
+    private void flushEdgeRun(World world, List<Entity> list, Config.TerrainFenceOptions f, boolean alongX,
+                              int from, int to, int top, int fixed, Config.HighlightOptions h) {
+        if (from < 0 || to < from) {
+            return;
+        }
+        int len = to - from + 1;
+        double along = len * f.width;
+        Vector3f scale;
+        double cx, cz;
+        if (alongX) {
+            cx = (from + to) / 2.0 + 0.5;
+            cz = fixed + 0.5;
+            scale = new Vector3f((float) along, (float) f.height, (float) f.thickness);
+        } else {
+            cx = fixed + 0.5;
+            cz = (from + to) / 2.0 + 0.5;
+            scale = new Vector3f((float) f.thickness, (float) f.height, (float) along);
+        }
+        double y = top + f.height / 2.0;
+        BlockDisplay d = spawnDisplay(world, cx, y, cz, f.material.createBlockData(), scale,
+                f.glow ? h.particles.dustColor : null);
+        if (d != null) {
             list.add(d);
         }
-        perPlayer.put(key, list);
     }
 
     private void despawnBlocks(Player p, String key) {
@@ -469,6 +695,21 @@ public class HighlightManager implements Listener {
         removePlayer(e.getPlayer().getUniqueId());
     }
 
+    /** Загрузился чанк — кэш территории мира устарел (могут появиться новые столбцы). */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent e) {
+        if (terrainCache.isEmpty()) {
+            return;
+        }
+        String prefix = e.getWorld().getName() + ":";
+        Iterator<Map.Entry<String, TerrainEntry>> it = terrainCache.entrySet().iterator();
+        while (it.hasNext()) {
+            if (it.next().getKey().startsWith(prefix)) {
+                it.remove();
+            }
+        }
+    }
+
     // ---------- утилиты ----------
 
     private static String key(World world, ProtectedRegion r) {
@@ -477,6 +718,12 @@ public class HighlightManager implements Listener {
 
     private static boolean isBlocks(String type) {
         return "BLOCKS".equals(type);
+    }
+
+    /** TERRITORY отображается «забором» (highlight.territory.display: BLOCKS). */
+    private boolean isFence(String type) {
+        return "TERRITORY".equals(type)
+                && "BLOCKS".equals(plugin.config().highlight().terrainDisplay);
     }
 
     private static String normalizeType(String type) {

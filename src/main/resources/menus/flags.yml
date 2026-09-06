@@ -268,7 +268,7 @@ Menus:
         - nonmembers
         - nonowners
       flag-permission-prefix: "qqregions.flags."
-ignore-flags:
+      ignore-flags:
         - territory-type
       material: MAP
       name: "&f{flag-name} &8· {group-label}"

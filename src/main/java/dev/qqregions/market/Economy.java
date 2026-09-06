@@ -41,12 +41,12 @@ public final class Economy {
     void reload() {
         vault = null;
         mGetBalance = mHas = mWithdraw = mDeposit = null;
+        boolean found = false;
         try {
             if (plugin.config().market().economyEnabled) {
                 Class<?> eco = Class.forName("net.milkbowl.vault.economy.Economy");
-                ServicesManager sm = Bukkit.getServicesManager();
-                Method reg = ServicesManager.class.getMethod("getRegisteredProvider", Class.class);
-                Object provider = reg.invoke(sm, eco);
+                found = true;
+                Object provider = provider(eco);
                 if (provider != null) {
                     vault = provider;
                     mGetBalance = eco.getMethod("getBalance", OfflinePlayer.class);
@@ -56,8 +56,59 @@ public final class Economy {
                 }
             }
         } catch (Throwable t) {
-            plugin.getLogger().warning("Vault/Economy недоступен: " + t.getMessage());
+            Throwable cause = t.getCause() == null ? t : t.getCause();
+            plugin.getLogger().warning("Vault/Economy недоступен: "
+                    + cause.getClass().getSimpleName()
+                    + (cause.getMessage() == null ? "" : ": " + cause.getMessage())
+                    + " (Vault-класс найден: " + found + ")");
         }
+    }
+
+    /** Достать Vault-провайдер сервиса несколькими способами (устойчивость к форкам API). */
+    private Object provider(Class<?> eco) {
+        ServicesManager sm = Bukkit.getServicesManager();
+        // 1) getRegisteredProvider(Class<T>): стандартный Bukkit API
+        try {
+            Method m = ServicesManager.class.getMethod("getRegisteredProvider", Class.class);
+            Object p = m.invoke(sm, eco);
+            if (p != null) {
+                return p;
+            }
+        } catch (Throwable ignore) {
+            // пробуем другие способы
+        }
+        // 2) getRegistration(Class) -> getProvider()
+        try {
+            Method reg = ServicesManager.class.getMethod("getRegistration", Class.class);
+            Object sr = reg.invoke(sm, eco);
+            if (sr != null) {
+                Method gp = sr.getClass().getMethod("getProvider");
+                Object p = gp.invoke(sr);
+                if (p != null) {
+                    return p;
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        // 3) getRegistrations(Class) -> перебор -> первый провайдер
+        try {
+            Method regs = ServicesManager.class.getMethod("getRegistrations", Class.class);
+            Object list = regs.invoke(sm, eco);
+            if (list instanceof Iterable) {
+                for (Object sr : (Iterable<?>) list) {
+                    try {
+                        Method gp = sr.getClass().getMethod("getProvider");
+                        Object p = gp.invoke(sr);
+                        if (p != null && eco.isInstance(p)) {
+                            return p;
+                        }
+                    } catch (ReflectiveOperationException ignore) {
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
     }
 
     public boolean enabled() {
