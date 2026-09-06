@@ -10,6 +10,7 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.flags.BooleanFlag;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.FlagContext;
+import com.sk89q.worldguard.protection.flags.FlagRegistry;
 import com.sk89q.worldguard.protection.flags.RegionGroup;
 import com.sk89q.worldguard.protection.flags.RegionGroupFlag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
@@ -39,8 +40,97 @@ public class Wg {
 
     private final QQRegions plugin;
 
+    /** Кастомный флаг «подсвечивать ли регион входящим» (StateFlag allow/deny). */
+    private StateFlag territoryVisible;
+
     public Wg(QQRegions plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Регистрация кастомного флага territory-visible в реестре WorldGuard.
+     * Вызывается в onEnable до загрузки данных регионов, чтобы флаг
+     * корректно сохранялся/загружался. Если флаг уже зарегистрирован другой
+     * плагином — берём существующий (StateFlag по имени).
+     */
+    public void registerFlags() {
+        try {
+            FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
+            try {
+                territoryVisible = new StateFlag("territory-visible", false);
+                registry.register(territoryVisible);
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                Flag<?> existing = registry.get("territory-visible");
+                territoryVisible = existing instanceof StateFlag ? (StateFlag) existing : null;
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Не удалось зарегистрировать флаг territory-visible: " + t.getMessage());
+            territoryVisible = null;
+        }
+    }
+
+    public StateFlag territoryVisibleFlag() {
+        return territoryVisible;
+    }
+
+    /** Регионы, которые содержат точку (Location игрока) — для флага подсветки. */
+    public List<ProtectedRegion> at(World world, org.bukkit.Location loc) {
+        RegionManager rm = manager(world);
+        if (rm == null) {
+            return List.of();
+        }
+        BlockVector3 v = BukkitAdapter.asBlockVector(loc);
+        ApplicableRegionSet set = rm.getApplicableRegions(v);
+        List<ProtectedRegion> out = new ArrayList<>();
+        for (ProtectedRegion r : set.getRegions()) {
+            if (r.contains(v)) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Применим ли флаг territory-visible к игроку: значение allow + группа.
+     * Учитывается region group флага (all по умолчанию), как /rg flag -g.
+     */
+    public boolean territoryVisibleAllows(World world, ProtectedRegion region, Player player) {
+        if (region == null || player == null) {
+            return false;
+        }
+        StateFlag flag = territoryVisible;
+        if (flag == null) {
+            return false;
+        }
+        if (region.getFlag(flag) != StateFlag.State.ALLOW) {
+            return false;
+        }
+        RegionGroup group = null;
+        try {
+            RegionGroupFlag gf = flag.getRegionGroupFlag();
+            if (gf != null) {
+                group = region.getFlag(gf);
+            }
+        } catch (Throwable ignored) {
+        }
+        if (group == null || group == RegionGroup.ALL) {
+            return true;
+        }
+        UUID id = player.getUniqueId();
+        boolean owner = contains(region.getOwners(), id);
+        boolean member = contains(region.getMembers(), id);
+        switch (group) {
+            case OWNERS:
+                return owner;
+            case MEMBERS:
+                return owner || member;
+            case NON_MEMBERS:
+                return !owner && !member;
+            case NON_OWNERS:
+                return !owner;
+            default:
+                return true;
+        }
     }
 
     public RegionManager manager(World world) {

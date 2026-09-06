@@ -35,7 +35,7 @@ select:
   point-locked: "&cТочка упёрлась в ограничения."
   invalid-amount: "&cНекорректное количество: &7{amount}"
   invalid-side: "&cНекорректная сторона: &7{side} &c(&7north, south, east, west, up, down&c)."
-interactive-on: "&aРежим выделения включён."
+  interactive-on: "&aРежим выделения включён."
   interactive-help: "&7ПКМ/ЛКМ кнопкой — действие (&a1&7 создать, &a4&7 выделить, &a6&7 сброс, &a9&7 отмена). Хотбар свободен."
   interactive-off: "&7Режим выделения выключен."
   interactive-on-fail: "&cНе удалось сохранить инвентарь — сессия выделения не запущена."
@@ -106,6 +106,15 @@ members:
   owner: "владельцем"
   member: "участником"
 
+visible:
+  disabled: "&cПодсветка регионов отключена в конфиге (highlight.enabled: false)."
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  shown: "&aПодсветка региона &7{region} &aвключена (&7{type}&a, {seconds} с)."
+  hidden: "&7Подсветка региона &7{region} &aвыключена."
+  hidden-all: "&7Все подсветки регионов скрыты."
+  type-set: "&aТип подсветки по умолчанию: &7{type}"
+  type-invalid: "&cНедопустимый тип подсветки: &7{type} &c(&7particles&c / &7blocks&c)."
+
 help:
   header: "&8===== &bQQRegions &7v{version} &8====="
   line: "&f{cmd}&8: &7{desc}"
@@ -134,5 +143,11 @@ help:
       desc: "Убрать игрока из региона"
     - usage: "flags [название]"
       desc: "Меню флагов (владельцы)"
+    - usage: "visible [название] [particles|blocks]"
+      desc: "Показать/скрыть подсветку границ региона"
+    - usage: "visible type <particles|blocks>"
+      desc: "Тип подсветки по умолчанию"
+    - usage: "visible off"
+      desc: "Скрыть все подсветки"
     - usage: "reload"
       desc: "Перезагрузить конфигурацию"

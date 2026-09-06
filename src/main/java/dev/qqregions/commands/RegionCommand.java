@@ -24,7 +24,8 @@ import java.util.Map;
 public class RegionCommand {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "select", "create", "delete", "info", "add", "remove", "flags", "reload", "help");
+            "select", "create", "delete", "info", "add", "remove", "flags", "reload", "help",
+            "visible", "view");
 
     private final QQRegions plugin;
     private final SelectCommand selectCommand;
@@ -65,6 +66,10 @@ public class RegionCommand {
                 return true;
             case "flags":
                 doFlags(sender, args);
+                return true;
+            case "visible":
+            case "view":
+                doVisible(sender, args);
                 return true;
             default:
                 lang(sender, "general.unknown-subcommand", "alias", label);
@@ -327,6 +332,72 @@ public class RegionCommand {
         }
     }
 
+    // ---------- visible / view ----------
+
+    private void doVisible(CommandSender sender, String[] args) {
+        if (requirePlayer(sender)) {
+            return;
+        }
+        Player p = (Player) sender;
+        if (!adminPerm(p, "qqregions.visible")) {
+            lang(p, "general.no-permission");
+            return;
+        }
+        if (!plugin.config().highlight().enabled) {
+            lang(p, "visible.disabled");
+            return;
+        }
+        // /region visible type <particles|blocks> — тип подсветки по умолчанию
+        if (args.length >= 2 && args[1].equalsIgnoreCase("type")) {
+            if (args.length < 3) {
+                lang(p, "general.usage", "usage", plugin.config().commandName() + " visible type <particles|blocks>");
+                return;
+            }
+            String type = args[2].toLowerCase(Locale.ROOT);
+            if (!isViewType(type)) {
+                lang(p, "visible.type-invalid", "type", args[2]);
+                return;
+            }
+            plugin.highlight().setDefaultType(p, type);
+            lang(p, "visible.type-set", "type", type);
+            return;
+        }
+        // /region visible off — скрыть все подсветки
+        if (args.length >= 2 && args[1].equalsIgnoreCase("off")) {
+            plugin.highlight().hideAll(p);
+            lang(p, "visible.hidden-all");
+            return;
+        }
+        ProtectedRegion region = resolveRegion(p, args.length >= 2 ? args[1] : null);
+        if (region == null) {
+            lang(p, "visible.none");
+            return;
+        }
+        String type = plugin.highlight().typeOf(p);
+        if (args.length >= 3) {
+            String t = args[2].toLowerCase(Locale.ROOT);
+            if (!isViewType(t)) {
+                lang(p, "visible.type-invalid", "type", args[2]);
+                return;
+            }
+            type = t;
+        }
+        boolean shown = plugin.highlight().toggle(p, p.getWorld(), region, type);
+        if (shown) {
+            lang(p, "visible.shown",
+                    "region", region.getId(),
+                    "type", type,
+                    "seconds", String.valueOf(plugin.config().highlight().showSeconds));
+        } else {
+            lang(p, "visible.hidden", "region", region.getId());
+        }
+    }
+
+    private static boolean isViewType(String type) {
+        String t = type.toLowerCase(Locale.ROOT);
+        return t.equals("particles") || t.equals("blocks");
+    }
+
     // ---------- вспомогательное ----------
 
     private ProtectedRegion resolveRegion(Player p, String name) {
@@ -407,6 +478,19 @@ public class RegionCommand {
         if (args.length == 3 && (sub.equals("add") || sub.equals("remove"))) {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 out.add(online.getName());
+            }
+        }
+        if (sub.equals("visible") || sub.equals("view")) {
+            // /region visible [название|off|type] [particles|blocks]
+            if (args.length == 2) {
+                List<String> opts = new ArrayList<>(List.of("off", "type"));
+                opts.addAll(plugin.wg().visibleNames(p.getWorld(), p));
+                out.addAll(filtered(opts, args, 1));
+                return out;
+            }
+            if (args.length == 3 && args[1].equalsIgnoreCase("type")) {
+                out.addAll(filtered(List.of("particles", "blocks"), args, 2));
+                return out;
             }
         }
         return filtered(out, args, args.length - 1);

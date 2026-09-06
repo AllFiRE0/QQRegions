@@ -38,28 +38,68 @@ public class SelectionView {
     private Entity viewMarker;
     private Entity viewMarker2;
     private int timer = 0;
-    /** Отпечаток последнего кадра: если не изменился — рендер пропускается
-     * (никакого спама частиц/дисплеев и debug-лога в покое). */
+    /** Отпечаток последнего кадра: если не изменился — BLOCKS-рендер пропускается
+     * (без спама NBT-пакетов и debug-лога в покое). */
     private String lastFp = "";
+    /** «Проходов» обновления без изменений (1 проход = 5 серверных тиков). */
+    private int idle = 0;
+    /** Подсветка скрыта за задержку бездействия; рисуется снова при изменении кадра. */
+    private boolean hidden = false;
 
     public SelectionView(QQRegions plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
     }
 
-    /** Троттлинг-обновление (вызывается каждый тик плагина). */
+    /**
+     * Троттлинг-обновление (вызывается каждый тик плагина).
+     * В PARTICLES-режиме частицы ПОДСЫПАЮТСЯ на каждом интервале, даже без
+     * изменения кадра: иначе статичная подсветка бы гасла сразу (частицы
+     * живут меньше секунды). В BLOCKS-режиме дисплеи обновляются/телепортируются
+     * только при изменении кадра.
+     * Авто-скрытие: через view-hide-after секунд без изменений подсветка
+     * скрывается (частицы перестают сыпаться / дисплеи убираются); любое
+     * новое изменение кадра снова включает её.
+     */
     public void update(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
+        if (sel == null) {
+            lastFp = "";
+            return;
+        }
+        String fp = fp(sel, marker, color, blockMat, false);
+        boolean changed = !fp.equals(lastFp);
+        lastFp = fp;
+        if (changed) {
+            idle = 0;
+            hidden = false;
+        } else {
+            idle++;
+        }
+        int hideCalls = plugin.config().viewHideAfterCalls();
+        if (hideCalls > 0 && idle >= hideCalls) {
+            if (!hidden) {
+                hidden = true;
+                cleanup();
+            }
+            return;
+        }
         timer += 5;
         if (timer < plugin.config().particles().updateTicks) {
             return;
         }
         timer = 0;
-        renderNow(sel, color, blockMat, marker);
+        if (plugin.config().blockView()) {
+            if (changed) {
+                renderBlockView(sel, color, blockMat, marker);
+            }
+        } else {
+            renderParticles(sel, color, marker);
+        }
     }
 
     /**
      * Немедленный рендер (без троттлинга) — для мгновенного отклика.
-     * Пропускает работу, если выделение и маркер не изменились.
+     * Всегда пересылает частицы (если не скрыта и кадр не изменился).
      */
     public void renderNow(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         timer = plugin.config().particles().updateTicks;
@@ -68,12 +108,18 @@ public class SelectionView {
             return;
         }
         String fp = fp(sel, marker, color, blockMat, false);
-        if (fp.equals(lastFp)) {
+        boolean changed = !fp.equals(lastFp);
+        lastFp = fp;
+        if (changed) {
+            idle = 0;
+            hidden = false;
+        } else if (hidden) {
             return;
         }
-        lastFp = fp;
         if (plugin.config().blockView()) {
-            renderBlockView(sel, color, blockMat, marker);
+            if (changed) {
+                renderBlockView(sel, color, blockMat, marker);
+            }
         } else {
             renderParticles(sel, color, marker);
         }
@@ -104,30 +150,41 @@ public class SelectionView {
      */
     public void renderSelect(Selection sel, Config.PointStyle p1, Config.PointStyle p2, int activePoint) {
         Config cfg = plugin.config();
-        timer = cfg.particles().updateTicks;
         Config.PointStyle act = activePoint == 1 ? p1 : p2;
         Config.PointStyle oth = activePoint == 1 ? p2 : p1;
         BlockVector3 actPos = sel.getPos(activePoint);
         BlockVector3 othPos = sel.getPos(activePoint == 1 ? 2 : 1);
-        // select-режим спавнит маркеры каждые 5 тиков; пропускаем работу,
+        // select-режим рендерит маркеры обеих точек; работу пропускаем
         // только если НИЧЕГО не менялось (обе точки, активная, цвета).
         String fp = fp(sel, othPos, oth.highlight, oth.block, true)
                 + '|' + activePoint
                 + '|' + actPos.getX() + ',' + actPos.getY() + ',' + actPos.getZ()
                 + '|' + act.highlight.asRGB();
-        if (fp.equals(lastFp)) {
-            return;
-        }
+        boolean changed = !fp.equals(lastFp);
         lastFp = fp;
         if (cfg.blockView()) {
+            if (!changed) {
+                return;
+            }
             renderBlockView(sel, act.highlight, act.block, actPos);
             updateOtherMarker(sel.getWorld(), oth.highlight, oth.block, othPos);
-        } else {
-            renderParticles(sel, act.highlight, null);
-            Config.ParticleOptions po = cfg.particles();
-            markerCube(sel.getWorld(), po, p1.highlight, sel.getPos(1));
-            markerCube(sel.getWorld(), po, p2.highlight, sel.getPos(2));
+            return;
         }
+        // PARTICLES: статичный кадр тоже подсыпаем с троттлингом, чтобы
+        // подсветка не гасла, когда игрок стоит на месте; изменение кадра
+        // рендерится сразу.
+        if (changed) {
+            timer = cfg.particles().updateTicks;
+        } else {
+            timer += 5;
+            if (timer < cfg.particles().updateTicks) {
+                return;
+            }
+        }
+        renderParticles(sel, act.highlight, null);
+        Config.ParticleOptions po = cfg.particles();
+        markerCube(sel.getWorld(), po, p1.highlight, sel.getPos(1));
+        markerCube(sel.getWorld(), po, p2.highlight, sel.getPos(2));
     }
 
     /** Удаляет все спавненные сущности (выход из сессии / смена режима). */

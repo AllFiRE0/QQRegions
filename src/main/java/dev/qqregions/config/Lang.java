@@ -33,15 +33,32 @@ public class Lang {
         if (!file.exists()) {
             plugin.saveResource("lang.yml", false);
         }
-        cfg = YamlConfiguration.loadConfiguration(file);
-        // базовые значения из jar на случай неполного файла
+        FileConfiguration loaded = null;
+        try {
+            loaded = YamlConfiguration.loadConfiguration(file);
+        } catch (Exception ex) {
+            plugin.getLogger().severe("Не удалось прочитать lang.yml: " + ex.getMessage());
+            plugin.getLogger().severe("Используются встроенные переводы. Исправьте файл и выполните /region reload.");
+        }
+        // базовые значения из jar на случай неполного/битого файла
+        FileConfiguration defs = new YamlConfiguration();
         try (InputStream in = plugin.getResource("lang.yml")) {
             if (in != null) {
-                cfg.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8)));
+                defs = YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
             plugin.getLogger().warning("Не удалось прочитать встроенный lang.yml: " + e.getMessage());
+        } catch (Exception e) {
+            plugin.getLogger().severe("Встроенный lang.yml повреждён: " + e.getMessage());
         }
+        if (loaded == null || loaded.getKeys(false).isEmpty()) {
+            // битый/пустой файл — работаем на встроенных переводах, чтобы
+            // сообщения не были пустыми; файл игрока не перезаписываем.
+            cfg = defs;
+            return;
+        }
+        cfg = loaded;
+        cfg.setDefaults(defs);
         cfg.options().copyDefaults(true);
         try {
             cfg.save(file);

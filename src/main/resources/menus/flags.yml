@@ -160,6 +160,7 @@ Menus:
         exit-override: END_PORTAL_FRAME
         entry: OAK_DOOR
         exit: DARK_OAK_DOOR
+        territory-visible: LIGHT
     navigation:
       prev:
         material: ARROW
@@ -256,6 +257,7 @@ Menus:
         creeper-explosion: TNT
         tnt-explosion: TNT
         fall-damage: IRON_BOOTS
+        territory-visible: LIGHT
     navigation:
       prev:
         material: ARROW
@@ -338,6 +340,7 @@ Menus:
         creeper-explosion: TNT
         tnt-explosion: TNT
         fall-damage: IRON_BOOTS
+        territory-visible: LIGHT
     navigation:
       prev:
         material: ARROW
@@ -419,6 +422,7 @@ Menus:
         creeper-explosion: TNT
         tnt-explosion: TNT
         fall-damage: IRON_BOOTS
+        territory-visible: LIGHT
     navigation:
       prev:
         material: ARROW

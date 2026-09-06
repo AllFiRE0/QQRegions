@@ -52,9 +52,11 @@ public class Config {
     private float viewBlockScale = 0.35f;
     private int viewDotsPerEdge = 16;
     private boolean commandSelectionView = true;
+    private int viewHideAfter = 5;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
+    private HighlightOptions highlight;
 
     public Config(QQRegions plugin) {
         this.plugin = plugin;
@@ -106,6 +108,7 @@ public class Config {
         viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
         viewDotsPerEdge = Math.max(2, cfg.getInt("interactive.view-dots-per-edge", 16));
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
+        viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 5));
 
         buttonMaterials.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
@@ -120,6 +123,7 @@ public class Config {
 
         particles = new ParticleOptions(cfg.getConfigurationSection("particles"));
         bossbar = new BossBarOptions(cfg.getConfigurationSection("bossbar"));
+        highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
     }
 
     private static List<String> lower(List<String> in) {
@@ -236,6 +240,16 @@ public class Config {
         return commandSelectionView;
     }
 
+    /** Секунд без изменений, после которых подсветка скрывается (0 = держать всегда). */
+    public int viewHideAfter() {
+        return viewHideAfter;
+    }
+
+    /** viewHideAfter в «вызовах» тика плагина (тик раз в 5 серверных тиков). */
+    public int viewHideAfterCalls() {
+        return viewHideAfter <= 0 ? 0 : viewHideAfter * 4;
+    }
+
     public Material buttonMaterial(String id) {
         Material m = buttonMaterials.get(id);
         return m == null ? Material.BARRIER : m;
@@ -247,6 +261,11 @@ public class Config {
 
     public BossBarOptions bossbar() {
         return bossbar;
+    }
+
+    /** Настройки подсветки регионов (команды /region visible и флаг territory-visible). */
+    public HighlightOptions highlight() {
+        return highlight;
     }
 
     // ---------------- вложенные опции ----------------
@@ -291,15 +310,61 @@ public class Config {
         public final int maxPoints;
 
         ParticleOptions(ConfigurationSection s) {
+            enabled = s == null ? true : s.getBoolean("enabled", true);
+            updateTicks = Math.max(1, s == null ? 10 : s.getInt("update-ticks", 10));
+            particleName = s == null ? "DUST" : s.getString("particle", "DUST");
+            dustColor = Colors.bukkit(s == null ? "#00ff00" : s.getString("dust-color", "#00ff00"), Color.fromRGB(0x00FF00));
+            dustSize = (float) (s == null ? 0.6 : s.getDouble("dust-size", 0.6));
+            amount = s == null ? 1 : s.getInt("amount", 1);
+            speed = s == null ? 0 : s.getDouble("speed", 0);
+            density = s == null ? 2 : s.getInt("point-density", 2);
+            maxPoints = s == null ? 4000 : s.getInt("max-points", 4000);
+        }
+    }
+
+/**
+     * Подсветка регионов: /region visible + флаг territory-visible.
+     * Контур региона рисуется окном showMillis, потом гаснет сам; повторное
+     * срабатывание флага — не чаще cooldownMillis на игрока и регион.
+     */
+    public static class HighlightOptions {
+        public final boolean enabled;
+        public final boolean flagEnabled;
+        public final String type;
+        public final int showSeconds;
+        public final long showMillis;
+        public final int scanTicks;
+        public final long cooldownMillis;
+        public final float blockScale;
+        public final Material block;
+        public final ParticleOptions particles;
+
+        HighlightOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = true;
+                flagEnabled = true;
+                type = "PARTICLES";
+                showSeconds = 10;
+                showMillis = 10_000L;
+                scanTicks = 20;
+                cooldownMillis = 10_000L;
+                blockScale = 0.35f;
+                block = Material.GLASS;
+                particles = new ParticleOptions(null);
+                return;
+            }
             enabled = s.getBoolean("enabled", true);
-            updateTicks = Math.max(1, s.getInt("update-ticks", 10));
-            particleName = s.getString("particle", "DUST");
-            dustColor = Colors.bukkit(s.getString("dust-color", "#00ff00"), Color.fromRGB(0x00FF00));
-            dustSize = (float) s.getDouble("dust-size", 0.6);
-            amount = s.getInt("amount", 1);
-            speed = s.getDouble("speed", 0);
-            density = s.getInt("point-density", 2);
-            maxPoints = s.getInt("max-points", 4000);
+            flagEnabled = s.getBoolean("flag-enabled", true);
+            type = s.getString("type", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
+            showSeconds = Math.max(1, s.getInt("show-seconds", 10));
+            showMillis = showSeconds * 1000L;
+            scanTicks = Math.max(1, s.getInt("scan-ticks", 20));
+            cooldownMillis = Math.max(0, s.getInt("cooldown-seconds", 10)) * 1000L;
+            blockScale = (float) s.getDouble("block-scale", 0.35);
+            String mat = s.getString("block", "GLASS");
+            Material m = Material.matchMaterial(mat);
+            block = m == null ? Material.GLASS : m;
+            particles = new ParticleOptions(s.getConfigurationSection("particles"));
         }
     }
 

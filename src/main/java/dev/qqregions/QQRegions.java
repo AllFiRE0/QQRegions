@@ -5,6 +5,7 @@ import dev.qqregions.config.Config;
 import dev.qqregions.config.Lang;
 import dev.qqregions.config.ReplaceManager;
 import dev.qqregions.gui.MenuManager;
+import dev.qqregions.highlight.HighlightManager;
 import dev.qqregions.papi.QQExpansion;
 import dev.qqregions.selection.InteractListener;
 import dev.qqregions.selection.SelectionManager;
@@ -33,6 +34,7 @@ public final class QQRegions extends JavaPlugin {
     private MenuManager menus;
     private CommandManager commands;
     private InteractListener interactListener;
+    private HighlightManager highlight;
 
     public static QQRegions get() {
         return instance;
@@ -47,6 +49,7 @@ public final class QQRegions extends JavaPlugin {
         this.lang = new Lang(this);
         this.replace = new ReplaceManager(this);
         this.wg = new Wg(this);
+        this.wg.registerFlags();
         this.selections = new SelectionManager(this);
         this.store = new SessionStore(this);
         this.menus = new MenuManager(this);
@@ -54,9 +57,11 @@ public final class QQRegions extends JavaPlugin {
         this.commands.register();
 
         this.interactListener = new InteractListener(this);
+        this.highlight = new HighlightManager(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
+        Bukkit.getPluginManager().registerEvents(highlight, this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             Papi.setEnabled(true);
@@ -76,6 +81,7 @@ public final class QQRegions extends JavaPlugin {
     private void onTick() {
         selections.tick();
         menus.tick();
+        highlight.tick();
     }
 
     @Override
@@ -85,6 +91,9 @@ public final class QQRegions extends JavaPlugin {
         }
         if (menus != null) {
             menus.closeAll();
+        }
+        if (highlight != null) {
+            highlight.clearAll();
         }
         if (commands != null) {
             commands.unregister();
@@ -123,6 +132,10 @@ public final class QQRegions extends JavaPlugin {
 
     public CommandManager commands() {
         return commands;
+    }
+
+    public HighlightManager highlight() {
+        return highlight;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */
