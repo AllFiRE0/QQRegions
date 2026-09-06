@@ -1,6 +1,7 @@
 package dev.qqregions.config;
 
 import dev.qqregions.QQRegions;
+import dev.qqregions.util.Colors;
 import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -265,7 +266,7 @@ public class Config {
             }
             String mat = s.getString("pane");
             pane = materialOr(mat, defaultPane);
-            highlight = hexColor(s.getString("highlight"), defaultColor);
+            highlight = Colors.bukkit(s.getString("highlight"), defaultColor);
             block = materialOr(s.getString("block"), defaultBlock);
         }
 
@@ -293,7 +294,7 @@ public class Config {
             enabled = s.getBoolean("enabled", true);
             updateTicks = Math.max(1, s.getInt("update-ticks", 10));
             particleName = s.getString("particle", "DUST");
-            dustColor = hexColor(s.getString("dust-color", "#00ff00"));
+            dustColor = Colors.bukkit(s.getString("dust-color", "#00ff00"), Color.fromRGB(0x00FF00));
             dustSize = (float) s.getDouble("dust-size", 0.6);
             amount = s.getInt("amount", 1);
             speed = s.getDouble("speed", 0);
@@ -313,6 +314,8 @@ public class Config {
         public final String fullText;
         public final BarColor conflictColor;
         public final String conflictText;
+        /** Цвет-заполнитель перед {current} ({value-color}): &f в норме, &c на лимите. */
+        public final String valueColor;
 
         BossBarOptions(ConfigurationSection s) {
             enabled = s.getBoolean("enabled", true);
@@ -325,43 +328,13 @@ public class Config {
                 st = BarStyle.SEGMENTED_10;
             }
             style = st;
-            normalColor = barColor(s.getString("normal.color", "WHITE"));
+            normalColor = Colors.bar(s.getString("normal.color", "WHITE"), BarColor.WHITE);
             normalText = s.getString("normal.text", "&8[{current}&8/&8{max}&8] &7блоков");
-            fullColor = barColor(s.getString("full.color", "RED"));
-            fullText = s.getString("full.text", "&cМаксимум блоков достигнут!");
-            conflictColor = barColor(s.getString("conflict.color", "YELLOW"));
+            fullColor = Colors.bar(s.getString("full.color", "RED"), BarColor.RED);
+            fullText = s.getString("full.text", "&c{value-color}{current}&8/&8{max}&c — максимум блоков!");
+            conflictColor = Colors.bar(s.getString("conflict.color", "YELLOW"), BarColor.YELLOW);
             conflictText = s.getString("conflict.text", "&eВыделение пересекает чужой регион!");
-        }
-    }
-
-    private static Color hexColor(String hex) {
-        try {
-            String h = hex.startsWith("#") ? hex.substring(1) : hex;
-            int rgb = Integer.parseInt(h, 16);
-            return Color.fromRGB(rgb);
-        } catch (Exception e) {
-            return Color.GREEN;
-        }
-    }
-
-    private static Color hexColor(String hex, Color def) {
-        try {
-            String h = hex.startsWith("#") ? hex.substring(1) : hex;
-            if (h.isEmpty()) {
-                return def;
-            }
-            int rgb = Integer.parseInt(h, 16);
-            return Color.fromRGB(rgb);
-        } catch (Exception e) {
-            return def;
-        }
-    }
-
-    private static BarColor barColor(String name) {
-        try {
-            return BarColor.valueOf(name.toUpperCase(java.util.Locale.ROOT));
-        } catch (Exception e) {
-            return BarColor.WHITE;
+            valueColor = s.getString("value-color", "&f");
         }
     }
 }

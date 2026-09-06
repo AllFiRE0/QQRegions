@@ -38,6 +38,9 @@ public class SelectionView {
     private Entity viewMarker;
     private Entity viewMarker2;
     private int timer = 0;
+    /** Отпечаток последнего кадра: если не изменился — рендер пропускается
+     * (никакого спама частиц/дисплеев и debug-лога в покое). */
+    private String lastFp = "";
 
     public SelectionView(QQRegions plugin, Player player) {
         this.plugin = plugin;
@@ -54,14 +57,44 @@ public class SelectionView {
         renderNow(sel, color, blockMat, marker);
     }
 
-    /** Немедленный рендер (без троттлинга) — для мгновенного отклика. */
+    /**
+     * Немедленный рендер (без троттлинга) — для мгновенного отклика.
+     * Пропускает работу, если выделение и маркер не изменились.
+     */
     public void renderNow(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         timer = plugin.config().particles().updateTicks;
+        if (sel == null) {
+            lastFp = "";
+            return;
+        }
+        String fp = fp(sel, marker, color, blockMat, false);
+        if (fp.equals(lastFp)) {
+            return;
+        }
+        lastFp = fp;
         if (plugin.config().blockView()) {
             renderBlockView(sel, color, blockMat, marker);
         } else {
             renderParticles(sel, color, marker);
         }
+    }
+
+    private static String fp(Selection sel, BlockVector3 marker, Color color, Material mat, boolean select) {
+        StringBuilder sb = new StringBuilder(96);
+        sb.append(sel.getWorld().getName()).append('|')
+                .append(sel.min().getX()).append(',').append(sel.min().getY()).append(',').append(sel.min().getZ()).append('|')
+                .append(sel.max().getX()).append(',').append(sel.max().getY()).append(',').append(sel.max().getZ());
+        if (marker != null) {
+            sb.append('|').append(marker.getX()).append(',').append(marker.getY()).append(',').append(marker.getZ());
+        }
+        if (color != null) {
+            sb.append('|').append(color.asRGB());
+        }
+        if (mat != null) {
+            sb.append('|').append(mat.name());
+        }
+        sb.append(select ? 'S' : 'R');
+        return sb.toString();
     }
 
     /**
@@ -76,6 +109,16 @@ public class SelectionView {
         Config.PointStyle oth = activePoint == 1 ? p2 : p1;
         BlockVector3 actPos = sel.getPos(activePoint);
         BlockVector3 othPos = sel.getPos(activePoint == 1 ? 2 : 1);
+        // select-режим спавнит маркеры каждые 5 тиков; пропускаем работу,
+        // только если НИЧЕГО не менялось (обе точки, активная, цвета).
+        String fp = fp(sel, othPos, oth.highlight, oth.block, true)
+                + '|' + activePoint
+                + '|' + actPos.getX() + ',' + actPos.getY() + ',' + actPos.getZ()
+                + '|' + act.highlight.asRGB();
+        if (fp.equals(lastFp)) {
+            return;
+        }
+        lastFp = fp;
         if (cfg.blockView()) {
             renderBlockView(sel, act.highlight, act.block, actPos);
             updateOtherMarker(sel.getWorld(), oth.highlight, oth.block, othPos);

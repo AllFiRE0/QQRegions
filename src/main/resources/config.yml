@@ -180,8 +180,12 @@ bossbar:
     color: WHITE
     text: "&8[&7{current}&8/&7{max}&8] &7блоков"
   full:
+    # При максимуме полоса красная, но current/max всё равно показываются.
     color: RED
-    text: "&cМаксимум блоков достигнут!"
+    text: "&c{value-color}{current}&8/&8{max}&c — максимум блоков!"
   conflict:
     color: YELLOW
     text: "&eВыделение пересекает чужой регион!"
+  # Цвет значения {current} ({value-color}): белым при норме, красным —
+  # когда достигнут максимум (полоса остаётся красной из full.color).
+  value-color: "&f"

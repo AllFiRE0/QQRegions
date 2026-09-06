@@ -444,10 +444,11 @@ public class InteractSession {
 
         String text;
         BarColor color;
+        boolean full = max > 0 && cur >= max;
         if (conflict) {
             text = bo.conflictText;
             color = bo.conflictColor;
-        } else if (max > 0 && cur >= max) {
+        } else if (full) {
             text = bo.fullText;
             color = bo.fullColor;
         } else {
@@ -455,7 +456,11 @@ public class InteractSession {
             color = bo.normalColor;
         }
         String percent = max <= 0 ? "100" : String.valueOf(Math.min(100L, cur * 100 / max));
-        text = text.replace("{current}", fmt(cur))
+        // {value-color} — цвет перед {current}: &f в норме, красный при лимите
+        // (значение тоже красится этим цветом, боссбар остаётся красным).
+        String valueColor = full ? "&c" : bo.valueColor;
+        text = text.replace("{value-color}", valueColor)
+                .replace("{current}", fmt(cur))
                 .replace("{max}", fmt(max))
                 .replace("{percent}", percent)
                 .replace("{player}", player.getName());

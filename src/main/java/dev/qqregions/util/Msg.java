@@ -7,14 +7,23 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
  * Утилиты работы с цветами и текстом.
  */
 public final class Msg {
-    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacyAmpersand();
+    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
+            .character('&')
+            .hexColors()
+            .useUnusualXRepeatedCharacterHexFormat()
+            .build();
 
     private Msg() {
     }
 
-    /** Преобразует строку с '&'-кодами и '&#RRGGBB' в Adventure-компонент. */
+    /**
+     * Преобразует строку в Adventure-компонент. Помимо '&'-кодов понимает
+     * '#RRGGBB', '&x&R&R&G&G&B&B' и все форматы Colors (имена, {#FF5555},
+     * [#lime], <#FF5555>, <color:#FF5555>, обёртки CMI). Неизвестные
+     * токены проходят как есть — строка не ломается.
+     */
     public static Component color(String s) {
-        return LEGACY.deserialize(s == null ? "" : s);
+        return LEGACY.deserialize(s == null ? "" : Colors.toLegacy(s));
     }
 
     /** Сериализует компонент обратно в строку с '§'. */
@@ -22,13 +31,9 @@ public final class Msg {
         return LEGACY.serialize(c);
     }
 
-    /** Палитра-парсер: "#00ff00" -> Bukkit Color. */
+    /** Палитра-парсер (совместимость): любой формат -> awt Color, fallback зелёный. */
     public static java.awt.Color parseColor(String hex) {
-        try {
-            String h = hex.startsWith("#") ? hex.substring(1) : hex;
-            return new java.awt.Color(Integer.parseInt(h, 16));
-        } catch (Exception e) {
-            return java.awt.Color.GREEN;
-        }
+        int rgb = Colors.parse(hex);
+        return new java.awt.Color(rgb == -1 ? 0x00FF00 : rgb);
     }
 }

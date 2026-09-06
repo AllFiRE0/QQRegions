@@ -186,6 +186,15 @@ public class SelectionManager implements Listener {
             if (!p.getWorld().equals(sel.getWorld())) {
                 continue;
             }
+            // Вырожденное выделение (0x0x0 / одна точка) рисовать незачем:
+            // это и не выделение ещё, только лишняя работа каждый тик.
+            if (sel.volume() <= 1) {
+                SelectionView dead = views.remove(id);
+                if (dead != null) {
+                    dead.cleanup();
+                }
+                continue;
+            }
             Config cfg = plugin.config();
             SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
             if (cfg.blockView()) {
