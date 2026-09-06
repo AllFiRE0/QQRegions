@@ -111,15 +111,10 @@ public class SelectionView {
             return;
         }
         World world = sel.getWorld();
-        double limitSq = (double) plugin.config().viewDistance() * plugin.config().viewDistance();
-        Location eye = player.getLocation();
+        // Весь контур рисуется БЕЗ обрезания по дистанции: лимит точек уже
+        // ограничивает нагрузку (max-points), а далёкие куски раньше
+        // «отрывались» из-за view-distance.
         for (BlockVector3 p : edgePoints(sel, po.density, po.maxPoints)) {
-            double dx = p.getBlockX() + 0.5 - eye.getX();
-            double dy = p.getBlockY() + 0.5 - eye.getY();
-            double dz = p.getBlockZ() + 0.5 - eye.getZ();
-            if (dx * dx + dy * dy + dz * dz > limitSq) {
-                continue;
-            }
             spawnParticle(world, po, color, p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5);
         }
         if (marker != null) {
@@ -157,24 +152,18 @@ public class SelectionView {
 
     private void renderBlockView(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         Config cfg = plugin.config();
-        World world = sel.getWorld();
-        double limitSq = (double) cfg.viewDistance() * cfg.viewDistance();
         int maxBlocks = cfg.viewMaxBlocks();
-        Location eye = player.getLocation();
 
         List<BlockVector3> inRange = new ArrayList<>();
         Set<Long> wanted = new HashSet<>();
+        // Без обрезания по дистанции: весь контур (до view-max-blocks точек)
+        // сплошные полосы по всем 12 рёбрам. Дальше вид-дистанция не режет.
         for (BlockVector3 p : edgePoints(sel, cfg.particles().density, maxBlocks)) {
             if (inRange.size() >= maxBlocks) {
                 break;
             }
-            double dx = p.getBlockX() + 0.5 - eye.getX();
-            double dy = p.getBlockY() + 0.5 - eye.getY();
-            double dz = p.getBlockZ() + 0.5 - eye.getZ();
-            if (dx * dx + dy * dy + dz * dz <= limitSq) {
-                wanted.add(blockKey(p));
-                inRange.add(p);
-            }
+            inRange.add(p);
+            wanted.add(blockKey(p));
         }
 
         viewBlocks.entrySet().removeIf(e -> {
