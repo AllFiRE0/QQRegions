@@ -285,8 +285,11 @@ public class SelectionView {
      * короткие рёбра идут каждым блоком. Все 12 рёбер рисуются ЦЕЛИКОМ
      * (без общего потолка, который раньше отбирал точки у последних
      * вертикальных граней), поэтому вертикали не могут пропасть.
+     * При debug: true в консоль выводится фактическое число точек каждого
+     * ребра (низ 0-3, верх 4-7, вертикали 8-11) — проверка «вертикали =
+     * горизонтали» по факту.
      */
-    private static List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
+    private List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
         int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
         BlockVector3 mn = sel.min();
         BlockVector3 mx = sel.max();
@@ -317,6 +320,10 @@ public class SelectionView {
         // пропускается, бюджет соблюдается.
         List<BlockVector3> out = new ArrayList<>(Math.min(cap + 16, 4096));
         Set<Long> seen = new HashSet<>();
+        int[] ns = new int[edges.length];
+        for (int i = 0; i < edges.length; i++) {
+            ns[i] = edges[i].n;
+        }
         for (Edge e : edges) {
             while (e.hasNext()) {
                 BlockVector3 p = e.next();
@@ -325,7 +332,27 @@ public class SelectionView {
                 }
             }
         }
+        if (plugin.config().debug()) {
+            plugin.getLogger().info("[selection-view] куб "
+                    + sx + "x" + sy + "x" + sz
+                    + " cap=" + cap + " perEdge=" + perEdge
+                    + " точек=" + out.size()
+                    + " низ=" + arr(ns, 0, 4)
+                    + " верх=" + arr(ns, 4, 8)
+                    + " вертY=" + arr(ns, 8, 12));
+        }
         return out;
+    }
+
+    private static String arr(int[] a, int from, int to) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = from; i < to; i++) {
+            if (i > from) {
+                sb.append(',');
+            }
+            sb.append(a[i]);
+        }
+        return sb.append(']').toString();
     }
 
     /** Шаг пунктира ребра длины len: короткое ребро (len <= need) — каждый блок. */
