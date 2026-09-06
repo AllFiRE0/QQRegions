@@ -2,6 +2,7 @@ package dev.qqregions.selection;
 
 import dev.qqregions.QQRegions;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -11,15 +12,20 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 
 /**
- * Слушатели интерактивной сессии выделения: ЛКМ — смена точки,
- * колесо мыши — движение точки, кнопки 1-9 — действия, чат — имя региона.
+ * Слушатели интерактивной сессии выделения:
+ * хотбар свободен (действия — кликом кнопкой в руке и ПКМ/ЛКМ по воздуху),
+ * в select-режиме колесо двигает активную точку, ЛКМ пустой рукой меняет точку,
+ * команды из protect-списка блокируются, чат — имя региона.
  */
 public class InteractListener implements Listener {
 
@@ -34,28 +40,46 @@ public class InteractListener implements Listener {
         return plugin.selections().session(p);
     }
 
+    private NamespacedKey buttonKey() {
+        return new NamespacedKey(plugin, InteractSession.BTN_TAG_KEY);
+    }
+
+    /** Возвращает id кнопки ("create"|"select"|"reset"|"cancel") или null, если предмет не кнопка. */
+    private String buttonId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        return item.getItemMeta().getPersistentDataContainer().get(buttonKey(), PersistentDataType.STRING);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onItemHeld(PlayerItemHeldEvent e) {
         InteractSession s = session(e.getPlayer());
         if (s == null) {
             return;
         }
-        e.setCancelled(true);
         int prev = e.getPreviousSlot();
         int next = e.getNewSlot();
         boolean scrollUp = next == (prev + 1) % 9;
         boolean scrollDown = next == (prev + 8) % 9;
-        if (scrollUp || scrollDown) {
+        if (s.isSelectingMode() && (scrollUp || scrollDown)) {
+            // В select-режиме колесо двигает точку, слот не меняем.
+            e.setCancelled(true);
             s.onWheel(scrollUp);
-        } else {
-            s.onHotbarSlot(next);
+            return;
         }
+        // Иначе хотбар свободен: смена цифрами 1-9 или колесом — как обычно.
+        plugin.dbg("hotbar slot: " + e.getPlayer().getName() + " -> " + next);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAnimation(PlayerAnimationEvent e) {
         InteractSession s = session(e.getPlayer());
-        if (s != null && e.getAnimationType() == PlayerAnimationType.ARM_SWING) {
+        if (s == null || e.getAnimationType() != PlayerAnimationType.ARM_SWING) {
+            return;
+        }
+        // ЛКМ кнопкой = её действие; ЛКМ пустой рукой = смена активной точки.
+        if (buttonId(e.getPlayer().getInventory().getItemInMainHand()) == null) {
             s.onSwing();
         }
     }
@@ -67,8 +91,12 @@ public class InteractListener implements Listener {
             return;
         }
         Action a = e.getAction();
-        if (a == Action.LEFT_CLICK_AIR || a == Action.LEFT_CLICK_BLOCK) {
-            s.onSwing();
+        if (a == Action.LEFT_CLICK_AIR || a == Action.RIGHT_CLICK_AIR
+                || a == Action.LEFT_CLICK_BLOCK || a == Action.RIGHT_CLICK_BLOCK) {
+            String id = buttonId(e.getPlayer().getInventory().getItemInMainHand());
+            if (id != null) {
+                s.runButton(id);
+            }
         }
         if (e.getHand() == EquipmentSlot.HAND) {
             e.setCancelled(true);
@@ -84,6 +112,26 @@ public class InteractListener implements Listener {
         e.setCancelled(true);
         String text = LEGACY.serialize(e.message());
         plugin.getServer().getScheduler().runTask(plugin, () -> s.tryCreate(text));
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onCommand(PlayerCommandPreprocessEvent e) {
+        InteractSession s = session(e.getPlayer());
+        if (s == null) {
+            return;
+        }
+        String cmd = e.getMessage().substring(1).toLowerCase();
+        for (String blocked : plugin.config().blockedCommands()) {
+            if (blocked.isEmpty()) {
+                continue;
+            }
+            if (cmd.equals(blocked) || cmd.startsWith(blocked + " ")) {
+                e.setCancelled(true);
+                e.getPlayer().sendMessage(plugin.lang().compPrefixed("select.command-blocked", "cmd", e.getMessage()));
+                plugin.dbg("blocked command '" + e.getMessage() + "' by " + e.getPlayer().getName());
+                return;
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

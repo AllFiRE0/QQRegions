@@ -1,6 +1,9 @@
 package dev.qqregions.selection;
 
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.regions.CuboidRegion;
+import com.sk89q.worldedit.regions.selector.CuboidRegionSelector;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
 import dev.qqregions.config.SelectionTemplate;
@@ -20,6 +23,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,8 +32,11 @@ import java.util.Set;
 
 /**
  * Интерактивная сессия выделения (/region select).
- * Сохраняет инвентарь игрока, показывает кнопки в хотбаре и управляет
- * точками выделения колесом мыши. Частицы и боссбар настраиваются в config.yml.
+ * Сохраняет инвентарь игрока, выкладывает кнопки в хотбар (слоты можно
+ * свободно переключать; действие — кликом зажатой кнопкой), колесо мыши
+ * в режиме выделения двигает активную точку. Частицы и боссбар настраиваются
+ * в config.yml. Если включён sync-worldedit, выделение передаётся в WorldEdit
+ * (sVis подсвечивает область автоматически).
  */
 public class InteractSession {
 
@@ -37,6 +44,9 @@ public class InteractSession {
     public static final int SLOT_SELECT = 3;
     public static final int SLOT_RESET = 5;
     public static final int SLOT_CANCEL = 8;
+
+    /** Ключ NBT-тега кнопки сессии (значение = "create"|"select"|"reset"|"cancel"). */
+    public static final String BTN_TAG_KEY = "session-button";
 
     private final QQRegions plugin;
     private final Player player;
@@ -54,9 +64,13 @@ public class InteractSession {
     private int particleTimer = 0;
     private int barTimer = 0;
 
+    /** Мир, в котором живёт сессия (для сброса WE-селекции). */
+    private final World world;
+
     public InteractSession(QQRegions plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
+        this.world = player.getWorld();
         PlayerInventory inv = player.getInventory();
         this.contents = inv.getContents().clone();
         this.armor = inv.getArmorContents().clone();
@@ -74,6 +88,8 @@ public class InteractSession {
         inv.setHeldItemSlot(SLOT_SELECT);
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-on"));
         player.sendMessage(plugin.lang().comp("select.interactive-help"));
+        plugin.dbg("session start: " + player.getName() + " @" + world.getName()
+                + " (syncWorldEdit=" + plugin.config().syncWorldEdit() + ")");
     }
 
     private ItemStack button(String id, String nameKey) {
@@ -82,25 +98,31 @@ public class InteractSession {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Msg.color(plugin.lang().get(nameKey)));
+            meta.getPersistentDataContainer().set(buttonKey(), PersistentDataType.STRING, id);
             item.setItemMeta(meta);
         }
         return item;
     }
 
-    // ---------- кнопки хотбара ----------
+    private NamespacedKey buttonKey() {
+        return new NamespacedKey(plugin, "session-button");
+    }
 
-    public void onHotbarSlot(int slot) {
-        switch (slot) {
-            case SLOT_CREATE:
+    // ---------- действия по кнопкам (клик зажатой кнопкой) ----------
+
+    public void runButton(String id) {
+        plugin.dbg("session button " + id + " by " + player.getName());
+        switch (id) {
+            case "create":
                 create();
                 break;
-            case SLOT_SELECT:
+            case "select":
                 toggleSelect();
                 break;
-            case SLOT_RESET:
+            case "reset":
                 reset();
                 break;
-            case SLOT_CANCEL:
+            case "cancel":
                 cancel();
                 break;
             default:
@@ -127,6 +149,7 @@ public class InteractSession {
 
     private void toggleSelect() {
         selectingMode = !selectingMode;
+        plugin.dbg("toggleSelect -> " + selectingMode);
         if (selectingMode) {
             SelectionManager mgr = plugin.selections();
             BlockVector3 feet = feet(player);
@@ -134,6 +157,7 @@ public class InteractSession {
             mgr.set(player, mgr.clampToWorld(sel));
             activePoint = 2;
         }
+        syncWorldEdit();
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
                 "point", plugin.lang().fmt("select.point-" + activePoint)));
     }
@@ -141,6 +165,7 @@ public class InteractSession {
     private void reset() {
         BlockVector3 feet = feet(player);
         plugin.selections().set(player, new Selection(player.getWorld(), feet, feet));
+        syncWorldEdit();
         player.sendMessage(plugin.lang().compPrefixed("select.reset"));
     }
 
@@ -156,9 +181,11 @@ public class InteractSession {
         inv.setItemInOffHand(offhand);
         inv.setContents(contents);
         hideBar();
+        clearWorldEdit();
         if (player.isOnline()) {
             player.sendMessage(plugin.lang().compPrefixed("select.interactive-off"));
         }
+        plugin.dbg("session end: " + player.getName());
     }
 
     // ---------- события мыши ----------
@@ -178,6 +205,7 @@ public class InteractSession {
         activePoint = activePoint == 1 ? 2 : 1;
         player.sendMessage(plugin.lang().compPrefixed("select.interactive-select-mode",
                 "point", plugin.lang().fmt("select.point-" + activePoint)));
+        plugin.dbg("point switch -> " + activePoint);
     }
 
     public void onWheel(boolean scrollUp) {
@@ -196,6 +224,8 @@ public class InteractSession {
             return;
         }
         plugin.selections().set(player, plugin.selections().clampToWorld(sel.withPoint(activePoint, next)));
+        syncWorldEdit();
+        plugin.dbg("wheel: point" + activePoint + " " + cur + " -> " + next);
     }
 
     private BlockVector3 computeMove(BlockVector3 cur, Location eye, boolean forward) {
@@ -290,7 +320,7 @@ public class InteractSession {
         }
         Config cfg = plugin.config();
 
-        if (cfg.particles().enabled && selectingMode) {
+        if (cfg.particles().enabled) {
             particleTimer += 5;
             if (particleTimer >= cfg.particles().updateTicks) {
                 particleTimer = 0;
@@ -435,6 +465,47 @@ public class InteractSession {
             }
             bar = null;
             barKey = null;
+        }
+    }
+
+    // ---------- синхронизация с WorldEdit (для подсветки sVis) ----------
+
+    /**
+     * Передаёт текущее выделение в WorldEdit-сессию игрока, чтобы sVis
+     * (Selection Visualizer) сразу подсвечивал область. Работает тихим
+     * fallback'ом: при любых ошибках — только debug-лог, без помех сессии.
+     */
+    private void syncWorldEdit() {
+        if (!plugin.config().syncWorldEdit()) {
+            return;
+        }
+        try {
+            Selection sel = plugin.selections().get(player);
+            if (sel == null) {
+                return;
+            }
+            com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(sel.getWorld());
+            com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
+                    .getSessionManager().get(BukkitAdapter.adapt(player));
+            session.setRegionSelector(weWorld, new CuboidRegionSelector(weWorld,
+                    new CuboidRegion(weWorld, sel.min(), sel.max())));
+        } catch (Throwable t) {
+            plugin.dbg("WE sync failed for " + player.getName() + ": " + t);
+        }
+    }
+
+    /** Сбрасывает WorldEdit-селекцию игрока при выходе из сессии. */
+    private void clearWorldEdit() {
+        if (!plugin.config().syncWorldEdit()) {
+            return;
+        }
+        try {
+            com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
+            com.sk89q.worldedit.LocalSession session = com.sk89q.worldedit.WorldEdit.getInstance()
+                    .getSessionManager().get(BukkitAdapter.adapt(player));
+            session.setRegionSelector(weWorld, null);
+        } catch (Throwable t) {
+            plugin.dbg("WE clear failed for " + player.getName() + ": " + t);
         }
     }
 

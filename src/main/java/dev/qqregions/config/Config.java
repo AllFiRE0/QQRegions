@@ -39,6 +39,9 @@ public class Config {
     private boolean invertWheel;
     private int lookAngle;
     private final Map<String, Material> buttonMaterials = new HashMap<>();
+    private List<String> blockedCommands = new ArrayList<>();
+    private boolean syncWorldEdit = true;
+    private boolean debug;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
@@ -77,6 +80,9 @@ public class Config {
         wheelStep = cfg.getInt("interactive.wheel-step", 1);
         invertWheel = cfg.getBoolean("interactive.invert-wheel", false);
         lookAngle = cfg.getInt("interactive.look-angle-for-vertical", 60);
+        blockedCommands = new ArrayList<>(lower(cfg.getStringList("interactive.blocked-commands")));
+        syncWorldEdit = cfg.getBoolean("interactive.sync-worldedit", true);
+        debug = cfg.getBoolean("debug", false);
 
         buttonMaterials.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
@@ -157,6 +163,18 @@ public class Config {
 
     public int lookAngle() {
         return lookAngle;
+    }
+
+    public List<String> blockedCommands() {
+        return blockedCommands;
+    }
+
+    public boolean syncWorldEdit() {
+        return syncWorldEdit;
+    }
+
+    public boolean debug() {
+        return debug;
     }
 
     public Material buttonMaterial(String id) {

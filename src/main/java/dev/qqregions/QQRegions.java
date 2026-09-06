@@ -117,4 +117,11 @@ public final class QQRegions extends JavaPlugin {
     public CommandManager commands() {
         return commands;
     }
+
+    /** Подробный лог в консоль, если в config.yml включён debug: true. */
+    public void dbg(String msg) {
+        if (config != null && config.debug()) {
+            getLogger().info("[DEBUG] " + msg);
+        }
+    }
 }
