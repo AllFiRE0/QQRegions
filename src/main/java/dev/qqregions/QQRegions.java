@@ -41,6 +41,15 @@ public final class QQRegions extends JavaPlugin {
     }
 
     @Override
+    public void onLoad() {
+        instance = this;
+        // Кастомные флаги WG обязаны регистрироваться ДО активации WorldGuard
+        // (после неё FlagRegistry блокируется).
+        this.wg = new Wg(this);
+        this.wg.registerFlags();
+    }
+
+    @Override
     public void onEnable() {
         instance = this;
 
@@ -48,8 +57,6 @@ public final class QQRegions extends JavaPlugin {
         this.config = new Config(this);
         this.lang = new Lang(this);
         this.replace = new ReplaceManager(this);
-        this.wg = new Wg(this);
-        this.wg.registerFlags();
         this.selections = new SelectionManager(this);
         this.store = new SessionStore(this);
         this.menus = new MenuManager(this);

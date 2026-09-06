@@ -10,10 +10,11 @@ import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import com.sk89q.worldguard.protection.flags.BooleanFlag;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.FlagContext;
-import com.sk89q.worldguard.protection.flags.FlagRegistry;
 import com.sk89q.worldguard.protection.flags.RegionGroup;
 import com.sk89q.worldguard.protection.flags.RegionGroupFlag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
+import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
+import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.managers.RemovalStrategy;
 import com.sk89q.worldguard.protection.managers.storage.StorageException;
@@ -59,9 +60,13 @@ public class Wg {
             try {
                 territoryVisible = new StateFlag("territory-visible", false);
                 registry.register(territoryVisible);
-            } catch (IllegalStateException | IllegalArgumentException e) {
+            } catch (FlagConflictException | IllegalArgumentException | IllegalStateException e) {
                 Flag<?> existing = registry.get("territory-visible");
-                territoryVisible = existing instanceof StateFlag ? (StateFlag) existing : null;
+                if (existing instanceof StateFlag) {
+                    territoryVisible = (StateFlag) existing;
+                } else {
+                    territoryVisible = null;
+                }
             }
         } catch (Throwable t) {
             plugin.getLogger().warning("Не удалось зарегистрировать флаг territory-visible: " + t.getMessage());
