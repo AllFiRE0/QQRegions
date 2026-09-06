@@ -1,0 +1,123 @@
+# ============================================================
+#  QQRegions — меню справки (/region help, кнопки @menu:help)
+#  Статичные кнопки с командами плагина. Полный список — в
+#  lang.yml (help.commands), текстовый вывод /region help.
+# ============================================================
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Помощь QQRegions"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "back":
+        slot: 48
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
+      "market":
+        slot: 53
+        material: GOLD_INGOT
+        name: "&eРынок"
+        lore:
+          - "&7Продажа, аренда, магазин флагов и расширений"
+        commands:
+          - "@menu:market"
+      "select":
+        slot: 11
+        material: WOODEN_AXE
+        name: "&fВыделение"
+        lore:
+          - "&7/region select — интерактивное выделение"
+          - "&7/region select pos <1|2>"
+          - "&7/region select chunk [N]"
+          - "&7/region select expand [сторона] <N>"
+          - "&7/region select view <ник> — выделение игрока"
+      "create-delete":
+        slot: 12
+        material: GRASS_BLOCK
+        name: "&fРегионы"
+        lore:
+          - "&7/region create <название>"
+          - "&7/region delete [название]"
+          - "&7/region info [название]"
+      "flags":
+        slot: 13
+        material: REDSTONE_TORCH
+        name: "&fФлаги"
+        lore:
+          - "&7/region flags [название] — меню флагов"
+          - "&7/region market flags — магазин флагов"
+          - "&7/region market — меню рынка"
+      "visible":
+        slot: 14
+        material: GLOWSTONE_DUST
+        name: "&fПодсветка"
+        lore:
+          - "&7/region visible [регион] [тип] — показать"
+          - "&7/region visible off — скрыть все"
+          - "&7/region visible type [тип] — тип по умолчанию"
+          - "&7/region visible true|allow|false|deny [тип] [регион] — флаг"
+      "market-help":
+        slot: 15
+        material: GOLD_INGOT
+        name: "&fРынок"
+        lore:
+          - "&7/region sell <ник> <сумма> [регион]"
+          - "&7/region rent <ник> <сумма> <время> [регион]"
+          - "&7/region buy [регион]"
+          - "&7/region tenant [регион]"
+          - "&7/region market flags|blocks — магазин"
+      "raid":
+        slot: 16
+        material: NETHERITE_SWORD
+        name: "&fРейд клана"
+        lore:
+          - "&7/region raid [регион] — рейд клана (JustTeams)"
+  "compact":
+    priority: 1
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Помощь QQRegions"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "close":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        commands:
+          - "close"
+      "back":
+        slot: 48
+        material: ARROW
+        name: "&eНазад"
+        commands:
+          - "@back"
+      "market":
+        slot: 53
+        material: GOLD_INGOT
+        name: "&eРынок"
+        commands:
+          - "@menu:market"

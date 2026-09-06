@@ -13,7 +13,7 @@
 #  Показ и клик по флагу требуют этого права; админ (qqregions.admin)
 #  видит и может менять все флаги.
 #
-#  Переменные: {region} {world} {player} {role} {flag} {group}
+#  Переменные: {region} {world} {player} {role} {flag} {flag-name} {group}
 #              {group-label} {groups-list} {flag-group} {flag-group-label}
 #              {flag-with-group} {flag-value} {flag-value-label} {next-state}
 #  Пагинация: слоты из dynamic-flags.slots; навигация блок navigation.
@@ -107,9 +107,10 @@ Menus:
         - nonowners
       # игрок видит флаг только при наличии права <префикс><флаг>
       flag-permission-prefix: "qqregions.flags."
-      ignore-flags: []            # какие флаги не показывать (по имени)
+      ignore-flags:
+        - territory-type            # какие флаги не показывать (по имени)
       material: MAP
-      name: "&f{flag} &8· {group-label}"
+      name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
@@ -242,9 +243,10 @@ Menus:
         - nonmembers
         - nonowners
       flag-permission-prefix: "qqregions.flags."
-      ignore-flags: []
+ignore-flags:
+        - territory-type
       material: MAP
-      name: "&f{flag} &8· {group-label}"
+      name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
@@ -266,14 +268,10 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        lore:
-          - "&7Предыдущая страница"
         slot: 47
       next:
         material: ARROW
         name: "&eВперёд"
-        lore:
-          - "&7Следующая страница"
         slot: 51
   "other":
     role-required: other
@@ -327,9 +325,10 @@ Menus:
         - nonmembers
         - nonowners
       flag-permission-prefix: "qqregions.flags."
-      ignore-flags: []
+      ignore-flags:
+        - territory-type
       material: MAP
-      name: "&f{flag} &8· {group-label}"
+      name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
@@ -411,9 +410,10 @@ Menus:
         - nonmembers
         - nonowners
       flag-permission-prefix: "qqregions.flags."
-      ignore-flags: []
+      ignore-flags:
+        - territory-type
       material: MAP
-      name: "&f{flag} &8· {group-label}"
+      name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"

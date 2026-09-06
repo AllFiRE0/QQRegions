@@ -102,9 +102,24 @@ public final class RaidManager {
         if (r == null) {
             return "Регион не найден.";
         }
+        return start(p, r);
+    }
+
+    /** Запустить рейд в заданном регионе (регион задан явно, не по позиции игрока). */
+    public String start(Player p, ProtectedRegion r) {
+        if (r == null) {
+            return "Регион не найден.";
+        }
+        if (!plugin.config().raid().enabled) {
+            return "Команда рейда недоступна.";
+        }
+        if (!teams.enabled()) {
+            return "JustTeams не установлен — кланы недоступны.";
+        }
         if (state != State.IDLE) {
             return "Рейд уже идёт.";
         }
+        World w = p.getWorld();
         return startChecks(p, w, r);
     }
 

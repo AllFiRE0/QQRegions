@@ -25,7 +25,7 @@ public class RegionCommand {
 
     private static final List<String> SUBCOMMANDS = List.of(
             "select", "create", "delete", "info", "add", "remove", "flags", "reload", "help",
-            "visible", "view", "sell", "rent", "buy", "tenant", "market");
+            "visible", "view", "raid", "sell", "rent", "buy", "tenant", "market");
 
     private final QQRegions plugin;
     private final SelectCommand selectCommand;
@@ -67,9 +67,14 @@ public class RegionCommand {
             case "flags":
                 doFlags(sender, args);
                 return true;
-            case "visible":
             case "view":
+                doView(sender, args);
+                return true;
+            case "visible":
                 doVisible(sender, args);
+                return true;
+            case "raid":
+                doRaid(sender, args);
                 return true;
             case "sell":
             case "rent":
@@ -88,6 +93,11 @@ public class RegionCommand {
 
     private void help(CommandSender sender, String label) {
         Lang l = plugin.lang();
+        if (sender instanceof Player p) {
+            if (plugin.menus().openHelp(p)) {
+                return;
+            }
+        }
         sender.sendMessage(l.comp("help.header", "version", plugin.getDescription().getVersion()));
         for (Object o : l.getList("help.commands")) {
             if (o instanceof Map) {
@@ -114,6 +124,7 @@ public class RegionCommand {
             plugin.menus().reload();
             plugin.market().reload();
             plugin.raid().reload();
+            plugin.shop().reload();
             lang(sender, "general.reloaded");
             lang(sender, "general.reloaded-summary", "aliases", String.join(", ", plugin.config().aliases()));
         } catch (Throwable t) {
@@ -161,6 +172,16 @@ public class RegionCommand {
         if (plugin.config().isBannedRegion(name) && !plugin.selections().isBypassed(p)) {
             lang(p, "create.banned", "region", name);
             return;
+        }
+        int maxRegions = plugin.config().maxRegions();
+        if (maxRegions > 0 && !plugin.selections().isBypassed(p)) {
+            int owned = plugin.wg().ownedCount(p.getWorld(), p);
+            int extra = plugin.shop().extraRegions(p.getUniqueId());
+            if (owned >= maxRegions + extra) {
+                lang(p, "create.region-limit", "max", fmt(maxRegions),
+                        "extra", fmt(extra), "current", fmt(owned));
+                return;
+            }
         }
         String norm = plugin.config().normalizeName(name);
         try {
@@ -341,7 +362,47 @@ public class RegionCommand {
         }
     }
 
-    // ---------- visible / view ----------
+    // ---------- view (временный показ) ----------
+
+    private void doView(CommandSender sender, String[] args) {
+        if (requirePlayer(sender)) {
+            return;
+        }
+        Player p = (Player) sender;
+        if (!adminPerm(p, "qqregions.visible")) {
+            lang(p, "general.no-permission");
+            return;
+        }
+        if (worldDisabled(p)) {
+            return;
+        }
+        if (!plugin.config().highlight().enabled) {
+            lang(p, "visible.disabled");
+            return;
+        }
+        // /region view [регион] [particles|blocks|territory]
+        String regionName = args.length >= 2 && !isViewType(args[1]) ? args[1] : null;
+        String type = plugin.highlight().typeOf(p);
+        for (int i = 1; i < args.length; i++) {
+            String a = args[i];
+            if (isViewType(a)) {
+                type = a;
+            } else if (regionName == null) {
+                regionName = a;
+            }
+        }
+        ProtectedRegion region = resolveRegion(p, regionName);
+        if (region == null) {
+            lang(p, "visible.none");
+            return;
+        }
+        plugin.highlight().show(p, p.getWorld(), region, type);
+        lang(p, "visible.view-shown",
+                "region", region.getId(), "type", type,
+                "seconds", String.valueOf(plugin.config().highlight().showSeconds));
+    }
+
+    // ---------- visible (показать/скрыть или задать флаг) ----------
 
     private void doVisible(CommandSender sender, String[] args) {
         if (requirePlayer(sender)) {
@@ -359,7 +420,6 @@ public class RegionCommand {
         // /region visible type <particles|blocks|territory> — тип подсветки по умолчанию
         if (args.length >= 2 && args[1].equalsIgnoreCase("type")) {
             if (args.length < 3) {
-                // Без аргумента — показать текущий тип и доступные.
                 lang(p, "visible.type-current", "type", plugin.highlight().typeOf(p),
                         "types", String.join(", ", HIGHLIGHT_TYPES));
                 return;
@@ -377,6 +437,42 @@ public class RegionCommand {
         if (args.length >= 2 && args[1].equalsIgnoreCase("off")) {
             plugin.highlight().hideAll(p);
             lang(p, "visible.hidden-all");
+            return;
+        }
+        // /region visible true|allow|false|deny [тип] [регион] — задать флаг territory-visible
+        if (args.length >= 2 && isVisibleValue(args[1])) {
+            String value = args[1].toLowerCase(Locale.ROOT);
+            String type = null;
+            String regionName = null;
+            for (int i = 2; i < args.length; i++) {
+                String a = args[i];
+                if (isViewType(a)) {
+                    type = a;
+                } else if (regionName == null) {
+                    regionName = a;
+                }
+            }
+            ProtectedRegion region = resolveRegion(p, regionName);
+            if (region == null) {
+                lang(p, "visible.none");
+                return;
+            }
+            if (!plugin.wg().owns(region, p)) {
+                lang(p, "visible.not-owner", "region", region.getId());
+                return;
+            }
+            // true|false → allow|deny
+            String state = value.equals("true") ? "allow" : value.equals("false") ? "deny" : value;
+            boolean ok = plugin.wg().setFlagValue(p.getWorld(), region, plugin.wg().territoryVisibleFlag(), state);
+            if (ok) {
+                lang(p, "visible.flag-set", "region", region.getId(), "flag", "territory-visible", "value", state);
+                if (type != null) {
+                    plugin.wg().setStringFlag(p.getWorld(), region, plugin.wg().territoryTypeFlag(), type);
+                    lang(p, "visible.type-set", "type", type);
+                }
+            } else {
+                lang(p, "visible.flag-fail", "region", region.getId());
+            }
             return;
         }
         ProtectedRegion region = resolveRegion(p, args.length >= 2 ? args[1] : null);
@@ -404,11 +500,47 @@ public class RegionCommand {
         }
     }
 
+    // ---------- raid ----------
+
+    private void doRaid(CommandSender sender, String[] args) {
+        if (requirePlayer(sender)) {
+            return;
+        }
+        Player p = (Player) sender;
+        if (!adminPerm(p, "qqregions.raid")) {
+            lang(p, "general.no-permission");
+            return;
+        }
+        if (worldDisabled(p)) {
+            return;
+        }
+        if (!plugin.config().raid().enabled) {
+            lang(p, "raid.disabled");
+            return;
+        }
+        ProtectedRegion region = resolveRegion(p, args.length > 1 ? args[1] : null);
+        if (region == null) {
+            lang(p, "raid.none");
+            return;
+        }
+        String res = plugin.raid().start(p, region);
+        if (res == null) {
+            lang(p, "raid.ok", "region", region.getId());
+        } else {
+            lang(p, "raid.fail", "region", region.getId(), "reason", res);
+        }
+    }
+
     private static final List<String> HIGHLIGHT_TYPES = List.of("particles", "blocks", "territory");
 
-private static boolean isViewType(String type) {
+    private static boolean isViewType(String type) {
         String t = type.toLowerCase(Locale.ROOT);
         return t.equals("particles") || t.equals("blocks") || t.equals("territory");
+    }
+
+    private static boolean isVisibleValue(String s) {
+        String t = s.toLowerCase(Locale.ROOT);
+        return t.equals("true") || t.equals("allow") || t.equals("false") || t.equals("deny");
     }
 
     // ---------- рынок (sell / rent / buy / tenant / market) ----------
@@ -425,6 +557,33 @@ private static boolean isViewType(String type) {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("market")) {
+            if (args.length >= 2) {
+                String act = args[1].toLowerCase(Locale.ROOT);
+                if (act.equals("flags")) {
+                    if (plugin.shop().enabled()) {
+                        if (!plugin.menus().openFlagShop(p)) {
+                            lang(p, "flags.menu-disabled");
+                        }
+                    } else if (!plugin.menus().openMyFlags(p)) {
+                        lang(p, "flags.menu-disabled");
+                    }
+                    return;
+                }
+                if (act.equals("blocks")) {
+                    if (!plugin.shop().enabled()) {
+                        lang(p, "shop.menu-disabled");
+                        return;
+                    }
+                    if (!plugin.menus().openBlockShop(p)) {
+                        lang(p, "shop.menu-disabled");
+                    }
+                    return;
+                }
+                if (act.equals("myflags")) {
+                    plugin.menus().openMyFlags(p);
+                    return;
+                }
+            }
             // /region market — меню рынка
             boolean opened = plugin.menus().openMarket(p);
             if (!opened) {

@@ -31,6 +31,8 @@ import java.util.Set;
  */
 public class Menu {
 
+    /** Имя файла меню (без .yml) — для навигации @back и истории переходов. */
+    private final String file;
     private final String title;
     private final int rows;
     private final int updateInterval;
@@ -44,14 +46,17 @@ public class Menu {
     private final Map<Integer, MenuItem> buttons = new LinkedHashMap<>();
 
     private final DynamicFlags dyn;
+    /** Секция purchased-flags (меню «Мои флаги»): только купленные флаги. */
+    private final DynamicFlags purchased;
     private final DynamicPlayers dynPlayers;
     private final List<Integer> extraSlots = new ArrayList<>();
     private MenuItem navPrev;
     private MenuItem navNext;
 
-    public Menu(String title, int rows, int updateInterval, int priority,
+    public Menu(String file, String title, int rows, int updateInterval, int priority,
                 String permissionGroup, String placeholderGroup, String roleRequired,
-                MenuItem fill, DynamicFlags dyn, DynamicPlayers dynPlayers) {
+                MenuItem fill, DynamicFlags dyn, DynamicFlags purchased, DynamicPlayers dynPlayers) {
+        this.file = file;
         this.title = title;
         this.rows = rows;
         this.updateInterval = updateInterval;
@@ -61,7 +66,12 @@ public class Menu {
         this.roleRequired = roleRequired;
         this.fill = fill;
         this.dyn = dyn;
+        this.purchased = purchased;
         this.dynPlayers = dynPlayers;
+    }
+
+    public String file() {
+        return file;
     }
 
     public int priority() {
@@ -110,16 +120,19 @@ public class Menu {
         return dynPlayers;
     }
 
-    /** Есть ли активная динамическая секция (флаги, игроки или menu-slots). */
+    /** Есть ли активная динамическая секция (флаги, покупки, игроки или menu-slots). */
     private boolean dynamicEnabled() {
-        return (dyn != null && dyn.enabled) || (dynPlayers != null && dynPlayers.enabled)
-                || !extraSlots.isEmpty();
+        return (dyn != null && dyn.enabled) || (purchased != null && purchased.enabled)
+                || (dynPlayers != null && dynPlayers.enabled) || !extraSlots.isEmpty();
     }
 
     /** Пул слотов под динамические кнопки (из активной секции). */
     public List<Integer> poolSlots() {
         if (dyn != null && dyn.enabled) {
             return dyn.slots;
+        }
+        if (purchased != null && purchased.enabled) {
+            return purchased.slots;
         }
         if (dynPlayers != null && dynPlayers.enabled) {
             return dynPlayers.slots;
@@ -165,10 +178,21 @@ public class Menu {
      * Строит список кнопок флагов — ОДНА кнопка на флаг (устраняет дубли 5x).
      * Кнопка показывает текущую группу флага; ЛКМ = переключить значение
      * (для текущей группы), ПКМ = сменить группу (см. MenuManager.onClick).
+     *
+     * tpl       — шаблон динамической секции (dynamic-flags или purchased-flags);
+     * ownedOnly — только купленные игроком флаги (меню «Мои флаги»);
+     * owned     — id купленных флагов (нижний регистр), null = пусто.
+     *
+     * Фильтрация видимости для обычного шаблона (ownedOnly=false):
+     *  - whitelist пустой  — прежнее поведение: только по праву <prefix><флаг>;
+     *  - флаг в whitelist  — бесплатный, виден всем;
+     *  - флаг в shop-ignore — скрыт из магазина, только по праву;
+     *  - остальные          — из магазина: виден если куплен ИЛИ есть право.
      */
-    public List<MenuItem> dynamicFlags(QQRegions plugin, Player player, Map<String, String> ctx) {
+    public List<MenuItem> flagItems(QQRegions plugin, Player player, Map<String, String> ctx,
+                                    DynamicFlags tpl, boolean ownedOnly, Set<String> owned) {
         List<MenuItem> out = new ArrayList<>();
-        if (dyn == null || !dyn.enabled) {
+        if (tpl == null || !tpl.enabled) {
             return out;
         }
         String worldName = ctx.get("world");
@@ -179,17 +203,32 @@ public class Menu {
         } catch (Throwable ignored) {
         }
 
+        Set<String> whitelist = plugin.config().flagsMenuWhitelist();
+        Set<String> shopIgnore = plugin.config().flagsShopIgnore();
+        boolean allFree = whitelist.isEmpty();
         boolean admin = player.hasPermission("qqregions.admin") || player.isOp();
         for (Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
             String key = id == null ? "" : id.toLowerCase(Locale.ROOT);
-            if (key.isEmpty() || dyn.ignore.contains(key)) {
+            if (key.isEmpty() || tpl.ignore.contains(key)) {
                 continue;
             }
-            // право на флаг: qqregions.flags.<flag> (выдаётся в LuckPerms);
-            // админы видят все флаги; пустой префикс = флаг доступен всем
-            String perm = dyn.permissionPrefix + key;
-            if (!dyn.permissionPrefix.isEmpty() && !admin && !player.hasPermission(perm)) {
+            String perm = tpl.permissionPrefix + key;
+            boolean visible;
+            if (ownedOnly) {
+                visible = owned != null && owned.contains(key);
+            } else if (allFree) {
+                visible = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
+            } else if (whitelist.contains(key)) {
+                visible = true;
+            } else if (shopIgnore.contains(key)) {
+                visible = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
+            } else {
+                boolean ownedFlag = owned != null && owned.contains(key);
+                boolean permOk = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
+                visible = ownedFlag || permOk;
+            }
+            if (!visible) {
                 continue;
             }
             boolean state = flag instanceof StateFlag;
@@ -205,10 +244,11 @@ public class Menu {
             String valueLabel = value.isEmpty()
                     ? "&7не задано"
                     : plugin.replace().resolve("flag-values", value);
-            // компактный список групп для подсказки ПКМ: текущая выделена ✓
-            String groupsList = groupsList(plugin, group);
+            String groupsList = groupsList(tpl, group);
+            String flagName = plugin.config().flagName(id);
 
             Map<String, String> fc = new LinkedHashMap<>(ctx);
+            fc.put("flag-name", flagName);
             fc.put("flag", id);
             fc.put("flag-value", value);
             fc.put("flag-value-label", valueLabel);
@@ -220,31 +260,39 @@ public class Menu {
             fc.put("flag-group-label", groupLabel);
             fc.put("flag-with-group", id);
 
-            String name = bake(fc, dyn.name);
-            List<String> lore = bakeList(fc, dyn.lore);
-            List<String> commands = bakeList(fc, dyn.commands);
+            String name = bake(fc, tpl.name);
+            List<String> lore = bakeList(fc, tpl.lore);
+            List<String> commands = bakeList(fc, tpl.commands);
 
-            String mat = dyn.materials.getOrDefault(id, dyn.material);
-            List<String> states = state ? dyn.states : dyn.customStates;
+            String mat = tpl.materials.getOrDefault(id, tpl.material);
+            List<String> states = state ? tpl.states : tpl.customStates;
             out.add(new MenuItem(mat, 1, null, name, lore, commands, "",
                     id, group, states, state));
         }
         return out;
     }
 
-    /** Список групп для подсказки «ПКМ — сменить группу», текущая отмечена. */
-    private String groupsList(QQRegions plugin, String currentGroup) {
+    /** Кнопки «Моих флагов»: только купленные игроком флаги (секция purchased-flags). */
+    public List<MenuItem> purchasedItems(QQRegions plugin, Player player, Map<String, String> ctx,
+                                         Set<String> owned) {
+        return flagItems(plugin, player, ctx, purchased, true, owned);
+    }
+
+    /** Список групп для lore «ПКМ — сменить группу»: по строке на группу,
+     * текущая отмечена галочкой. Многострочность разбивается в MenuItem.build. */
+    private String groupsList(DynamicFlags tpl, String currentGroup) {
         StringBuilder sb = new StringBuilder();
-        for (String g : dyn.groups) {
-            if (sb.length() > 0) {
-                sb.append("&7, ");
-            }
+        for (String g : tpl.groups) {
             String label = plugin.replace().resolve("flag-groups", g);
             if (g.equalsIgnoreCase(currentGroup)) {
-                sb.append("&a").append(label).append("&r&7");
+                sb.append("&a✓ ").append(label);
             } else {
-                sb.append("&7").append(label);
+                sb.append("&8• &7").append(label);
             }
+            sb.append('\n');
+        }
+        if (sb.length() > 0) {
+            sb.setLength(sb.length() - 1);
         }
         return sb.toString();
     }
@@ -361,7 +409,7 @@ public class Menu {
             if (g == null) {
                 continue;
             }
-            Menu menu = parseGroup(g, topUpdate);
+            Menu menu = parseGroup(g, topUpdate, file.getName().replaceFirst("\\.yml$", ""));
             if (menu != null) {
                 out.add(menu);
             }
@@ -369,7 +417,7 @@ public class Menu {
         return out;
     }
 
-    private static Menu parseGroup(ConfigurationSection g, int topUpdate) {
+    private static Menu parseGroup(ConfigurationSection g, int topUpdate, String fileBase) {
         String title = g.getString("title", "&0QQRegions");
         int rows = Math.max(1, Math.min(6, g.getInt("size", 6)));
         int update = g.getInt("update_interval", topUpdate);
@@ -390,8 +438,10 @@ public class Menu {
         }
 
         DynamicFlags dyn = DynamicFlags.parse(g.getConfigurationSection("dynamic-flags"));
+        DynamicFlags purchased = DynamicFlags.parseCommon(g.getConfigurationSection("purchased-flags"), true);
         DynamicPlayers dynPlayers = DynamicPlayers.parse(g.getConfigurationSection("dynamic-players"));
-        Menu menu = new Menu(title, rows, update, priority, permGroup, phGroup, roleRequired, fill, dyn, dynPlayers);
+        Menu menu = new Menu(fileBase, title, rows, update, priority,
+                permGroup, phGroup, roleRequired, fill, dyn, purchased, dynPlayers);
 
         ConfigurationSection btns = g.getConfigurationSection("buttons");
         if (btns != null) {
@@ -495,7 +545,13 @@ public class Menu {
         }
 
         public static DynamicFlags parse(ConfigurationSection d) {
-            if (d == null || !d.getBoolean("enabled", false)) {
+            return parseCommon(d, d != null && d.getBoolean("enabled", false));
+        }
+
+        /** Парсинг без проверки enabled: для purchased-flags, где секция
+         *  активна всегда, если присутствует (enabled не требуется). */
+        static DynamicFlags parseCommon(ConfigurationSection d, boolean enabled) {
+            if (d == null || !enabled) {
                 return null;
             }
             List<Integer> slots = new ArrayList<>();
@@ -534,7 +590,7 @@ public class Menu {
             }
             return new DynamicFlags(true, slots,
                     d.getString("material", "MAP"),
-                    d.getString("name", "&f{flag}"),
+                    d.getString("name", "&f{flag-name}"),
                     d.getStringList("lore"),
                     d.getStringList("commands"),
                     groups,

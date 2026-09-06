@@ -107,6 +107,22 @@ Menus:
         permission: qqregions.admin
         commands:
           - "@teleport"
+      "highlight":
+        slot: 16
+        material: GLOWSTONE_DUST
+        name: "&eПодсветка границ"
+        lore:
+          - "&7Показать границы региона"
+        commands:
+          - "@highlight"
+      "help":
+        slot: 25
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды плагина"
+        commands:
+          - "@menu:help"
       "delete":
         slot: 23
         material: BARRIER
@@ -179,6 +195,22 @@ Menus:
           - "&7Просмотр владельцев и участников"
         commands:
           - "@menu:players"
+      "highlight":
+        slot: 16
+        material: GLOWSTONE_DUST
+        name: "&eПодсветка границ"
+        lore:
+          - "&7Показать границы региона"
+        commands:
+          - "@highlight"
+      "help":
+        slot: 24
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды плагина"
+        commands:
+          - "@menu:help"
   "other":
     role-required: other
     priority: 10
@@ -236,6 +268,22 @@ Menus:
           - "&7Просмотр владельцев и участников"
         commands:
           - "@menu:players"
+      "highlight":
+        slot: 16
+        material: GLOWSTONE_DUST
+        name: "&eПодсветка границ"
+        lore:
+          - "&7Показать границы региона"
+        commands:
+          - "@highlight"
+      "help":
+        slot: 24
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды плагина"
+        commands:
+          - "@menu:help"
       "raid":
         slot: 47
         material: NETHERITE_SWORD

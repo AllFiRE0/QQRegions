@@ -106,8 +106,17 @@ public class MenuItem {
                 for (String l : lore) {
                     if (l == null || l.isEmpty()) {
                         lines.add(Component.empty());
-                    } else {
-                        lines.add(Msg.color(process(plugin, player, ctx, l)));
+                        continue;
+                    }
+                    // после Papi/replace в строке могут остаться \n (например
+                    // {groups-list}); каждую физическую строку красим отдельно
+                    String processed = process(plugin, player, ctx, l);
+                    for (String seg : processed.split("\n", -1)) {
+                        if (seg.isEmpty()) {
+                            lines.add(Component.empty());
+                        } else {
+                            lines.add(Msg.color(seg));
+                        }
                     }
                 }
             }

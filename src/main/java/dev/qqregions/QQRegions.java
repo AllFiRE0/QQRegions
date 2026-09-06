@@ -12,6 +12,7 @@ import dev.qqregions.raid.RaidManager;
 import dev.qqregions.selection.InteractListener;
 import dev.qqregions.selection.SelectionManager;
 import dev.qqregions.selection.SessionStore;
+import dev.qqregions.shop.ShopManager;
 import dev.qqregions.util.Papi;
 import dev.qqregions.wg.Wg;
 import org.bukkit.Bukkit;
@@ -39,6 +40,7 @@ public final class QQRegions extends JavaPlugin {
     private HighlightManager highlight;
     private MarketManager market;
     private RaidManager raid;
+    private ShopManager shop;
 
     public static QQRegions get() {
         return instance;
@@ -71,6 +73,7 @@ public final class QQRegions extends JavaPlugin {
         this.highlight = new HighlightManager(this);
         this.market = new MarketManager(this);
         this.raid = new RaidManager(this);
+        this.shop = new ShopManager(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
@@ -173,6 +176,10 @@ public final class QQRegions extends JavaPlugin {
 
     public RaidManager raid() {
         return raid;
+    }
+
+    public ShopManager shop() {
+        return shop;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */

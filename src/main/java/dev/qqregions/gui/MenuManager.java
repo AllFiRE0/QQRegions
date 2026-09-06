@@ -17,10 +17,13 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,6 +40,8 @@ public class MenuManager implements Listener {
      *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
      *  чистит open), но промпт должен пережить это и обработать сообщение. */
     private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
+    /** История переходов между меню для кнопки @back. */
+    private final Map<UUID, Deque<NavState>> history = new HashMap<>();
     private final QQRegions plugin;
 
     public MenuManager(QQRegions plugin) {
@@ -54,6 +59,10 @@ public class MenuManager implements Listener {
         saveMissingResource("menus/info.yml", dir);
         saveMissingResource("menus/players.yml", dir);
         saveMissingResource("menus/market.yml", dir);
+        saveMissingResource("menus/flagshop.yml", dir);
+        saveMissingResource("menus/blocks.yml", dir);
+        saveMissingResource("menus/myflags.yml", dir);
+        saveMissingResource("menus/help.yml", dir);
         File[] files = dir.listFiles((d, n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
         if (files != null) {
             for (File f : files) {
@@ -146,7 +155,7 @@ public class MenuManager implements Listener {
 
     /** Чем заполняются динамические слоты меню. */
     private enum Kind {
-        FLAGS, PLAYERS, MARKET
+        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS
     }
 
     private static long regionArea(ProtectedRegion region) {
@@ -176,27 +185,75 @@ public class MenuManager implements Listener {
     }
 
     public boolean open(Player player, String menuName, Map<String, String> ctx) {
-        return open(player, menuName, ctx, 0, null);
+        return open(player, menuName, ctx, 0, null, true);
     }
 
     public boolean open(Player player, String menuName, Map<String, String> ctx, int page) {
-        return open(player, menuName, ctx, page, null);
+        return open(player, menuName, ctx, page, null, true);
     }
 
     public boolean open(Player player, String menuName, Map<String, String> ctx, int page, String role) {
+        return open(player, menuName, ctx, page, role, true);
+    }
+
+    /**
+     * Открыть меню. При record=true и переходе в ДРУГОЙ файл меню текущее
+     * меню запоминается в истории (кнопка @back возвращает на него).
+     */
+    public boolean open(Player player, String menuName, Map<String, String> ctx, int page, String role, boolean record) {
         Menu best = pick(player, menuName, role);
         if (best == null) {
             return false;
         }
+        if (record) {
+            pushHistory(player, menuName.toLowerCase(java.util.Locale.ROOT));
+        }
         if ("info".equalsIgnoreCase(menuName)) {
             enrichInfoContext(ctx);
         }
-        Kind kind = switch (menuName.toLowerCase(java.util.Locale.ROOT)) {
+        Kind kind = kindOf(menuName);
+        return render(player, best, ctx, page, role, kind);
+    }
+
+    private Kind kindOf(String menuName) {
+        return switch (menuName.toLowerCase(java.util.Locale.ROOT)) {
             case "players" -> Kind.PLAYERS;
             case "market" -> Kind.MARKET;
+            case "flagshop" -> Kind.FLAG_SHOP;
+            case "blocks" -> Kind.BLOCK_SHOP;
+            case "myflags" -> Kind.MY_FLAGS;
             default -> Kind.FLAGS;
         };
-        return render(player, best, ctx, page, role, kind);
+    }
+
+    /** Запомнить текущее открытое меню перед переходом в другой файл. */
+    private void pushHistory(Player p, String target) {
+        OpenMenu cur = open.get(p.getUniqueId());
+        if (cur == null || cur.menu.file() == null || cur.menu.file().equalsIgnoreCase(target)) {
+            return;
+        }
+        Deque<NavState> stack = history.computeIfAbsent(p.getUniqueId(), k -> new ArrayDeque<>());
+        stack.push(new NavState(cur.menu.file(), new HashMap<>(cur.ctx), cur.role));
+        while (stack.size() > 20) {
+            stack.removeLast();
+        }
+    }
+
+    /** Кнопка @back: вернуться к предыдущему меню (без записи в историю). */
+    private void goBack(Player p) {
+        Deque<NavState> stack = history.get(p.getUniqueId());
+        NavState prev = stack == null ? null : stack.pollFirst();
+        if (prev == null) {
+            if (stack != null && stack.isEmpty()) {
+                history.remove(p.getUniqueId());
+            }
+            p.sendMessage(dev.qqregions.util.Msg.color("&7Нет предыдущего меню."));
+            return;
+        }
+        if (stack.isEmpty()) {
+            history.remove(p.getUniqueId());
+        }
+        open(p, prev.menuName, prev.ctx, 0, prev.role, false);
     }
 
     /** До-заполнить контекст информационного меню, если его открыли из другого. */
@@ -247,12 +304,14 @@ public class MenuManager implements Listener {
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
         List<MenuItem> dynItems;
-        if (kind == Kind.PLAYERS) {
-            dynItems = playerItems(menu, ctx);
-        } else if (kind == Kind.MARKET) {
-            dynItems = marketItems(menu, ctx);
-        } else {
-            dynItems = menu.dynamicFlags(plugin, player, ctx);
+        Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
+        switch (kind) {
+            case PLAYERS -> dynItems = playerItems(menu, ctx);
+            case MARKET -> dynItems = marketItems(menu, ctx);
+            case FLAG_SHOP -> dynItems = flagShopItems(menu, player, ctx);
+            case BLOCK_SHOP -> dynItems = blockShopItems(menu, player, ctx);
+            case MY_FLAGS -> dynItems = menu.purchasedItems(plugin, player, ctx, owned);
+            default -> dynItems = menu.flagItems(plugin, player, ctx, menu.dynamicFlags(), false, owned);
         }
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
@@ -286,6 +345,7 @@ public class MenuManager implements Listener {
             }
         }
         open.clear();
+        history.clear();
     }
 
     // ---------- события ----------
@@ -312,14 +372,19 @@ public class MenuManager implements Listener {
                 && !p.hasPermission("qqregions.admin") && !p.hasPermission(item.permission())) {
             return;
         }
-        // флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix)
+        // флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix).
+        // Бесплатные флаги (flags-menu.whitelist) и купленные в магазине кликаются и без права.
         Menu.DynamicFlags dyn = om.menu.dynamicFlags();
         String flagPermPrefix = dyn == null ? null : dyn.permissionPrefix;
         if (item.isDynamic() && item.flag() != null && !item.flag().isEmpty()
                 && flagPermPrefix != null && !flagPermPrefix.isEmpty()
                 && !p.hasPermission("qqregions.admin")
                 && !p.hasPermission(flagPermPrefix + item.flag().toLowerCase(java.util.Locale.ROOT))) {
-            return;
+            String flagKey = item.flag().toLowerCase(java.util.Locale.ROOT);
+            if (!plugin.config().flagsMenuWhitelist().contains(flagKey)
+                    && !plugin.shop().ownedFlags(p.getUniqueId()).contains(flagKey)) {
+                return;
+            }
         }
         List<String> cmds = item.commands();
         if (cmds == null) {
@@ -373,11 +438,27 @@ public class MenuManager implements Listener {
             }
             if (c.startsWith("@menu:")) {
                 String target = c.substring("@menu:".length()).trim();
-                open(p, target, om.ctx, 0, om.role);
+                if ("myflags".equalsIgnoreCase(target)) {
+                    openMyFlags(p);
+                } else {
+                    open(p, target, om.ctx, 0, om.role);
+                }
                 continue;
             }
             if (c.equalsIgnoreCase("@teleport")) {
                 teleportToRegion(p, om.ctx, om.role);
+                continue;
+            }
+            if (c.equalsIgnoreCase("@back")) {
+                goBack(p);
+                continue;
+            }
+            if (c.equalsIgnoreCase("@highlight")) {
+                highlightRegion(p, om.ctx);
+                continue;
+            }
+            if (c.startsWith("@shop-buy:")) {
+                shopBuy(p, c.substring("@shop-buy:".length()).trim());
                 continue;
             }
             if (c.startsWith("@flag:")) {
@@ -735,6 +816,199 @@ public class MenuManager implements Listener {
         }
     }
 
+    /** Кнопка @highlight: показать подсветку границ текущего региона. */
+    private void highlightRegion(Player p, Map<String, String> ctx) {
+        org.bukkit.World w = worldFrom(ctx);
+        ProtectedRegion r = w == null ? null : plugin.wg().byName(w, ctx.get("region"));
+        if (w == null || r == null) {
+            p.sendMessage(dev.qqregions.util.Msg.color("&cРегион не найден."));
+            return;
+        }
+        plugin.highlight().show(p, w, r, plugin.highlight().typeOf(p));
+    }
+
+    // ---------- магазин флагов и расширений ----------
+
+    /** Меню магазина флагов (flagshop.yml). */
+    public boolean openFlagShop(Player p) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        return open(p, "flagshop", ctx, 0, null, true);
+    }
+
+    /** Меню расширений площади/регионов (blocks.yml). */
+    public boolean openBlockShop(Player p) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        return open(p, "blocks", ctx, 0, null, true);
+    }
+
+    /** Меню справки (help.yml). */
+    public boolean openHelp(Player p) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        return open(p, "help", ctx, 0, null, true);
+    }
+
+    /** «Мои флаги»: список купленных в магазине флагов. */
+    public boolean openMyFlags(Player p) {
+        if (plugin.shop().ownedFlags(p.getUniqueId()).isEmpty()) {
+            p.sendMessage(plugin.lang().compPrefixed("shop.none-owned"));
+            return false;
+        }
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", "");
+        ctx.put("region", "");
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        return open(p, "myflags", ctx, 0, null, true);
+    }
+
+    /** Кнопки магазина флагов: не купленные, не whitelist, не shop-ignore. */
+    private List<MenuItem> flagShopItems(Menu menu, Player player, Map<String, String> ctx) {
+        List<MenuItem> out = new ArrayList<>();
+        MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        Set<String> whitelist = plugin.config().flagsMenuWhitelist();
+        Set<String> shopIgnore = plugin.config().flagsShopIgnore();
+        Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
+        boolean allFree = whitelist.isEmpty();
+        Menu.DynamicFlags dyn = menu.dynamicFlags();
+        for (com.sk89q.worldguard.protection.flags.Flag<?> flag : plugin.wg().allFlags()) {
+            String id = flag.getName();
+            String key = id == null ? "" : id.toLowerCase(java.util.Locale.ROOT);
+            if (key.isEmpty() || allFree || whitelist.contains(key)
+                    || shopIgnore.contains(key) || owned.contains(key)) {
+                continue;
+            }
+            double price = plugin.shop().priceOf(key);
+            if (price <= 0) {
+                continue;
+            }
+            Map<String, String> pc = new HashMap<>(ctx);
+            pc.put("flag-name", plugin.config().flagName(id));
+            pc.put("price", plugin.market().economy().format(price));
+            String name = tpl.process(plugin, player, pc, "&f{flag-name}");
+            List<String> lore = new ArrayList<>();
+            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price}"));
+            lore.add("&7После покупки появится в меню флагов");
+            lore.add("&eЛКМ — купить");
+            String mat = dyn == null ? null : dyn.materials.get(id);
+            out.add(new MenuItem(mat == null ? "EMERALD" : mat, 1, null, name, lore,
+                    List.of("@shop-buy:flag:" + key), ""));
+        }
+        return out;
+    }
+
+    /** Кнопки расширений: пакеты площади и пакеты «+регион». */
+    private List<MenuItem> blockShopItems(Menu menu, Player player, Map<String, String> ctx) {
+        List<MenuItem> out = new ArrayList<>();
+        MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        Set<String> ownedArea = plugin.shop().ownedAreaPacks(player.getUniqueId());
+        for (dev.qqregions.shop.ShopManager.Pack p : plugin.shop().areaPacks()) {
+            if (ownedArea.contains(p.id())) {
+                continue;
+            }
+            Map<String, String> pc = new HashMap<>(ctx);
+            pc.put("pack-name", p.name());
+            pc.put("pack-amount", String.valueOf(p.amount()));
+            pc.put("price", plugin.market().economy().format(p.price()));
+            String name = tpl.process(plugin, player, pc, "&f{pack-name}");
+            List<String> lore = new ArrayList<>();
+            lore.add(tpl.process(plugin, player, pc, "&7Увеличивает выделение на &f{pack-amount}&7 блоков"));
+            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price}"));
+            lore.add("&eЛКМ — купить");
+            out.add(new MenuItem("GOLD_INGOT", 1, null, name, lore,
+                    List.of("@shop-buy:area:" + p.id()), ""));
+        }
+        for (dev.qqregions.shop.ShopManager.Pack p : plugin.shop().regionPacks()) {
+            Map<String, String> pc = new HashMap<>(ctx);
+            pc.put("pack-name", p.name());
+            pc.put("pack-amount", String.valueOf(p.amount()));
+            pc.put("price", plugin.market().economy().format(p.price()));
+            String name = tpl.process(plugin, player, pc, "&f{pack-name}");
+            List<String> lore = new ArrayList<>();
+            lore.add(tpl.process(plugin, player, pc, "&7Добавляет &f{pack-amount}&7 к лимиту регионов"));
+            lore.add(tpl.process(plugin, player, pc, "&7Цена: &f{price} &8(повторяемый)"));
+            lore.add("&eЛКМ — купить");
+            out.add(new MenuItem("EMERALD", 1, null, name, lore,
+                    List.of("@shop-buy:region:" + p.id()), ""));
+        }
+        return out;
+    }
+
+    /** Обработчик @shop-buy:<flag|area|region>:<id>. */
+    private void shopBuy(Player p, String spec) {
+        String[] parts = spec.split(":", 2);
+        if (parts.length < 2) {
+            return;
+        }
+        String kind = parts[0].trim().toLowerCase(java.util.Locale.ROOT);
+        String id = parts[1].trim();
+        String res;
+        switch (kind) {
+            case "flag" -> res = plugin.shop().buyFlag(p.getUniqueId(), id);
+            case "area" -> res = plugin.shop().buyAreaPack(p.getUniqueId(), id);
+            case "region" -> res = plugin.shop().buyRegionPack(p.getUniqueId(), id);
+            default -> {
+                return;
+            }
+        }
+        switch (res) {
+            case "ok" -> {
+                if ("flag".equals(kind)) {
+                    p.sendMessage(plugin.lang().compPrefixed("shop.flag-bought",
+                            "flag-name", plugin.config().flagName(id),
+                            "price", plugin.market().economy().format(plugin.shop().priceOf(id))));
+                } else {
+                    p.sendMessage(plugin.lang().compPrefixed("shop.pack-bought",
+                            "pack-name", packName(kind, id),
+                            "price", plugin.market().economy().format(packPrice(kind, id))));
+                }
+            }
+            case "already" -> p.sendMessage(plugin.lang().compPrefixed("shop.already",
+                    "flag-name", plugin.config().flagName(id)));
+            case "no-money" -> p.sendMessage(plugin.lang().compPrefixed("shop.no-money"));
+            case "not-found" -> p.sendMessage(plugin.lang().compPrefixed("shop.not-found"));
+            case "no-economy" -> p.sendMessage(plugin.lang().compPrefixed("shop.no-economy"));
+            default -> p.sendMessage(plugin.lang().compPrefixed("shop.error"));
+        }
+        OpenMenu live = open.get(p.getUniqueId());
+        if (live != null) {
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        }
+    }
+
+    private String packName(String kind, String id) {
+        for (dev.qqregions.shop.ShopManager.Pack p : packList(kind)) {
+            if (p.id().equalsIgnoreCase(id)) {
+                return p.name();
+            }
+        }
+        return id;
+    }
+
+    private double packPrice(String kind, String id) {
+        for (dev.qqregions.shop.ShopManager.Pack p : packList(kind)) {
+            if (p.id().equalsIgnoreCase(id)) {
+                return p.price();
+            }
+        }
+        return 0;
+    }
+
+    private List<dev.qqregions.shop.ShopManager.Pack> packList(String kind) {
+        return "region".equals(kind) ? plugin.shop().regionPacks() : plugin.shop().areaPacks();
+    }
+
     /** Кнопка входа на псевдокоманды меню игроков. */
     private void removeParticipant(Player p, OpenMenu om, String spec) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
@@ -872,5 +1146,9 @@ public class MenuManager implements Listener {
             this.om = om;
             this.kind = kind;
         }
+    }
+
+    /** Точка истории для кнопки @back (откуда пришли, чтобы вернуться). */
+    private record NavState(String menuName, Map<String, String> ctx, String role) {
     }
 }

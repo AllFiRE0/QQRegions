@@ -50,6 +50,11 @@ select:
   button-select: "&eВыделить область"
   button-reset: "&6Сброс выделения"
   button-cancel: "&cОтмена"
+  view-set: "&aПросмотр выделения игрока &f{target} &aвключён. ЛКМ/ПКМ — сменить точку, колесо — двигать."
+  view-offline: "&cИгрок &f{target} &cне в сети."
+  view-self: "&cНельзя просматривать собственное выделение."
+  view-no-selection: "&cУ игрока &f{target} &cнет активного выделения."
+  view-off: "&7Просмотр выделения игрока выключен."
 
 create:
   prompt: "&aВведите название региона в чат (&7cancel&a — отмена, выделение сохранится):"
@@ -61,6 +66,7 @@ create:
   fail: "&cНе удалось создать регион: &7{error}"
   none: "&cСначала выделите область (см. &7/{alias} help&c)."
   banned: "&cС регионом &7{region} &cработать запрещено."
+  region-limit: "&cДостигнут лимит регионов: &f{max}&c. Доп. слоты — в меню рынка (&f/region market&c)."
   cancel-words:
     - "cancel"
     - "отмена"
@@ -116,6 +122,9 @@ visible:
   type-set: "&aТип подсветки по умолчанию: &7{type}"
   type-current: "&aТекущий тип подсветки: &7{type}&a. Доступно: &7{types}"
   type-invalid: "&cНедопустимый тип подсветки: &7{type} &c(&7particles&c / &7blocks&c / &7territory&c)."
+  view-shown: "&eПросмотр подсветки региона &7{region}&e."
+  flag-set: "&aФлаг &f{flag}&a региона &7{region} &aустановлен: &f{value}"
+  flag-fail: "&cНе удалось установить флаг подсветки."
 
 help:
   header: "&8===== &bQQRegions &7v{version} &8====="
@@ -151,6 +160,18 @@ help:
       desc: "Тип подсветки по умолчанию (без аргумента — текущий)"
     - usage: "visible off"
       desc: "Скрыть все подсветки"
+    - usage: "visible view [регион]"
+      desc: "Временно показать подсветку (без сохранения флага)"
+    - usage: "visible true|allow|false|deny [particles|blocks|territory] [регион]"
+      desc: "Установить флаг подсветки региона"
+    - usage: "select view <ник>"
+      desc: "Посмотреть выделение другого игрока"
+    - usage: "market flags"
+      desc: "Магазин флагов"
+    - usage: "market blocks"
+      desc: "Расширения: площадь и «+регион»"
+    - usage: "raid [регион]"
+      desc: "Запустить рейд клана на регион (JustTeams)"
     - usage: "sell <ник> <сумма> [регион]"
       desc: "Продать регион игроку"
     - usage: "sell accept|decline|cancel <id>"
@@ -206,3 +227,19 @@ market:
   rent-unpaid-tenant: "&cНедостаточно средств — аренда &7{region} &cпрекращена."
   rent-unpaid-owner: "&cАрендатор не оплатил аренду &7{region} &c— аренда прекращена."
   rent-ended: "&7Срок аренды региона &7{region} &7завершён."
+
+shop:
+  none-owned: "&7У вас нет купленных флагов. Магазин: &f/region market flags"
+  flag-bought: "&aФлаг &f{flag-name} &aкуплен за &f{price}&a."
+  pack-bought: "&aПакет &f{pack-name} &aкуплен за &f{price}&a."
+  already: "&cУ вас уже есть &f{flag-name}&c."
+  no-money: "&cНедостаточно средств на счету."
+  not-found: "&cПокупка не найдена или не продаётся."
+  no-economy: "&cЭкономика (Vault) недоступна — покупка невозможна."
+  error: "&cНе удалось завершить покупку."
+  menu-disabled: "&cМеню магазина не настроено."
+
+raid:
+  none: "&cВы не в регионе и название не указано."
+  ok: "&aРейд на &f{region} &aзапущен! Все нападающие должны оставаться в регионе."
+  fail: "&cНе удалось запустить рейд: &f{reason}"

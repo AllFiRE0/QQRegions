@@ -1,0 +1,101 @@
+# ============================================================
+#  QQRegions — «Мои флаги» (купленные в магазине)
+#  Секция purchased-flags активна всегда при наличии (enabled не
+#  нужен): показываются только флаги, купленные игроком. Открытие
+#  без покупок отвечает сообщением (shop.none-owned).
+#
+#  Динамические кнопки: {flag-name} {group-label} {groups-list}
+# ============================================================
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Мои флаги ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "back":
+        slot: 49
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Вернуться на рынок"
+        commands:
+          - "@back"
+      "market":
+        slot: 45
+        material: GOLD_INGOT
+        name: "&eРынок"
+        lore:
+          - "&7Меню рынка"
+        commands:
+          - "@menu:market"
+      "flagshop":
+        slot: 46
+        material: REDSTONE_TORCH
+        name: "&eМагазин флагов"
+        lore:
+          - "&7Купить ещё флаги"
+        commands:
+          - "@menu:flagshop"
+      "help":
+        slot: 44
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды плагина"
+        commands:
+          - "@menu:help"
+    purchased-flags:
+      slots:
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 28
+        - 29
+        - 30
+        - 31
+        - 32
+        - 33
+        - 34
+        - 37
+        - 38
+        - 39
+        - 40
+        - 41
+        - 42
+        - 43
+      groups:
+        - all
+      material: OAK_SIGN
+      name: "&f{flag-name}"
+      lore:
+        - "&7Купленный флаг"
+        - "&7Группа: &f{group-label}"
+      commands: []
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        slot: 47
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        slot: 51

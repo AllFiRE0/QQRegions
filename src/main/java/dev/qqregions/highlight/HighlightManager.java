@@ -145,7 +145,7 @@ public class HighlightManager implements Listener {
                 }
                 markCooldown(p, key, now);
                 flagShown.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>()).add(key);
-                show(p, p.getWorld(), r, h.type);
+                show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
             }
         }
     }
@@ -197,6 +197,11 @@ public class HighlightManager implements Listener {
 
     public boolean isActive(Player p, ProtectedRegion r) {
         return isActive(p, key(p.getWorld(), r));
+    }
+
+    /** Показать подсветку без переключения (используется /region view). */
+    public void show(Player p, World world, ProtectedRegion r, String type) {
+        show(p, world, r, key(world, r), type);
     }
 
     /** Скрыть подсветку конкретного региона. */
@@ -277,10 +282,11 @@ public class HighlightManager implements Listener {
     // ---------- TERRITORY (террейн-подсветка вдоль границы) ----------
 
     /**
-     * Верхние точки столбцов вдоль периметра региона: для каждой колонки
-     * (x,z) периметра ищется верхний не-воздушный блок — в обычном мире это
-     * поверхность рельефа, под землёй — потолок пещеры/камень. Результат
-     * кэшируется на "world:region" и пересчитывается при пересоздании.
+     * Точки подсветки территории вдоль периметра: для каждой колонки (x,z)
+     * собираются ВЕРХИ всех пластов (каждый Y-уровень, где блок не воздух,
+     * а над ним воздух) и НИЗЫ (блок не воздух, а под ним воздух — своды
+     * пещер и выступы). Так деревья больше не «съедают» границу: светятся
+     * и трава, и кроны, и потолки пещер. Результат кэшируется на "world:region".
      */
     private List<BlockVector3> terrainPoints(World world, ProtectedRegion r) {
         String ck = world.getName() + ":" + r.getId();
@@ -305,10 +311,7 @@ public class HighlightManager implements Listener {
                 if (!world.isChunkLoaded(cx, cz)) {
                     continue;
                 }
-                int top = topNonAirY(world, pt.getBlockX(), pt.getBlockZ(), minY, maxY);
-                if (top >= 0) {
-                    out.add(BlockVector3.at(pt.getBlockX(), top + 1, pt.getBlockZ()));
-                }
+                addColumnLevels(world, pt.getBlockX(), pt.getBlockZ(), minY, maxY, out);
             }
         } catch (Throwable t) {
             plugin.dbg("terrainPoints error: " + t.getMessage());
@@ -317,15 +320,21 @@ public class HighlightManager implements Listener {
         return out;
     }
 
-    /** Самый верхний блок колонки (не воздух) в диапазоне высот; -1 если нет. */
-    private int topNonAirY(World world, int x, int z, int minY, int maxY) {
+    /** Дополняет out точками всех «слоёв» одной колонки (верхи + пещерные низы). */
+    private void addColumnLevels(World world, int x, int z, int minY, int maxY, List<BlockVector3> out) {
+        boolean prevSolid = false; // блок сразу над текущим был не воздухом
         for (int y = maxY; y >= minY; y--) {
             Material type = world.getBlockAt(x, y, z).getType();
-            if (type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR) {
-                return y;
+            boolean solid = type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR;
+            if (solid && !prevSolid) {
+                // верх пласта: воздух сверху (или граница мира) — точка над блоком
+                out.add(BlockVector3.at(x, y + 1, z));
+            } else if (!solid && prevSolid) {
+                // низ пласта: воздух снизу (свод пещеры / выступ) — точка в пустоте
+                out.add(BlockVector3.at(x, y + 1, z));
             }
+            prevSolid = solid;
         }
-        return -1;
     }
 
     private void spawnParticle(World world, Config.ParticleOptions po, double x, double y, double z) {
@@ -401,6 +410,12 @@ public class HighlightManager implements Listener {
     public String typeOf(Player p) {
         String t = defaultType.get(p.getUniqueId());
         return t != null ? t : plugin.config().highlight().type;
+    }
+
+    /** Тип подсветки для региона: из флага territory-type региона, иначе тип по умолчанию. */
+    private String typeFor(World world, ProtectedRegion r) {
+        String t = plugin.wg().territoryTypeOf(world, r);
+        return (t == null || t.isEmpty()) ? plugin.config().highlight().type : t;
     }
 
     // ---------- уборка ----------

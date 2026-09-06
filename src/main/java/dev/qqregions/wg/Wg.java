@@ -13,6 +13,7 @@ import com.sk89q.worldguard.protection.flags.FlagContext;
 import com.sk89q.worldguard.protection.flags.RegionGroup;
 import com.sk89q.worldguard.protection.flags.RegionGroupFlag;
 import com.sk89q.worldguard.protection.flags.StateFlag;
+import com.sk89q.worldguard.protection.flags.StringFlag;
 import com.sk89q.worldguard.protection.flags.registry.FlagConflictException;
 import com.sk89q.worldguard.protection.flags.registry.FlagRegistry;
 import com.sk89q.worldguard.protection.managers.RegionManager;
@@ -43,6 +44,8 @@ public class Wg {
 
     /** Кастомный флаг «подсвечивать ли регион входящим» (StateFlag allow/deny). */
     private StateFlag territoryVisible;
+    /** Кастомный флаг типа подсветки региона: particles|blocks|territory. */
+    private StringFlag territoryType;
 
     public Wg(QQRegions plugin) {
         this.plugin = plugin;
@@ -81,10 +84,49 @@ public class Wg {
             plugin.getLogger().severe("Флаг territory-visible НЕ зарегистрирован. Вход в регионы "
                     + "не будет подсвечиваться (команда /region visible продолжит работать).");
         }
+        // Флаг типа подсветки региона: значение particles|blocks|territory
+        // (используется, когда territory-visible=allow ВКЛЮЧАЕТ входную подсветку).
+        try {
+            territoryType = new StringFlag("territory-type");
+            registry.register(territoryType);
+            plugin.getLogger().info("Зарегистрирован флаг territory-type (StringFlag).");
+        } catch (FlagConflictException | IllegalArgumentException | IllegalStateException e) {
+            Flag<?> existing = registry.get("territory-type");
+            if (existing instanceof StringFlag) {
+                territoryType = (StringFlag) existing;
+                plugin.getLogger().info("Флаг territory-type уже был зарегистрирован — использую существующий.");
+            } else {
+                territoryType = null;
+                plugin.getLogger().warning("Флаг territory-type зарегистрирован с типом "
+                        + (existing == null ? "null" : existing.getClass().getSimpleName())
+                        + " (ожидался StringFlag) — тип подсветки будет браться по умолчанию из config.");
+            }
+        }
     }
 
     public StateFlag territoryVisibleFlag() {
         return territoryVisible;
+    }
+
+    public StringFlag territoryTypeFlag() {
+        return territoryType;
+    }
+
+    /** Нормализованный тип подсветки региона из флага (particles|blocks|territory; "" если не задан). */
+    public String territoryTypeOf(World world, ProtectedRegion region) {
+        if (world == null || region == null || territoryType == null) {
+            return "";
+        }
+        try {
+            Object v = region.getFlag(territoryType);
+            if (v == null) {
+                return "";
+            }
+            String t = v.toString().trim().toLowerCase(java.util.Locale.ROOT);
+            return t.equals("particles") || t.equals("blocks") || t.equals("territory") ? t : "";
+        } catch (Throwable t) {
+            return "";
+        }
     }
 
     /** Регионы, которые содержат точку (Location игрока) — для флага подсветки. */
@@ -253,6 +295,24 @@ public class Wg {
             }
         }
         return out;
+    }
+
+    /** Сколько регионов мира ещё принадлежит игроку (для лимита region-limit). */
+    public int ownedCount(World world, Player player) {
+        if (world == null || player == null) {
+            return 0;
+        }
+        boolean admin = player.hasPermission("qqregions.admin");
+        int count = 0;
+        for (ProtectedRegion r : all(world)) {
+            if (plugin.config().isBannedRegion(r.getId())) {
+                continue;
+            }
+            if (admin || contains(r.getOwners(), player)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /** Роль игрока в регионе: OWNER / MEMBER / NONE (админ всегда OWNER). */
@@ -536,6 +596,26 @@ public class Wg {
                 }
             }
             region.setFlag((Flag) flag, parsed);
+            RegionManager rm = manager(world);
+            if (rm != null) {
+                rm.save();
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Установить строковый флаг региона (например, territory-type).
+     * Сохраняет регион. Возвращает true при успехе.
+     */
+    public boolean setStringFlag(World world, ProtectedRegion region, StringFlag flag, String value) {
+        if (world == null || region == null || flag == null) {
+            return false;
+        }
+        try {
+            region.setFlag(flag, value == null ? "" : value);
             RegionManager rm = manager(world);
             if (rm != null) {
                 rm.save();

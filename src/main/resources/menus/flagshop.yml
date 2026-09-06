@@ -1,0 +1,95 @@
+# ============================================================
+#  QQRegions — магазин флагов (/region market flags)
+#  Продаются флаги из реестра WorldGuard, НЕ входящие в
+#  flags-menu.whitelist (бесплатные) и flags-menu.shop-ignore
+#  (служебные, только по праву). Цены — shop.yml (flags.*),
+#  экономика общая с рынком (Vault).
+#  После покупки флаг появляется в меню флагов региона и в
+#  «Моих флагах» (кнопка в меню рынка).
+#
+#  Динамические кнопки: {flag-name} {flag} {price}
+# ============================================================
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Магазин флагов ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "back":
+        slot: 49
+        material: BARRIER
+        name: "&cЗакрыть"
+        lore:
+          - "&7Закрыть меню"
+        commands:
+          - "close"
+      "market":
+        slot: 45
+        material: GOLD_INGOT
+        name: "&eРынок"
+        lore:
+          - "&7Вернуться к рынку"
+        commands:
+          - "@menu:market"
+      "myflags":
+        slot: 46
+        material: WRITABLE_BOOK
+        name: "&bМои флаги"
+        lore:
+          - "&7Купленные флаги"
+        commands:
+          - "@menu:myflags"
+      "help":
+        slot: 44
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды плагина"
+        commands:
+          - "@menu:help"
+    menu-slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        slot: 47
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        slot: 51

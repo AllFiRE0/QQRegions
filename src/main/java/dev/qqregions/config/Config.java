@@ -61,6 +61,15 @@ public class Config {
     private MarketOptions market;
     private RaidOptions raid;
 
+    /** flags-menu.whitelist: флаги, доступные всем бесплатно (пусто = прежнее поведение). */
+    private Set<String> flagsMenuWhitelist = new HashSet<>();
+    /** flags-menu.shop-ignore: флаги, скрытые из магазина (только по праву). */
+    private Set<String> flagsShopIgnore = new HashSet<>();
+    /** flags-names: пользовательские названия флагов (key = id флага, value = название). */
+    private final Map<String, String> flagNameReplace = new HashMap<>();
+    /** regions.max-regions: лимит регионов на игрока (0 = без лимита). */
+    private int maxRegions;
+
     public Config(QQRegions plugin) {
         this.plugin = plugin;
         reload();
@@ -130,6 +139,20 @@ public class Config {
         highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
         market = new MarketOptions(cfg.getConfigurationSection("market"));
         raid = new RaidOptions(cfg.getConfigurationSection("raid"));
+
+        flagsMenuWhitelist = new HashSet<>(lower(cfg.getStringList("flags-menu.whitelist")));
+        flagsShopIgnore = new HashSet<>(lower(cfg.getStringList("flags-menu.shop-ignore")));
+        flagNameReplace.clear();
+        ConfigurationSection fn = cfg.getConfigurationSection("flags-names");
+        if (fn != null) {
+            for (String k : fn.getKeys(false)) {
+                String v = fn.getString(k);
+                if (v != null) {
+                    flagNameReplace.put(k.toLowerCase(java.util.Locale.ROOT), v);
+                }
+            }
+        }
+        maxRegions = Math.max(0, cfg.getInt("regions.max-regions", 0));
     }
 
     private static List<String> lower(List<String> in) {
@@ -287,6 +310,30 @@ public class Config {
     /** Настройки рейда клана «Воришка» (кнопка в меню info, шаблон other). */
     public RaidOptions raid() {
         return raid;
+    }
+
+    /** Флаги, видимые всем без права (пустой список = как раньше, по правам). */
+    public Set<String> flagsMenuWhitelist() {
+        return flagsMenuWhitelist;
+    }
+
+    /** Флаги, скрытые из магазина и видимые только по праву <prefix><флаг>. */
+    public Set<String> flagsShopIgnore() {
+        return flagsShopIgnore;
+    }
+
+    /** Название флага из config.yml flags-names или исходный id, если замены нет. */
+    public String flagName(String id) {
+        if (id == null) {
+            return "";
+        }
+        String mapped = flagNameReplace.get(id.toLowerCase(java.util.Locale.ROOT));
+        return mapped == null ? id : mapped;
+    }
+
+    /** Лимит регионов на игрока (0 = без лимита). */
+    public int maxRegions() {
+        return maxRegions;
     }
 
     // ---------------- вложенные опции ----------------

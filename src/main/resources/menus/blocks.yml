@@ -1,14 +1,10 @@
 # ============================================================
-#  QQRegions — меню рынка (/region market)
-#  Список живых предложений: продажа/аренда регионов.
-#  Открывается командой /region market и кнопками меню владельца.
+#  QQRegions — расширения (/region market blocks)
+#  Пакеты площади (area-packs, max-blocks выделения) и пакеты
+#  «+регион» (region-packs, лимит regions.max-regions).
+#  Цены и состав — shop.yml. Покупки на игрока навсегда.
 #
-#  Динамические кнопки строятся из market.yml (предложения):
-#    {market-type} {market-region} {market-world} {market-price}
-#    {market-who} {market-owner} {market-status}
-#  ЛКМ — принять предложение, ПКМ — отменить своё.
-#
-#  Рынок требует Vault (softdepend) и market.enabled: true в config.yml.
+#  Динамические кнопки: {pack-name} {pack-amount} {price}
 # ============================================================
 update_interval: 20
 
@@ -17,43 +13,27 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Рынок регионов"
+    title: "&#000000Расширения ({page}/{pages})"
     size: 6
     fill:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "back":
-        slot: 48
+        slot: 49
         material: ARROW
         name: "&eНазад"
         lore:
-          - "&7Вернуться в предыдущее меню"
+          - "&7Вернуться на рынок"
         commands:
           - "@back"
-      "blocks":
-        slot: 44
-        material: GOLD_BLOCK
-        name: "&6Расширение"
-        lore:
-          - "&7Пакеты площади и «+регион»"
-        commands:
-          - "@menu:blocks"
       "flagshop":
         slot: 46
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
-          - "&7Купить флаг, доступный по праву"
+          - "&7Флаги без права"
         commands:
           - "@menu:flagshop"
       "myflags":
@@ -61,11 +41,11 @@ Menus:
         material: WRITABLE_BOOK
         name: "&bМои флаги"
         lore:
-          - "&7Купленные в магазине флаги"
+          - "&7Купленные флаги"
         commands:
           - "@menu:myflags"
       "help":
-        slot: 45
+        slot: 44
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -94,6 +74,13 @@ Menus:
       - 32
       - 33
       - 34
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
     navigation:
       prev:
         material: ARROW
