@@ -336,14 +336,6 @@ public class SelectionManager implements Listener {
             if (!p.getWorld().equals(sel.getWorld())) {
                 continue;
             }
-            // Одна точка — рисуем маркер в этой точке, но не объём.
-            if (sel.volume() <= 1) {
-                Config cfg = plugin.config();
-                SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
-                Color col = cfg.blockView() ? cfg.pointStyle(2).highlight : cfg.particles().dustColor;
-                v.renderNow(sel, col, cfg.pointStyle(2).block, sel.getPos(1));
-                continue;
-            }
             Config cfg = plugin.config();
             if (cfg.viewHideDistance() > 0 && farFromSelection(p, sel, cfg.viewHideDistance())) {
                 SelectionView far = views.remove(id);
@@ -353,12 +345,26 @@ public class SelectionManager implements Listener {
                 continue;
             }
             SelectionView v = views.computeIfAbsent(id, k -> new SelectionView(plugin, p));
-            if (cfg.blockView()) {
-                v.update(sel, cfg.pointStyle(2).highlight, cfg.pointStyle(2).block, null);
-            } else {
-                v.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
-            }
+            // Отдельная логика командного выделения: маркеры обеих точек всегда
+            // видны и едут за переустановкой, контур объёма не гаснет сразу.
+            v.updateCommand(sel);
         }
+    }
+
+    /**
+     * Немедленная перерисовка командной подсветки игрока (вызывается из команд
+     * /region select pos/point/max/chunk/expand/outset — не ждём тик тика плагина).
+     */
+    public void touch(Player player) {
+        if (!plugin.config().commandSelectionView() || worldDisabledFor(player)) {
+            return;
+        }
+        Selection sel = selections.get(player.getUniqueId());
+        if (sel == null || !player.getWorld().equals(sel.getWorld())) {
+            return;
+        }
+        SelectionView v = views.computeIfAbsent(player.getUniqueId(), k -> new SelectionView(plugin, player));
+        v.updateCommand(sel);
     }
 
     /**

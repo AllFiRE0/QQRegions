@@ -57,6 +57,74 @@ public final class BoxOutline {
         return out;
     }
 
+    /**
+     * Рёбра куба + внутренняя сетка по горизонтальным плоскостям (для
+     * подсветки регионов типа PARTICLES/BLOCKS). Бюджет maxPoints делится
+     * поровну: половина — 12 рёбер, половина — линии сетки. Каждая линия
+     * сетки получает тот же «пунктир», что и рёбра (период растёт с длиной,
+     * короткие идут каждым блоком), поэтому квадраты читаются в любом
+     * масштабе. Отрисовка не затрагивает вертикальные ребра/грани.
+     *
+     * @param step        шаг сетки в блоках (<=1 — сетки нет)
+     * @param topPlane    рисовать линии на верхней плоскости (y = max)
+     * @param bottomPlane рисовать линии на нижней плоскости (y = min)
+     */
+    public static List<BlockVector3> pointsWithGrid(BlockVector3 mn, BlockVector3 mx, int maxPoints,
+                                                    int step, boolean topPlane, boolean bottomPlane) {
+        int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
+        List<BlockVector3> out = new ArrayList<>(Math.min(cap + 32, 8192));
+        Set<BlockVector3> seen = new HashSet<>();
+        int edgeBudget = Math.max(12, cap / 2);
+        for (BlockVector3 p : points(mn, mx, edgeBudget)) {
+            if (seen.add(p)) {
+                out.add(p);
+            }
+        }
+        if (step <= 1 || (!topPlane && !bottomPlane)) {
+            return out;
+        }
+
+        int minX = mn.getX(), maxX = mx.getX();
+        int minY = mn.getY(), maxY = mx.getY();
+        int minZ = mn.getZ(), maxZ = mx.getZ();
+        int sx = Math.abs(maxX - minX);
+        int sz = Math.abs(maxZ - minZ);
+
+        int planes = (topPlane ? 1 : 0) + (bottomPlane ? 1 : 0);
+        int lines = sx / step + sz / step;
+        int perLine = Math.max(2, Math.max(1, cap - edgeBudget) / Math.max(1, lines * planes));
+        int need = perLine - 1;
+
+        if (topPlane) {
+            for (int z = minZ; z <= maxZ; z += step) {
+                addLine(out, seen, BlockVector3.at(minX, maxY, z), BlockVector3.at(maxX, maxY, z), sx, strideFor(sx, need));
+            }
+            for (int x = minX; x <= maxX; x += step) {
+                addLine(out, seen, BlockVector3.at(x, maxY, minZ), BlockVector3.at(x, maxY, maxZ), sz, strideFor(sz, need));
+            }
+        }
+        if (bottomPlane) {
+            for (int z = minZ; z <= maxZ; z += step) {
+                addLine(out, seen, BlockVector3.at(minX, minY, z), BlockVector3.at(maxX, minY, z), sx, strideFor(sx, need));
+            }
+            for (int x = minX; x <= maxX; x += step) {
+                addLine(out, seen, BlockVector3.at(x, minY, minZ), BlockVector3.at(x, minY, maxZ), sz, strideFor(sz, need));
+            }
+        }
+        return out;
+    }
+
+    private static void addLine(List<BlockVector3> out, Set<BlockVector3> seen,
+                                BlockVector3 a, BlockVector3 b, int len, int stride) {
+        Edge e = new Edge(a, b, len, stride);
+        while (e.hasNext()) {
+            BlockVector3 p = e.next();
+            if (seen.add(p)) {
+                out.add(p);
+            }
+        }
+    }
+
     private static int strideFor(int len, int need) {
         return len <= need ? 1 : (len + need - 1) / need;
     }

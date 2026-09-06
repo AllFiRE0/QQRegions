@@ -54,6 +54,8 @@ public class Config {
     private boolean commandSelectionView = true;
     private int viewHideAfter = 5;
     private int viewHideDistance = 0;
+    /** Авто-скрытие командной подсветки выделения (сек; 0 = держать, пока есть). */
+    private int cmdViewHideAfter = 0;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
@@ -126,6 +128,7 @@ public class Config {
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
         viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 5));
         viewHideDistance = Math.max(0, cfg.getInt("interactive.view-hide-distance", 0));
+        cmdViewHideAfter = Math.max(0, cfg.getInt("interactive.command-selection-hide-after", 0));
 
         buttonMaterials.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
@@ -285,6 +288,12 @@ public class Config {
         return viewHideDistance;
     }
 
+    /** Авто-скрытие подсветки командного выделения в секундах (0 = держать всегда).
+     *  Не влияет на интерактивный select (у него свой view-hide-after). */
+    public int cmdViewHideAfter() {
+        return cmdViewHideAfter;
+    }
+
     /** Настройки рынка / аренды (Vault + sell/rent/buy). */
     public MarketOptions market() {
         return market;
@@ -429,6 +438,8 @@ public class Config {
         public final String terrainDisplay;
         /** Параметры «забора» (terrainDisplay: BLOCKS). */
         public final TerrainFenceOptions fence;
+        /** Внутренняя сетка-«квадраты» для BLOCKS/PARTICLES (не для TERRITORY). */
+        public final GridOptions grid;
         public final ParticleOptions particles;
 
         HighlightOptions(ConfigurationSection s) {
@@ -446,6 +457,7 @@ public class Config {
                 terrainCacheSeconds = 3;
                 terrainDisplay = "PARTICLES";
                 fence = new TerrainFenceOptions(null);
+                grid = new GridOptions(null);
                 particles = new ParticleOptions(null);
                 return;
             }
@@ -465,37 +477,66 @@ public class Config {
             String td = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
             terrainDisplay = ("BLOCKS".equals(td) || "PARTICLES".equals(td)) ? td : "PARTICLES";
             fence = new TerrainFenceOptions(s.getConfigurationSection("territory.fence"));
+            grid = new GridOptions(s.getConfigurationSection("grid"));
             particles = new ParticleOptions(s.getConfigurationSection("particles"));
         }
     }
 
     /**
-     * Параметры дисплей-«забора» по периметру региона (highlight.territory.fence,
-     * работает при type: TERRITORY и territory.display: BLOCKS). Забор повторяет
-     * рельеф: для каждого сплошного участка границы одинаковой высоты создаётся
-     * один BlockDisplay с масштабом: вдоль границы = длина участка * width,
-     * вверх = height, поперёк = thickness.
+     * Параметры блок-дисплеев TERRITORY (highlight.territory.fence, работает при
+     * type: TERRITORY и territory.display: BLOCKS). Блок-дисплеи ставятся
+     * ОТДЕЛЬНЫМИ «штакетинами»: размеры каждого — width вдоль границы,
+     * height вверх, thickness поперёк; расстояние между ЦЕНТРАМИ соседей —
+     * spacing; сдвиг вверх/вниз — offset.
      */
     public static class TerrainFenceOptions {
         public final Material material;
-        /** Высота забора (по Y, в блоках). 1.0 = один блок от вершины рельефа. */
+        /** Высота одного блока-дисплея (по Y, в блоках). */
         public final double height;
-        /** Длина сегмента вдоль границы (в блоках); 1.0 = сплошной забор. */
+        /** Ширина вдоль границы (в блоках). */
         public final double width;
-        /** Толщина поперёк границы (в блоках). 0.2 = тонкая стенка. */
+        /** Толщина поперёк границы (в блоках). */
         public final double thickness;
+        /** Расстояние между центрами соседей вдоль границы (в блоках). */
+        public final double spacing;
+        /** Сдвиг вверх/вниз относительно вершины рельефа (в блоках). */
+        public final double offset;
         /** Светиться ли (glow) в цвет highlight.particles.dust-color. */
         public final boolean glow;
 
         TerrainFenceOptions(ConfigurationSection s) {
-            String def = "OAK_FENCE";
+            String def = "OAK_PLANKS";
             String matName = (s == null || s.getString("material") == null) ? def : s.getString("material");
             Material m = Material.matchMaterial(matName);
-            material = m == null ? Material.OAK_FENCE : m;
+            material = m == null ? Material.OAK_PLANKS : m;
             height = Math.max(0.05, s == null ? 1.0 : s.getDouble("height", 1.0));
-            width = Math.max(0.05, s == null ? 1.0 : s.getDouble("width", 1.0));
-            thickness = Math.max(0.05, s == null ? 0.2 : s.getDouble("thickness", 0.2));
+            width = Math.max(0.05, s == null ? 0.3 : s.getDouble("width", 0.3));
+            thickness = Math.max(0.05, s == null ? 0.3 : s.getDouble("thickness", 0.3));
+            spacing = Math.max(0.1, s == null ? 1.0 : s.getDouble("spacing", 1.0));
+            offset = s == null ? 0.0 : s.getDouble("offset", 0.0);
             glow = s == null || s.getBoolean("glow", true);
+        }
+    }
+
+    /**
+     * Внутренняя сетка («квадраты» по всей площади) для подсветки типа
+     * PARTICLES/BLOCKS (highlight.grid). НЕ применяется к TERRITORY и его
+     * отображениям — те игнорируют этот раздел. Линии сетки рисуются на
+     * горизонтальных плоскостях: grid-planes: top (верх региона), bottom
+     * (низ) или both. Шаг между линиями — grid-step.
+     */
+    public static class GridOptions {
+        public final boolean enabled;
+        /** Шаг линий сетки в блоках (расстояние между соседними линиями). */
+        public final int step;
+        /** Где рисовать линии: top | bottom | both. */
+        public final String planes;
+
+        GridOptions(ConfigurationSection s) {
+            enabled = s == null || s.getBoolean("enabled", true);
+            step = Math.max(2, s == null ? 25 : s.getInt("step", 25));
+            String p = s == null ? "both" : s.getString("planes", "both").toLowerCase(java.util.Locale.ROOT);
+            planes = ("top".equals(p) || "bottom".equals(p)) ? p : "both";
         }
     }
 

@@ -212,7 +212,7 @@ public class RegionCommand {
             lang(p, "delete.none");
             return;
         }
-        if (!plugin.wg().owns(region, p)) {
+        if (!plugin.wg().owns(region, p) && !adminPerm(p, "qqregions.admin")) {
             lang(p, "delete.not-owner");
             return;
         }
@@ -288,7 +288,7 @@ public class RegionCommand {
             lang(p, "info.none");
             return;
         }
-        if (!plugin.wg().owns(region, p)) {
+        if (!plugin.wg().owns(region, p) && !adminPerm(p, "qqregions.admin")) {
             lang(p, add ? "add.not-allowed" : "remove.not-allowed", "region", region.getId());
             return;
         }
@@ -842,17 +842,33 @@ public class RegionCommand {
                     out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
                     return out;
                 case "add":
-                case "remove":
-                    out.addAll(filtered(List.of("member", "owner"), args, 1));
+                case "remove": {
+                    List<String> rolesPlayers = new ArrayList<>(List.of("member", "owner"));
+                    for (Player online : Bukkit.getOnlinePlayers()) {
+                        rolesPlayers.add(online.getName());
+                    }
+                    out.addAll(filtered(rolesPlayers, args, 1));
                     return out;
+                }
                 default:
                     return out;
             }
         }
         if (args.length == 3 && (sub.equals("add") || sub.equals("remove"))) {
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                out.add(online.getName());
+            // add [member|owner] <ник>  →  ник;  add <ник> [регион]  →  регион
+            if (args[1].equalsIgnoreCase("member") || args[1].equalsIgnoreCase("owner")) {
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    out.add(online.getName());
+                }
+            } else {
+                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 2));
             }
+            return out;
+        }
+        if (args.length == 4 && (sub.equals("add") || sub.equals("remove"))) {
+            // add [member|owner] <ник> [регион]
+            out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
+            return out;
         }
         if (sub.equals("view")) {
             // /region view [регион] [тип]
@@ -890,24 +906,50 @@ public class RegionCommand {
         }
         if (sub.equals("sell") || sub.equals("rent") || sub.equals("buy")
                 || sub.equals("tenant") || sub.equals("market")) {
-            // /region sell|rent|buy|tenant [акция] [регион]
-            List<String> opts;
+            // offer-акции (accept/decline/list/…) доступны через любой из жаргонов
+            List<String> offer = sub.equals("sell") || sub.equals("rent")
+                    ? List.of("accept", "decline", "cancel", "list")
+                    : List.of("accept", "decline", "list");
             if (sub.equals("sell") || sub.equals("rent")) {
-                opts = new ArrayList<>(List.of("accept", "decline", "cancel", "list"));
-            } else if (sub.equals("buy") || sub.equals("tenant")) {
-                opts = new ArrayList<>(List.of("accept", "decline", "list"));
-            } else {
-                opts = new ArrayList<>(List.of("open", "list", "flags", "blocks", "myflags"));
+                // /region sell <ник> <сумма> [регион]
+                // /region rent  <ник> <сумма> <время> [регион]
+                if (args.length == 2) {
+                    for (Player online : Bukkit.getOnlinePlayers()) {
+                        out.add(online.getName());
+                    }
+                    out.addAll(filtered(offer, args, 1));
+                    return out;
+                }
+                if (args.length == 3) {
+                    out.addAll(filtered(List.of("100", "250", "500", "1000", "5000"), args, 2));
+                    return out;
+                }
+                if (args.length == 4) {
+                    if (sub.equals("rent")) {
+                        out.addAll(filtered(List.of("1d", "7d", "30d", "90d"), args, 3));
+                    } else {
+                        out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
+                    }
+                    return out;
+                }
+                if (args.length == 5 && sub.equals("rent")) {
+                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 4));
+                    return out;
+                }
+                return filtered(out, args, args.length - 1);
             }
-            if (args.length == 2) {
-                out.addAll(filtered(opts, args, 1));
-                return out;
+            if (sub.equals("buy") || sub.equals("tenant")) {
+                // /region buy|tenant [регион]  (плюс offer-акции)
+                if (args.length == 2) {
+                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
+                    out.addAll(filtered(offer, args, 1));
+                    return out;
+                }
+                return filtered(out, args, args.length - 1);
             }
-            if (args.length == 3) {
-                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 2));
-                return out;
-            }
-            return filtered(out, args, args.length - 1);
+            // /region market [open|list|flags|blocks|myflags]
+            out.addAll(filtered(List.of("open", "list", "flags", "blocks", "myflags"), args, args.length - 1));
+            return out;
         }
         return filtered(out, args, args.length - 1);
     }

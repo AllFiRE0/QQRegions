@@ -84,6 +84,7 @@ public class SelectCommand {
                 p.getLocation().getBlockY(), p.getLocation().getBlockZ());
         sel.setPos(which, pos);
         mgr.set(p, sel);
+        mgr.touch(p);
         send(p, "select.pos-set",
                 "point", plugin.lang().fmt("select.point-" + which),
                 "x", String.valueOf(pos.getBlockX()),
@@ -108,6 +109,7 @@ public class SelectCommand {
         Selection sel = mgr.getOrCreate(p, p.getWorld());
         sel.setPos(which, pos);
         mgr.set(p, sel);
+        mgr.touch(p);
         send(p, "select.pos-set",
                 "point", plugin.lang().fmt("select.point-" + which),
                 "x", String.valueOf(pos.getBlockX()),
@@ -138,6 +140,7 @@ public class SelectCommand {
             return;
         }
         mgr.set(p, sel);
+        mgr.touch(p);
         warnMin(p, sel);
         send(p, "select.max-built", "blocks", RegionCommand.fmt(sel.volume()));
     }
@@ -196,6 +199,7 @@ public class SelectCommand {
             return;
         }
         mgr.set(p, sel);
+        mgr.touch(p);
         warnMin(p, sel);
         send(p, "select.chunk-built",
                 "chunks", String.valueOf(side * side),
@@ -319,6 +323,7 @@ public class SelectCommand {
             return;
         }
         mgr.set(p, next);
+        mgr.touch(p);
         warnMin(p, next);
         send(p, okKey, "blocks", RegionCommand.fmt(next.volume()));
     }

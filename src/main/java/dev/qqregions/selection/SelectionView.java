@@ -46,6 +46,15 @@ public class SelectionView {
     /** Подсветка скрыта за задержку бездействия; рисуется снова при изменении кадра. */
     private boolean hidden = false;
 
+    // --- отдельная логика КОМАНДНОГО выделения (pos/point/max/chunk/expand/outset) ---
+    /** Маркеры точек 1 и 2 (блок-дисплеи), живущие независимо от маркеров select. */
+    private Entity viewCmdMarker1;
+    private Entity viewCmdMarker2;
+    /** Отпечаток последнего кадра командного выделения (обе точки + цвета). */
+    private String cmdFp = "";
+    private int cmdIdle = 0;
+    private boolean cmdHidden = false;
+
     public SelectionView(QQRegions plugin, Player player) {
         this.plugin = plugin;
         this.player = player;
@@ -125,6 +134,94 @@ public class SelectionView {
         }
     }
 
+    /**
+     * Рендер выделения, созданного ОБЫЧНЫМИ КОМАНДАМИ (/region select pos 1/2,
+     * point, max, chunk, expand, outset). ОТДЕЛЬНАЯ логика от интерактивного
+     * select (renderSelect не задействован — маркеры свои): всегда рисуются
+     * маркеры ОБЕИХ точек (каждая своим цветом/блоком), при volume>1 — контур
+     * объёма; маркеры телепортируются за переустановленными точками. Авто-
+     * скрытие только по explicit command-selection-hide-after (0 = держать).
+     */
+    public void updateCommand(Selection sel) {
+        if (sel == null) {
+            cmdFp = "";
+            return;
+        }
+        Config cfg = plugin.config();
+        Config.PointStyle s1 = cfg.pointStyle(1);
+        Config.PointStyle s2 = cfg.pointStyle(2);
+        BlockVector3 p1 = sel.getPos(1);
+        BlockVector3 p2 = sel.getPos(2);
+        String frame = sel.getWorld().getName()
+                + '|' + sel.min() + '|' + sel.max()
+                + '|' + p1 + '|' + p2
+                + '|' + s1.highlight.asRGB() + '|' + s2.highlight.asRGB()
+                + '|' + s1.block.name() + '|' + s2.block.name();
+        boolean changed = !frame.equals(cmdFp);
+        cmdFp = frame;
+        if (changed) {
+            cmdIdle = 0;
+            cmdHidden = false;
+        } else {
+            cmdIdle++;
+        }
+        int hideCalls = cfg.cmdViewHideAfter() * 4; // 4 прохода тика в секунду
+        if (hideCalls > 0 && cmdIdle >= hideCalls) {
+            if (!cmdHidden) {
+                cmdHidden = true;
+                cleanup();
+            }
+            return;
+        }
+        if (cmdHidden) {
+            return;
+        }
+        if (cfg.blockView()) {
+            if (!changed) {
+                return;
+            }
+            renderBlockView(sel, s2.highlight, s2.block, null);
+            placeCmdMarker(1, sel.getWorld(), p1, s1);
+            placeCmdMarker(2, sel.getWorld(), p2, s2);
+            return;
+        }
+        Config.ParticleOptions po = cfg.particles();
+        if (!po.enabled) {
+            return;
+        }
+        if (changed) {
+            timer = po.updateTicks;
+        } else {
+            timer += 5;
+            if (timer < po.updateTicks) {
+                return;
+            }
+        }
+        renderParticles(sel, s2.highlight, null);
+        markerCube(sel.getWorld(), po, s1.highlight, p1);
+        markerCube(sel.getWorld(), po, s2.highlight, p2);
+    }
+
+    /** Маркер точки командного выделения: телепорт при изменении, спавн при отсутствии. */
+    private void placeCmdMarker(int which, World world, BlockVector3 pos, Config.PointStyle style) {
+        Entity marker = which == 1 ? viewCmdMarker1 : viewCmdMarker2;
+        if (marker != null && marker.isValid()) {
+            marker.teleport(displayLoc(world, pos));
+            if (marker instanceof BlockDisplay bd) {
+                bd.setBlock(style.block.createBlockData());
+                bd.setGlowColorOverride(style.highlight);
+            }
+            return;
+        }
+        BlockDisplay d = spawnViewBlock(world, pos, style.block, style.highlight,
+                Math.min(1.0f, plugin.config().viewBlockScale() * 2.0f));
+        if (which == 1) {
+            viewCmdMarker1 = d;
+        } else {
+            viewCmdMarker2 = d;
+        }
+    }
+
     private static String fp(Selection sel, BlockVector3 marker, Color color, Material mat, boolean select) {
         StringBuilder sb = new StringBuilder(96);
         sb.append(sel.getWorld().getName()).append('|')
@@ -200,6 +297,14 @@ public class SelectionView {
         if (viewMarker2 != null) {
             viewMarker2.remove();
             viewMarker2 = null;
+        }
+        if (viewCmdMarker1 != null) {
+            viewCmdMarker1.remove();
+            viewCmdMarker1 = null;
+        }
+        if (viewCmdMarker2 != null) {
+            viewCmdMarker2.remove();
+            viewCmdMarker2 = null;
         }
         timer = 0;
     }

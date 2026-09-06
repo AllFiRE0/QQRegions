@@ -322,7 +322,7 @@ public class HighlightManager implements Listener {
         }
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
-        for (BlockVector3 pt : BoxOutline.points(mn, mx, h.particles.maxPoints)) {
+        for (BlockVector3 pt : outlinePoints(mn, mx, h.particles.maxPoints)) {
             int cx = pt.getBlockX() >> 4;
             int cz = pt.getBlockZ() >> 4;
             if (!world.isChunkLoaded(cx, cz)) {
@@ -354,6 +354,24 @@ public class HighlightManager implements Listener {
             }
             spawnParticle(world, po, pt.getBlockX() + 0.5, pt.getBlockY() + 0.5, pt.getBlockZ() + 0.5);
         }
+    }
+
+    // ---------- рёбра + сетка (PARTICLES/BLOCKS) ----------
+
+    /**
+     * Точки контура региона для PARTICLES/BLOCKS: рёбра куба, а при
+     * highlight.grid — ещё и внутренняя сетка на горизонтальных плоскостях
+     * (highlight.grid.planes). TERRITORY сюда не попадает — у него свой
+     * проход по рельефу (terrainPoints/fenceEntities).
+     */
+    private List<BlockVector3> outlinePoints(BlockVector3 mn, BlockVector3 mx, int maxPoints) {
+        Config.GridOptions g = plugin.config().highlight().grid;
+        if (!g.enabled) {
+            return BoxOutline.points(mn, mx, maxPoints);
+        }
+        boolean top = "top".equals(g.planes) || "both".equals(g.planes);
+        boolean bottom = "bottom".equals(g.planes) || "both".equals(g.planes);
+        return BoxOutline.pointsWithGrid(mn, mx, maxPoints, g.step, top, bottom);
     }
 
     // ---------- TERRITORY (террейн-подсветка вдоль границы) ----------
@@ -457,28 +475,20 @@ public class HighlightManager implements Listener {
                 e.remove();
             }
         }
-        List<Entity> list;
-        if ("TERRITORY".equals(type)) {
-            list = fenceEntities(world, r, h);
-            if (list == null) {
-                if (perPlayer.isEmpty()) {
-                    blockViews.remove(p.getUniqueId());
-                }
-                return;
-            }
-        } else {
-            list = boxBlocks(world, r, h);
-        }
+        List<Entity> list = "TERRITORY".equals(type)
+                ? fenceEntities(world, r, h)
+                : boxBlocks(world, r, h);
         perPlayer.put(key, list);
     }
 
-    /** Точки-кубики BLOCKS по рёбрам объёма. */
+    /** Точки-кубики BLOCKS по рёбрам объёма (+ сетка, если highlight.grid). */
     private List<Entity> boxBlocks(World world, ProtectedRegion r, Config.HighlightOptions h) {
-        int budget = Math.min(h.particles.maxPoints, 600);
+        int gridBoost = h.grid.enabled ? 1500 : 600;
+        int budget = Math.min(h.particles.maxPoints, gridBoost);
         List<Entity> list = new ArrayList<>(budget);
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
-        for (BlockVector3 pt : BoxOutline.points(mn, mx, budget)) {
+        for (BlockVector3 pt : outlinePoints(mn, mx, budget)) {
             int cx = pt.getBlockX() >> 4;
             int cz = pt.getBlockZ() >> 4;
             if (!world.isChunkLoaded(cx, cz)) {
@@ -517,11 +527,11 @@ public class HighlightManager implements Listener {
     }
 
     /**
-     * «Забор» TERRITORY: для каждой из 4 сторон прямоугольника региона идём
-     * по колонкам, находим верхний блок, и группируем подряд идущие колонки
-     * одинаковой высоты в один BlockDisplay (`length участка × width` вдоль
-     * границы, `height` вверх, `thickness` поперёк). На ровной местности —
-     * один дисплей на сторону, на рельефе — по числу перепадов высоты.
+     * Блок-дисплеи TERRITORY: по каждой из 4 сторон прямоугольника региона
+     * ставится ОТДЕЛЬНЫЙ блок-дисплей (штакетина) с шагом fence.spacing:
+     * размеры width вдоль границы, height вверх, thickness поперёк, сдвиг
+     * offset относительно вершины рельефа. Повторяет рельеф (каждая штакетина
+     * опирается на верхний блок своей колонки).
      */
     private List<Entity> fenceEntities(World world, ProtectedRegion r, Config.HighlightOptions h) {
         Config.TerrainFenceOptions f = h.fence;
@@ -532,60 +542,53 @@ public class HighlightManager implements Listener {
         int minY = Math.max(world.getMinHeight(), mn.getBlockY());
         int maxY = Math.min(world.getMaxHeight() - 1, mx.getBlockY());
         List<Entity> list = new ArrayList<>(16);
-        // Стороны, параллельные X (z фиксирован): забор вытянут вдоль X.
-        edgeFence(world, list, f, minX, maxX, minY, maxY,
-                minZ, true, h);
-        edgeFence(world, list, f, minX, maxX, minY, maxY,
-                maxZ, true, h);
-        // Стороны, параллельные Z (x фиксирован): забор вытянут вдоль Z.
-        edgeFence(world, list, f, minZ, maxZ, minY, maxY,
-                minX, false, h);
-        edgeFence(world, list, f, minZ, maxZ, minY, maxY,
-                maxX, false, h);
+        int budget = Math.max(1000, h.particles.maxPoints);
+        // Стороны, параллельные X (z фиксирован).
+        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, budget);
+        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, budget);
+        // Стороны, параллельные Z (x фиксирован).
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, budget);
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, budget);
         return list;
     }
 
     /**
      * Один край региона. При alongX=true колонки идут по X при фиксированном
-     * fixed=Z; сегмент забора получает scale (len*width, height, thickness).
-     * При alongX=false колонки идут по Z при фиксированном fixed=X; сегмент —
-     * (thickness, height, len*width).
+     * fixed=Z; блок получает scale (width, height, thickness). При alongX=false
+     * колонки идут по Z при фиксированном fixed=X; scale (thickness, height, width).
      */
-    private void edgeFence(World world, List<Entity> list, Config.TerrainFenceOptions f,
-                           int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
-                           Config.HighlightOptions h) {
-        int runStart = -1;
-        int runTop = 0;
-        for (int i = lo; i <= hi; i++) {
+    private void picketEdge(World world, List<Entity> list, Config.TerrainFenceOptions f,
+                            int lo, int hi, int minY, int maxY, int fixed, boolean alongX, int budget) {
+        double step = f.spacing;
+        for (double pos = lo; pos <= hi + 1e-6 && list.size() < budget; pos += step) {
+            int col = Math.max(lo, Math.min(hi, (int) Math.round(pos)));
             boolean loaded;
             int top;
             if (alongX) {
-                loaded = world.isChunkLoaded(i >> 4, fixed >> 4);
-                top = loaded ? topSolid(world, i, fixed, minY, maxY) : Integer.MIN_VALUE;
+                loaded = world.isChunkLoaded(col >> 4, fixed >> 4);
+                top = loaded ? topSolid(world, col, fixed, minY, maxY) : Integer.MIN_VALUE;
             } else {
-                loaded = world.isChunkLoaded(fixed >> 4, i >> 4);
-                top = loaded ? topSolid(world, fixed, i, minY, maxY) : Integer.MIN_VALUE;
+                loaded = world.isChunkLoaded(fixed >> 4, col >> 4);
+                top = loaded ? topSolid(world, fixed, col, minY, maxY) : Integer.MIN_VALUE;
             }
             if (!loaded || top == Integer.MIN_VALUE) {
-                flushEdgeRun(world, list, f, alongX, runStart, i - 1, runTop, fixed, h);
-                runStart = -1;
                 continue;
             }
-            if (runStart == -1) {
-                runStart = i;
-                runTop = top;
-            } else if (top != runTop) {
-                flushEdgeRun(world, list, f, alongX, runStart, i - 1, runTop, fixed, h);
-                runStart = i;
-                runTop = top;
+            double cx = alongX ? pos + 0.5 : fixed + 0.5;
+            double cz = alongX ? fixed + 0.5 : pos + 0.5;
+            double y = top + f.height / 2.0 + f.offset;
+            Vector3f scale = alongX
+                    ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
+                    : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
+            BlockDisplay d = spawnDisplay(world, cx, y, cz, f.material.createBlockData(), scale,
+                    f.glow ? plugin.config().highlight().particles.dustColor : null);
+            if (d != null) {
+                list.add(d);
             }
-        }
-        if (runStart != -1) {
-            flushEdgeRun(world, list, f, alongX, runStart, hi, runTop, fixed, h);
         }
     }
 
-    /** Самый верхний не-воздух в колонке (y+не найден — Integer.MIN_VALUE). */
+    /** Самый верхний не-воздух в колонке (не найден — Integer.MIN_VALUE). */
     private int topSolid(World world, int x, int z, int minY, int maxY) {
         Material type = world.getBlockAt(x, maxY, z).getType();
         if (type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR) {
@@ -598,33 +601,6 @@ public class HighlightManager implements Listener {
             }
         }
         return Integer.MIN_VALUE;
-    }
-
-    /** Создать один сегмент забора на участке [from..to] одной высоты. */
-    private void flushEdgeRun(World world, List<Entity> list, Config.TerrainFenceOptions f, boolean alongX,
-                              int from, int to, int top, int fixed, Config.HighlightOptions h) {
-        if (from < 0 || to < from) {
-            return;
-        }
-        int len = to - from + 1;
-        double along = len * f.width;
-        Vector3f scale;
-        double cx, cz;
-        if (alongX) {
-            cx = (from + to) / 2.0 + 0.5;
-            cz = fixed + 0.5;
-            scale = new Vector3f((float) along, (float) f.height, (float) f.thickness);
-        } else {
-            cx = fixed + 0.5;
-            cz = (from + to) / 2.0 + 0.5;
-            scale = new Vector3f((float) f.thickness, (float) f.height, (float) along);
-        }
-        double y = top + f.height / 2.0;
-        BlockDisplay d = spawnDisplay(world, cx, y, cz, f.material.createBlockData(), scale,
-                f.glow ? h.particles.dustColor : null);
-        if (d != null) {
-            list.add(d);
-        }
     }
 
     private void despawnBlocks(Player p, String key) {
