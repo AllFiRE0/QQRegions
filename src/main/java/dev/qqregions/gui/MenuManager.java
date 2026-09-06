@@ -936,7 +936,7 @@ public class MenuManager implements Listener {
                 }
                 Pattern pat = Menu.searchPattern(q);
                 String translated = plugin.config().flagName(id);
-                String plain = dev.qqregions.util.Msg.color(translated);
+                String plain = dev.qqregions.util.Msg.toLegacy(dev.qqregions.util.Msg.color(translated));
                 if (!pat.matcher(id).find() && !pat.matcher(translated).find()
                         && !pat.matcher(plain).find()) {
                     continue;

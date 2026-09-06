@@ -58,8 +58,8 @@ public class Wg {
      * зарегистрирован другой плагином — берём существующий (StateFlag).
      */
     public void registerFlags() {
+        FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
         try {
-            FlagRegistry registry = WorldGuard.getInstance().getFlagRegistry();
             try {
                 territoryVisible = new StateFlag("territory-visible", false);
                 registry.register(territoryVisible);

@@ -245,7 +245,7 @@ public class Menu {
             String valueLabel = value.isEmpty()
                     ? "&7не задано"
                     : plugin.replace().resolve("flag-values", value);
-            String groupsList = groupsList(tpl, group);
+            String groupsList = groupsList(plugin, tpl, group);
             String flagName = plugin.config().flagName(id);
 
             // активный поиск флагов (ctx["_flagsearch"]): совпадение по id
@@ -258,7 +258,7 @@ public class Menu {
                     continue;
                 }
                 Pattern pat = searchPattern(q);
-                String plain = Msg.color(flagName);
+                String plain = Msg.toLegacy(Msg.color(flagName));
                 if (!pat.matcher(id).find() && !pat.matcher(flagName).find()
                         && !pat.matcher(plain).find()) {
                     continue;
@@ -298,7 +298,7 @@ public class Menu {
 
     /** Список групп для lore «ПКМ — сменить группу»: по строке на группу,
      * текущая отмечена галочкой. Многострочность разбивается в MenuItem.build. */
-    private String groupsList(DynamicFlags tpl, String currentGroup) {
+    private String groupsList(QQRegions plugin, DynamicFlags tpl, String currentGroup) {
         StringBuilder sb = new StringBuilder();
         for (String g : tpl.groups) {
             String label = plugin.replace().resolve("flag-groups", g);
