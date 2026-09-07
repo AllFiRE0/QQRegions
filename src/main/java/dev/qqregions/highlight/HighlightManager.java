@@ -721,6 +721,28 @@ public class HighlightManager implements Listener {
                 dedup.add(pt);
             }
         }
+        if (plugin.config().debug()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("[territory-fence] ПАРАМЕТРЫ: material=").append(f.material)
+                    .append(" h=").append(f.height).append(" w=").append(f.width)
+                    .append(" t=").append(f.thickness).append(" spacing=").append(f.spacing)
+                    .append(" offset=").append(f.offset)
+                    .append(" along=").append(f.alongOffset)
+                    .append(" across=").append(f.acrossOffset)
+                    .append(" бюджет=").append(budget);
+            plugin.getLogger().info(sb.toString());
+            plugin.getLogger().info("[territory-fence] регион x=" + minX + ".." + maxX
+                    + " z=" + minZ + ".." + maxZ
+                    + " всего=" + dedup.size() + " (до дедупа=" + list.size() + ")");
+            int n = Math.min(8, dedup.size());
+            for (int i = 0; i < n; i++) {
+                Picket pt = dedup.get(i);
+                plugin.getLogger().info("[territory-fence] штакетина#" + i
+                        + " x=" + String.format(java.util.Locale.ROOT, "%.3f", pt.x)
+                        + " y=" + String.format(java.util.Locale.ROOT, "%.3f", pt.y)
+                        + " z=" + String.format(java.util.Locale.ROOT, "%.3f", pt.z));
+            }
+        }
         return dedup;
     }
 
