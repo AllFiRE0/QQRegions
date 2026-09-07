@@ -890,7 +890,7 @@ public class Config {
 
         MarketHoloOptions(ConfigurationSection s) {
             enabled = s == null || s.getBoolean("enabled", true);
-            yOffset = s == null ? 0.5 : s.getDouble("y-offset", 0.5);
+            yOffset = s == null ? 1.5 : s.getDouble("y-offset", 1.5);
             viewDistance = s == null ? 24 : Math.max(1, s.getDouble("view-distance", 24));
             scale = s == null ? 1.0 : Math.max(0.05, s.getDouble("scale", 1.0));
             lineWidth = s == null ? 200 : Math.max(10, s.getInt("line-width", 200));
