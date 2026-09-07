@@ -157,6 +157,13 @@ public final class MarketManager {
         offers.add(o);
         save();
         plugin.marketHolos().refresh();
+        if (o.buyer != null) {
+            player(o.buyer).ifPresent(t -> plugin.lang().send(t, "market.sale-offer-sent",
+                    "region", o.region,
+                    "world", o.world,
+                    "price", economy().format(o.price),
+                    "initiator", nameOf(initiator.getUniqueId())));
+        }
         return "ok";
     }
 
@@ -201,6 +208,14 @@ public final class MarketManager {
         offers.add(o);
         save();
         plugin.marketHolos().refresh();
+        if (o.tenant != null) {
+            player(o.tenant).ifPresent(t -> plugin.lang().send(t, "market.rent-offer-sent",
+                    "region", o.region,
+                    "world", o.world,
+                    "price", economy().format(o.price),
+                    "time", MarketHolos.fmtMinutes(o.periodMillis / 60_000L),
+                    "initiator", nameOf(initiator.getUniqueId())));
+        }
         return "ok";
     }
 
@@ -428,6 +443,11 @@ public final class MarketManager {
         return u.equals(o.owner);
     }
 
+    /** Создатель объявления (для SALE — продавец, для RENT — владелец). */
+    private static UUID initiatorOf(Offer o) {
+        return o.kind == Offer.Kind.SALE ? o.seller : o.owner;
+    }
+
     // ---------- тик аренды ----------
 
     public void tick() {
@@ -475,12 +495,37 @@ public final class MarketManager {
                 changed = true;
                 continue;
             }
-            // приватное предложение: контрагент не принял за offer-timeout — снять.
-            // Владельцы региона не меняются, деньги никому не переводятся.
+            // приватное предложение: контрагент не принял за offer-timeout.
+            // RELIST — перевыставить регион публично (цена/условия сохраняются);
+            // CANCEL — снять объявление с рынка. Владельцы региона не меняются.
             if (o.status == Offer.Status.PENDING && o.pendingUntil > 0
                     && now >= o.pendingUntil) {
-                o.status = Offer.Status.CANCELLED;
-                save();
+                UUID counterpart = o.kind == Offer.Kind.SALE ? o.buyer : o.tenant;
+                UUID initiator = initiatorOf(o);
+                Config.MarketOptions m = plugin.config().market();
+                String price = economy().format(o.price);
+                if (m.offerTimeoutAction == Config.MarketOptions.OfferTimeoutAction.RELIST) {
+                    if (o.kind == Offer.Kind.SALE) {
+                        o.buyer = null;
+                    } else {
+                        o.tenant = null;
+                    }
+                    long dur = m.listDurationMillis;
+                    o.listDurationMillis = dur;
+                    o.listUntil = now + dur;
+                    o.pendingUntil = 0;
+                    o.status = Offer.Status.ACTIVE;
+                    save();
+                    player(counterpart).ifPresent(t -> plugin.lang().send(t, "market.offer-expired",
+                            "region", o.region, "world", o.world, "price", price));
+                    player(initiator).ifPresent(t -> plugin.lang().send(t, "market.offer-relisted",
+                            "region", o.region, "world", o.world, "price", price));
+                } else {
+                    o.status = Offer.Status.CANCELLED;
+                    save();
+                    player(initiator).ifPresent(t -> plugin.lang().send(t, "market.offer-timeout-cancelled",
+                            "region", o.region, "world", o.world, "price", price));
+                }
                 changed = true;
             }
         }

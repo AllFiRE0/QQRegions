@@ -744,6 +744,10 @@ public class Config {
         public final CommissionOptions commission;
         /** Срок жизни ПРИВАТНОГО предложения в минутах (market.offer-timeout-minutes). */
         public final long offerTimeoutMillis;
+        /** Что сделать с ПРИВАТНЫМ предложением по истечении срока
+         *  (market.offer-timeout-action): RELIST — перевыставить публично;
+         *  CANCEL — снять объявление с рынка. */
+        public final OfferTimeoutAction offerTimeoutAction;
         /** Голограммы-вывески рынка (market.market-holo). */
         public final MarketHoloOptions marketHolo;
 
@@ -754,6 +758,8 @@ public class Config {
         public enum RentCharge { ONCE, PERIOD }
 
         public enum MultiOwner { SINGLE, SPLIT }
+
+        public enum OfferTimeoutAction { RELIST, CANCEL }
 
         MarketOptions(ConfigurationSection s) {
             if (s == null) {
@@ -774,6 +780,7 @@ public class Config {
                 multiowner = MultiOwner.SINGLE;
                 commission = new CommissionOptions(null);
                 offerTimeoutMillis = 60L * 60_000L;
+                offerTimeoutAction = OfferTimeoutAction.RELIST;
                 marketHolo = new MarketHoloOptions(null);
                 return;
             }
@@ -821,6 +828,14 @@ public class Config {
             multiowner = mo;
             commission = new CommissionOptions(s.getConfigurationSection("commission"));
             offerTimeoutMillis = Math.max(0, s.getInt("offer-timeout-minutes", 60)) * 60_000L;
+            OfferTimeoutAction ota;
+            try {
+                ota = OfferTimeoutAction.valueOf(
+                        s.getString("offer-timeout-action", "RELIST").toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                ota = OfferTimeoutAction.RELIST;
+            }
+            offerTimeoutAction = ota;
             marketHolo = new MarketHoloOptions(s.getConfigurationSection("market-holo"));
         }
     }

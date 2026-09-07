@@ -69,7 +69,17 @@ public final class Yml {
             return;
         }
         int jv = version(jar);
-        int dv = version(YamlConfiguration.loadConfiguration(file));
+        int dv;
+        try {
+            dv = version(YamlConfiguration.loadConfiguration(file));
+        } catch (Exception e) {
+            // Битый YAML на диске (например после ручной правки): не даём
+            // плагину упасть при старте — считаем версию 0 и перезаписываем
+            // файл из jar (бэкап битой копии остаётся рядом).
+            plugin.getLogger().warning("Повреждённый " + resource
+                    + " на диске — будет восстановлен из jar: " + e.getMessage());
+            dv = 0;
+        }
         if (jv <= dv) {
             return;
         }
