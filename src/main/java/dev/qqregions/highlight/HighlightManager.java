@@ -204,29 +204,40 @@ public class HighlightManager implements Listener {
                 cur.add(key(p.getWorld(), r));
                 under.add(r);
             }
-            // hide-on-exit: если региона больше нет под игроком — скрываем.
-            if (h.hideOnExit) {
-                Set<String> prev = flagShown.get(p.getUniqueId());
-                if (prev != null) {
-                    for (String k : new ArrayList<>(prev)) {
-                        if (!cur.contains(k)) {
-                            prev.remove(k);
-                            cooldownRemove(p, k);
-                            if (isActive(p, k)) {
-                                removeActive(p, k);
-                            }
-                        }
+            Set<String> was = flagShown.get(p.getUniqueId());
+            Set<String> next = was == null ? new HashSet<>() : new HashSet<>(was);
+            // ВХОД: регион только что появился под игроком — показать один раз
+            // (entry-семантика, как entry/exit у WorldGuard: пока игрок бегает
+            // внутри, подсветка НЕ перезапускается).
+            for (ProtectedRegion r : under) {
+                String k = key(p.getWorld(), r);
+                if (next.contains(k)) {
+                    continue;
+                }
+                if (onCooldown(p, k, now)) {
+                    continue;
+                }
+                markCooldown(p, k, now);
+                next.add(k);
+                show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
+            }
+            // ВЫХОД: hide-on-exit — скрыть, когда региона больше нет под игроком.
+            if (was != null) {
+                for (String k : was) {
+                    if (cur.contains(k)) {
+                        continue;
+                    }
+                    next.remove(k);
+                    cooldownRemove(p, k);
+                    if (h.hideOnExit && isActive(p, k)) {
+                        removeActive(p, k);
                     }
                 }
             }
-            for (ProtectedRegion r : under) {
-                String key = key(p.getWorld(), r);
-                if (onCooldown(p, key, now)) {
-                    continue;
-                }
-                markCooldown(p, key, now);
-                flagShown.computeIfAbsent(p.getUniqueId(), k -> new HashSet<>()).add(key);
-                show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
+            if (next.isEmpty()) {
+                flagShown.remove(p.getUniqueId());
+            } else {
+                flagShown.put(p.getUniqueId(), next);
             }
         }
     }
@@ -570,8 +581,10 @@ public class HighlightManager implements Listener {
      * Блок-дисплеи TERRITORY: по каждой из 4 сторон прямоугольника региона
      * ставится ОТДЕЛЬНЫЙ блок-дисплей (штакетина) с шагом fence.spacing:
      * размеры width вдоль границы, height вверх, thickness поперёк, сдвиг
-     * offset относительно вершины рельефа. Повторяет рельеф (каждая штакетина
-     * опирается на верхний блок своей колонки).
+     * offset. Штакетины ставятся на КАЖДУЮ высоту каждой колонки границы,
+     * где есть рельеф (не воздух и не из ignore-списка): многослойная
+     * граница (дерево, постройка в несколько этажей) больше не создаёт
+     * «пустого разрыва» у земли.
      */
     private List<Entity> fenceEntities(World world, ProtectedRegion r, Config.HighlightOptions h) {
         Config.TerrainFenceOptions f = h.fence;
@@ -599,6 +612,10 @@ public class HighlightManager implements Listener {
      * Один край региона. При alongX=true колонки идут по X при фиксированном
      * fixed=Z; блок получает scale (width, height, thickness). При alongX=false
      * колонки идут по Z при фиксированном fixed=X; scale (thickness, height, width).
+     * Штакетина ставится на КАЖДУЮ высоту колонки, где есть рельеф (не воздух
+     * и не игнорируемый блок): дерево или структура в несколько слоёв больше
+     * не создаёт «пустого разрыва» у земли — забор идёт по всему рельефу
+     * границы, от земли до верха.
      */
     private void picketEdge(World world, List<Entity> list, Config.TerrainFenceOptions f,
                             int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
@@ -607,46 +624,30 @@ public class HighlightManager implements Listener {
         int made = 0;
         for (double pos = lo; pos <= hi + 1e-6 && made < budget; pos += step) {
             int col = Math.max(lo, Math.min(hi, (int) Math.round(pos)));
-            boolean loaded;
-            int top;
-            if (alongX) {
-                loaded = world.isChunkLoaded(col >> 4, fixed >> 4);
-                top = loaded ? topSolid(world, col, fixed, minY, maxY, ignore) : Integer.MIN_VALUE;
-            } else {
-                loaded = world.isChunkLoaded(fixed >> 4, col >> 4);
-                top = loaded ? topSolid(world, fixed, col, minY, maxY, ignore) : Integer.MIN_VALUE;
-            }
-            if (!loaded || top == Integer.MIN_VALUE) {
+            int x = alongX ? col : fixed;
+            int z = alongX ? fixed : col;
+            if (!world.isChunkLoaded(x >> 4, z >> 4)) {
                 continue;
             }
             double cx = alongX ? pos + 0.5 : fixed + 0.5;
             double cz = alongX ? fixed + 0.5 : pos + 0.5;
-            double y = top + f.height / 2.0 + f.offset;
             Vector3f scale = alongX
                     ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
                     : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
-            BlockDisplay d = spawnDisplay(world, cx, y, cz, f.material.createBlockData(), scale,
-                    f.glow ? plugin.config().highlight().particles.dustColor : null);
-            if (d != null) {
-                list.add(d);
-                made++;
+            // КАЖДАЯ высота колонки с рельефом получает штакетину.
+            for (int y = maxY; y >= minY && made < budget; y--) {
+                if (!isTerrain(world.getBlockAt(x, y, z).getType(), ignore)) {
+                    continue;
+                }
+                BlockDisplay d = spawnDisplay(world, cx, y + f.height / 2.0 + f.offset, cz,
+                        f.material.createBlockData(), scale,
+                        f.glow ? plugin.config().highlight().particles.dustColor : null);
+                if (d != null) {
+                    list.add(d);
+                    made++;
+                }
             }
         }
-    }
-
-    /** Самый верхний не-воздух в колонке (игнорируемые блоки не считаются рельефом; не найден — Integer.MIN_VALUE). */
-    private int topSolid(World world, int x, int z, int minY, int maxY, Set<Material> ignore) {
-        Material type = world.getBlockAt(x, maxY, z).getType();
-        if (isTerrain(type, ignore)) {
-            return maxY;
-        }
-        for (int y = maxY - 1; y >= minY; y--) {
-            Material m = world.getBlockAt(x, y, z).getType();
-            if (isTerrain(m, ignore)) {
-                return y;
-            }
-        }
-        return Integer.MIN_VALUE;
     }
 
     /** true, если блок — рельеф (не воздух и не в списке ignore). */

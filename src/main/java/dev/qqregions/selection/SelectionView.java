@@ -335,6 +335,10 @@ public class SelectionView {
      * ребра (низ 0-3, верх 4-7, вертикали 8-11) — проверка «вертикали =
      * горизонтали» по факту.
      */
+    /** Отпечаток генератора: по нему в логе видно, из какого кода собран jar.
+     *  b1 — старый дедуп по blockKey (терял южные вертикали), b3 — текущий. */
+    private static final String EDGE_GEN_REV = "b3";
+
     private List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
         int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
         BlockVector3 mn = sel.min();
@@ -382,6 +386,7 @@ public class SelectionView {
             plugin.getLogger().info("[selection-view] " + mn + ".." + mx
                     + " куб " + sx + "x" + sy + "x" + sz
                     + " cap=" + cap + " perEdge=" + perEdge
+                    + " ген=" + EDGE_GEN_REV
                     + " точек=" + out.size()
                     + " низ=" + arr(ns, 0, 4)
                     + " верх=" + arr(ns, 4, 8)
