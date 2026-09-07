@@ -47,6 +47,10 @@ public class SelectionView {
     private boolean hidden = false;
     /** Часть точек кадра была в незагруженных чанках — ждём их и перерисуем. */
     private boolean unloadedPending = false;
+    /** Тик-счётчик принудительного «самолечения» кадра: раз в N вызовов фоновый
+     *  ре-рендер проверяет, что у всех точек кадра есть ЖИВЫЕ дисплеи (их могли
+     *  убить разгрузки чанков в покое). */
+    private int healTimer = 0;
 
     // --- отдельная логика КОМАНДНОГО выделения (pos/point/max/chunk/expand/outset) ---
     /** Маркеры точек 1 и 2 (блок-дисплеи), живущие независимо от маркеров select. */
@@ -96,7 +100,7 @@ public class SelectionView {
         }
         timer += 5;
         if (plugin.config().blockView()) {
-            if (changed || unloadedPending) {
+            if (changed || unloadedPending || forceHeal()) {
                 renderBlockView(sel, color, blockMat, marker);
             }
         } else {
@@ -128,12 +132,19 @@ public class SelectionView {
             return;
         }
         if (plugin.config().blockView()) {
-            if (changed || unloadedPending) {
+            if (changed || unloadedPending || forceHeal()) {
                 renderBlockView(sel, color, blockMat, marker);
             }
         } else {
             renderParticles(sel, color, marker);
         }
+    }
+
+    /** Даже без изменения кадра иногда пересобираем дисплеи: сущности в дальних
+     *  чанках могут умереть от разгрузки чанков, и их надо переспавнить. */
+    private boolean forceHeal() {
+        healTimer++;
+        return healTimer % 4 == 0;
     }
 
     /**
@@ -179,7 +190,7 @@ public class SelectionView {
             return;
         }
         if (cfg.blockView()) {
-            if (!changed && !unloadedPending) {
+            if (!changed && !unloadedPending && !forceHeal()) {
                 return;
             }
             renderBlockView(sel, s2.highlight, s2.block, null);
@@ -262,7 +273,7 @@ public class SelectionView {
         boolean changed = !fp.equals(lastFp);
         lastFp = fp;
         if (cfg.blockView()) {
-            if (!changed && !unloadedPending) {
+            if (!changed && !unloadedPending && !forceHeal()) {
                 return;
             }
             renderBlockView(sel, act.highlight, act.block, actPos);
@@ -483,6 +494,8 @@ public class SelectionView {
     private void renderBlockView(Selection sel, Color color, Material blockMat, BlockVector3 marker) {
         Config cfg = plugin.config();
         World world = sel.getWorld();
+        BlockVector3 mn0 = sel.min();
+        BlockVector3 mx0 = sel.max();
 
         // Контур выделения — ровно старый вид (edgePoints): у каждого ребра куба
         // почти равный бюджет точек (cap/12) и равномерный шаг по длине ребра,
@@ -505,7 +518,11 @@ public class SelectionView {
         List<BlockVector3> need = new ArrayList<>();
         List<BlockVector3> spare = new ArrayList<>();
         for (BlockVector3 p : points) {
-            if (!viewBlocks.containsKey(p)) {
+            // containsKey() НЕ достаточно: если дисплей умер вместе с выгрузкой
+            // чанка, ключ-позиция остаётся в map, а сущность невалидна — без
+            // этой проверки вертикали в дальних чанках пропадают НАВСЕГДА.
+            Entity existing = viewBlocks.get(p);
+            if (existing == null || !existing.isValid()) {
                 need.add(p);
             }
         }
@@ -562,6 +579,29 @@ public class SelectionView {
             }
         }
 
+        if (plugin.config().debug()) {
+            // Диагностика двух южных/северных вертикальных колонок:
+            // считаем ЖИВЫЕ дисплеи по 4 угловым колонкам (x=min|max, z=min|max).
+            int north = 0;
+            int south = 0;
+            for (Map.Entry<BlockVector3, Entity> e : viewBlocks.entrySet()) {
+                BlockVector3 k = e.getKey();
+                int kx = k.getBlockX();
+                int kz = k.getBlockZ();
+                boolean cornerX = kx == mn0.getBlockX() || kx == mx0.getBlockX();
+                boolean cornerZ = kz == mn0.getBlockZ() || kz == mx0.getBlockZ();
+                if (cornerX && cornerZ) {
+                    if (kz == mx0.getBlockZ()) {
+                        south++;
+                    } else {
+                        north++;
+                    }
+                }
+            }
+            plugin.getLogger().info("[selection-view] колонки: север=" + north
+                    + " юг=" + south + " всего=" + viewBlocks.size() + " хотелось=" + wanted.size());
+        }
+
         if (marker == null) {
             if (viewMarker != null) {
                 viewMarker.remove();
@@ -580,6 +620,19 @@ public class SelectionView {
         } else {
             viewMarker = spawnViewBlock(world, marker, blockMat, color,
                     Math.min(1.0f, cfg.viewBlockScale() * 2.0f));
+        }
+
+        // Самовосстановление: если какой-то желаемой точке кадра не хватило
+        // ЖИВОГО дисплея (умер при выгрузке чанка, спавн провалился) — ставим
+        // флаг, чтобы следующий тик перерисовал кадр и доспавнил недостающее.
+        // Гарантирует 12 полных рёбер даже после смерти сущностей в дальних
+        // чанках; в здоровом кадре флаг не ставится (ре-рендеров не будет).
+        for (BlockVector3 p : points) {
+            Entity e = viewBlocks.get(p);
+            if (e == null || !e.isValid()) {
+                unloadedPending = true;
+                break;
+            }
         }
     }
 
