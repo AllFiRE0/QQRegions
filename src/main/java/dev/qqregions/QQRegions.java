@@ -8,7 +8,6 @@ import dev.qqregions.gui.MenuManager;
 import dev.qqregions.highlight.HighlightManager;
 import dev.qqregions.market.MarketHolos;
 import dev.qqregions.market.MarketManager;
-import dev.qqregions.market.RentHolos;
 import dev.qqregions.papi.QQExpansion;
 import dev.qqregions.raid.RaidManager;
 import dev.qqregions.selection.InteractListener;
@@ -43,7 +42,6 @@ public final class QQRegions extends JavaPlugin {
     private MarketManager market;
     private RaidManager raid;
     private ShopManager shop;
-    private RentHolos rentHolos;
     private MarketHolos marketHolos;
 
     public static QQRegions get() {
@@ -78,13 +76,11 @@ public final class QQRegions extends JavaPlugin {
         this.market = new MarketManager(this);
         this.raid = new RaidManager(this);
         this.shop = new ShopManager(this);
-        this.rentHolos = new RentHolos(this);
         this.marketHolos = new MarketHolos(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
         Bukkit.getPluginManager().registerEvents(highlight, this);
-        Bukkit.getPluginManager().registerEvents(rentHolos, this);
 
         marketHolos.refresh();
 
@@ -108,7 +104,7 @@ public final class QQRegions extends JavaPlugin {
         menus.tick();
         highlight.tick();
         raid.tick();
-        rentHolos.tick();
+        marketHolos.tick();
         marketTick();
     }
 
@@ -136,9 +132,6 @@ public final class QQRegions extends JavaPlugin {
         }
         if (market != null) {
             market.save();
-        }
-        if (rentHolos != null) {
-            rentHolos.onDisable();
         }
         if (marketHolos != null) {
             marketHolos.clearAll();
@@ -196,10 +189,6 @@ public final class QQRegions extends JavaPlugin {
 
     public ShopManager shop() {
         return shop;
-    }
-
-    public RentHolos rentHolos() {
-        return rentHolos;
     }
 
     public MarketHolos marketHolos() {

@@ -667,10 +667,6 @@ public class RegionCommand {
             doRentDur(p, label, args);
             return;
         }
-        if (sub.equals("tenant") && args.length >= 2 && args[1].equalsIgnoreCase("holo")) {
-            doTenantHolo(p, label, args);
-            return;
-        }
 
         // ---- sell [ник] <сумма> [регион] | rent [ник] <сумма> <время> [регион] ----
         if (sub.equals("sell") || sub.equals("rent")) {
@@ -808,39 +804,6 @@ public class RegionCommand {
         String res = plugin.market().setListDuration(o, p, minutes);
         lang(p, "ok".equals(res) ? "market.listdur-set" : marketErr(res),
                 "region", region.getId(), "minutes", fmtDur(minutes));
-    }
-
-    /** /region tenant holo on|off [регион] — голограмма аренды (для владельца). */
-    private void doTenantHolo(Player p, String label, String[] args) {
-        if (args.length < 3) {
-            lang(p, "general.usage", "usage", label + " tenant holo on|off [регион]");
-            return;
-        }
-        String v = args[2].toLowerCase(Locale.ROOT);
-        if (!v.equals("on") && !v.equals("off")) {
-            lang(p, "general.usage", "usage", label + " tenant holo on|off [регион]");
-            return;
-        }
-        if (!plugin.rentHolos().enabled()) {
-            lang(p, "market.holo-disabled");
-            return;
-        }
-        String regionName = args.length > 3 ? args[3] : null;
-        ProtectedRegion region = resolveRegion(p, regionName);
-        if (region == null) {
-            lang(p, "market.no-region");
-            return;
-        }
-        boolean shownNow = plugin.rentHolos().shown(p, p.getWorld(), region);
-        if (v.equals("on") && !shownNow) {
-            plugin.rentHolos().show(p, p.getWorld(), region);
-            lang(p, "market.holo-on");
-        } else if (v.equals("off") && shownNow) {
-            plugin.rentHolos().toggle(p, p.getWorld(), region);
-            lang(p, "market.holo-off");
-        } else {
-            lang(p, shownNow ? "market.holo-on" : "market.holo-off");
-        }
     }
 
     /** Код ошибки MarketManager -> ключ перевода. */
@@ -1096,16 +1059,7 @@ public class RegionCommand {
                 if (args.length == 2) {
                     List<String> opts = new ArrayList<>(regions);
                     opts.addAll(List.of("accept", "decline", "list"));
-                    if (sub.equals("tenant")) {
-                        opts.add("holo");
-                    }
                     return filtered(opts, args, 1);
-                }
-                if (sub.equals("tenant") && args[1].equalsIgnoreCase("holo")) {
-                    if (args.length == 3) {
-                        return filtered(List.of("on", "off"), args, 2);
-                    }
-                    return args.length == 4 ? filtered(regions, args, 3) : List.of();
                 }
                 return List.of();
             }

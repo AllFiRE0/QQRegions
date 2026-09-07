@@ -872,18 +872,13 @@ public class MenuManager implements Listener {
             }
             out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore,
                     List.of(cmd), ""));
-            // кнопки владельца: срок объявления и голограмма (только свои аренды)
+            // кнопка владельца: срок объявления (только свои аренды)
             if (mine && !sale && pub) {
                 out.add(new MenuItem("CLOCK", 1, null,
                         tpl.process(plugin, viewer, pc, plugin.lang().get("menu.item-listdur")),
                         List.of(tpl.process(plugin, viewer, pc,
                                 plugin.lang().get("menu.item-listdur-lore"))),
                         List.of("@market:dur:" + o.id), ""));
-                out.add(new MenuItem("BEACON", 1, null,
-                        tpl.process(plugin, viewer, pc, plugin.lang().get("menu.item-holo")),
-                        List.of(tpl.process(plugin, viewer, pc,
-                                plugin.lang().get("menu.item-holo-lore"))),
-                        List.of("@market:holo:" + o.id), ""));
             }
         }
         return out;
@@ -946,18 +941,6 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-action-fail",
                             "action", "&eавтовозврат", "reason", marketReason(res));
                 }
-                break;
-            }
-            case "holo": {
-                org.bukkit.World w = org.bukkit.Bukkit.getWorld(o.world);
-                ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
-                if (w == null || r == null) {
-                    plugin.lang().send(p, "menu.offer-not-found");
-                    break;
-                }
-                boolean shown = plugin.rentHolos().toggle(p, w, r);
-                plugin.lang().send(p, shown ? "market.holo-on" : "market.holo-off",
-                        "region", o.region);
                 break;
             }
             case "dur":

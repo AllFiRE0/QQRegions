@@ -759,8 +759,6 @@ public class Config {
         /** Автовозврат с автопродлением: после окончания аренды объявление
          *  автоматически снова выставляется в маркете (market.rent.auto-rent). */
         public final boolean autoRent;
-        /** Голограмма-кольцо аренды (market.hologram): включается владельцем. */
-        public final HoloOptions holo;
         /** Как распределять оплату при нескольких владельцах (market.multiowner). */
         public final MultiOwner multiowner;
         /** Комиссия сервера (market.commission). */
@@ -799,7 +797,6 @@ public class Config {
                 periodMillis = 1440L * 60_000L;
                 listDurationMillis = 7L * 24L * 60_000L;
                 autoRent = true;
-                holo = new HoloOptions(null);
                 multiowner = MultiOwner.SINGLE;
                 commission = new CommissionOptions(null);
                 offerTimeoutMillis = 60L * 60_000L;
@@ -841,7 +838,6 @@ public class Config {
             periodMillis = Math.max(1, r == null ? 1440 : r.getInt("period-minutes", 1440)) * 60_000L;
             listDurationMillis = Math.max(1, r == null ? 10080 : r.getInt("list-duration-minutes", 10080)) * 60_000L;
             autoRent = r == null || r.getBoolean("auto-rent", true);
-            holo = new HoloOptions(s.getConfigurationSection("hologram"));
             MultiOwner mo;
             try {
                 mo = MultiOwner.valueOf(s.getString("multiowner", "SINGLE").toUpperCase(java.util.Locale.ROOT));
@@ -876,52 +872,28 @@ public class Config {
     }
 
     /**
-     * Голограммы-вывески рынка (market.market-holo): большой текст над
-     * регионом на время активного объявления (публичного или приватного),
-     * видимый любому игроку.
+     * Голограмма-вывеска рынка (market.market-holo): ОДНА плавающая голограмма
+     * возле периметра региона, которая «облетает» границы следом за игроком и
+     * всегда смотрит на него. Видна любому игроку в радиусе view-distance,
+     * чьи координаты по Y внутри высот региона.
      */
     public static class MarketHoloOptions {
         public final boolean enabled;
-        /** Высота вывески над регионом (Y-центр, от пола у минимума региона). */
+        /** Сдвиг голограммы вверх/вниз относительно уровня Y ИГРОКА (в блоках). */
         public final double yOffset;
-        /** Смещение по X относительно центра региона. */
-        public final double centerXOffset;
-        /** Смещение по Z относительно центра региона. */
-        public final double centerZOffset;
+        /** Радиус (по X/Z), внутри которого голограмма начинает вести игрока. */
+        public final double viewDistance;
+        /** Множитель размера текста голограммы. */
+        public final double scale;
         /** Длина строки в блоках. */
         public final int lineWidth;
 
         MarketHoloOptions(ConfigurationSection s) {
             enabled = s == null || s.getBoolean("enabled", true);
-            yOffset = s == null ? 3.0 : s.getDouble("y-offset", 3.0);
-            centerXOffset = s == null ? 0.0 : s.getDouble("center-x-offset", 0.0);
-            centerZOffset = s == null ? 0.0 : s.getDouble("center-z-offset", 0.0);
+            yOffset = s == null ? 0.5 : s.getDouble("y-offset", 0.5);
+            viewDistance = s == null ? 24 : Math.max(1, s.getDouble("view-distance", 24));
+            scale = s == null ? 1.0 : Math.max(0.05, s.getDouble("scale", 1.0));
             lineWidth = s == null ? 200 : Math.max(10, s.getInt("line-width", 200));
-        }
-    }
-
-    /**
-     * Голограмма аренды (market.hologram): светящееся кольцо из TextDisplay по
-     * периметру региона на уровне глаз игрока. Включается владельцем или
-     * арендатором на время показа.
-     */
-    public static class HoloOptions {
-        public final boolean enabled;
-        /** Расстояние между центрами сегментов кольца (в блоках). */
-        public final double spacing;
-        /** Ширина одного сегмента-TextDisplay (в блоках). */
-        public final double width;
-        /** Сдвиг кольца вверх/вниз относительно уровня глаз (в блоках). */
-        public final double yOffset;
-        /** Текст (цвет) одного сегмента кольца. */
-        public final String text;
-
-        HoloOptions(ConfigurationSection s) {
-            enabled = s == null || s.getBoolean("enabled", true);
-            spacing = Math.max(0.25, s == null ? 2.0 : s.getDouble("spacing", 2.0));
-            width = Math.max(0.1, s == null ? 0.9 : s.getDouble("width", 0.9));
-            yOffset = s == null ? 0.3 : s.getDouble("y-offset", 0.3);
-            text = s == null ? "&#ffe64d•" : s.getString("text", "&#ffe64d•");
         }
     }
 
