@@ -581,10 +581,11 @@ public class HighlightManager implements Listener {
      * Блок-дисплеи TERRITORY: по каждой из 4 сторон прямоугольника региона
      * ставится ОТДЕЛЬНЫЙ блок-дисплей (штакетина) с шагом fence.spacing:
      * размеры width вдоль границы, height вверх, thickness поперёк, сдвиг
-     * offset. Штакетины ставятся на КАЖДУЮ высоту каждой колонки границы,
-     * где есть рельеф (не воздух и не из ignore-списка): многослойная
-     * граница (дерево, постройка в несколько этажей) больше не создаёт
-     * «пустого разрыва» у земли.
+     * offset. Штакетина ставится на КАЖДЫЙ видимый верх пласта колонки
+     * границы (блок рельефа, над которым уже не рельеф) и поднимается ровно
+     * на поверхность: многослойная граница (дерево, постройка в несколько
+     * этажей) получает забор на каждом слое, а ровная земля — сплошную
+     * линию забора по всей длине кромки.
      */
     private List<Entity> fenceEntities(World world, ProtectedRegion r, Config.HighlightOptions h) {
         Config.TerrainFenceOptions f = h.fence;
@@ -612,16 +613,21 @@ public class HighlightManager implements Listener {
      * Один край региона. При alongX=true колонки идут по X при фиксированном
      * fixed=Z; блок получает scale (width, height, thickness). При alongX=false
      * колонки идут по Z при фиксированном fixed=X; scale (thickness, height, width).
-     * Штакетина ставится на КАЖДУЮ высоту колонки, где есть рельеф (не воздух
-     * и не игнорируемый блок): дерево или структура в несколько слоёв больше
-     * не создаёт «пустого разрыва» у земли — забор идёт по всему рельефу
-     * границы, от земли до верха.
+     * Штакетина ставится на КАЖДЫЙ видимый верх пласта колонки (блок рельефа,
+     * над которым уже не рельеф) и ПОДНИМАЕТСЯ ровно на поверхность (ячейка
+     * выше топ-блока), где её не закрывают соседние твёрдые блоки. Раньше
+     * штакетина писалась по центру самого блока рельефа -> на ровной границе
+     * она тонула внутри земли и была невидима; вдобавок заглубленные слои
+     * съедали весь бюджет и грани обрывались уже у углов.
      */
     private void picketEdge(World world, List<Entity> list, Config.TerrainFenceOptions f,
                             int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
                             int budget, Set<Material> ignore) {
         double step = f.spacing;
         int made = 0;
+        int cols = 0;
+        int colsTerrain = 0;
+        boolean dbg = plugin.config().debug();
         for (double pos = lo; pos <= hi + 1e-6 && made < budget; pos += step) {
             int col = Math.max(lo, Math.min(hi, (int) Math.round(pos)));
             int x = alongX ? col : fixed;
@@ -629,17 +635,26 @@ public class HighlightManager implements Listener {
             if (!world.isChunkLoaded(x >> 4, z >> 4)) {
                 continue;
             }
+            cols++;
             double cx = alongX ? pos + 0.5 : fixed + 0.5;
             double cz = alongX ? fixed + 0.5 : pos + 0.5;
             Vector3f scale = alongX
                     ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
                     : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
-            // КАЖДАЯ высота колонки с рельефом получает штакетину.
+            // Только ВЕРХИ пластов: блок — рельеф, а над ним уже не рельеф.
+            // Заглублённые слои пропускаем — они всё равно невидимы, а бюджет
+            // тратят (раньше первые колонки от угла съедали весь лимит края).
             for (int y = maxY; y >= minY && made < budget; y--) {
                 if (!isTerrain(world.getBlockAt(x, y, z).getType(), ignore)) {
                     continue;
                 }
-                BlockDisplay d = spawnDisplay(world, cx, y + f.height / 2.0 + f.offset, cz,
+                Material above = world.getBlockAt(x, y + 1, z).getType();
+                if (isTerrain(above, ignore)) {
+                    continue;
+                }
+                colsTerrain++;
+                BlockDisplay d = spawnDisplay(world, cx,
+                        y + 1 + f.height / 2.0 + f.offset, cz,
                         f.material.createBlockData(), scale,
                         f.glow ? plugin.config().highlight().particles.dustColor : null);
                 if (d != null) {
@@ -647,6 +662,12 @@ public class HighlightManager implements Listener {
                     made++;
                 }
             }
+        }
+        if (dbg) {
+            plugin.getLogger().info("[territory-fence] alongX=" + alongX + " fixed=" + fixed
+                    + " lo=" + lo + " hi=" + hi + " колонок=" + cols
+                    + " сРельефом=" + colsTerrain + " штакетин=" + made
+                    + " лимит=" + budget);
         }
     }
 
