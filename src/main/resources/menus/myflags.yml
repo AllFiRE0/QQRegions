@@ -6,6 +6,7 @@
 #
 #  Динамические кнопки: {flag-name} {group-label} {groups-list}
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -21,11 +22,11 @@ Menus:
       name: " "
     buttons:
       "back":
-        slot: 49
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
-          - "&7Вернуться на рынок"
+          - "&7Вернуться в предыдущее меню"
         commands:
           - "@back"
       "market":
@@ -45,7 +46,7 @@ Menus:
         commands:
           - "@menu:flagshop"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:

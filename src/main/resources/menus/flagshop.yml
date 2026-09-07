@@ -9,6 +9,7 @@
 #
 #  Динамические кнопки: {flag-name} {flag} {price}
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -24,9 +25,9 @@ Menus:
       name: " "
     buttons:
       "back":
-        slot: 49
-        material: BARRIER
-        name: "&cНазад"
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -57,7 +58,7 @@ Menus:
         commands:
           - "@menu:myflags"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:

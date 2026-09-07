@@ -5,17 +5,20 @@ import java.util.UUID;
 /**
  * Предложение рынка: продажа или аренда региона.
  *
- * SALE createdBy="SELLER" — продавец предлагает купить конкретному игроку
- *     (seller; buyer=targer); принимает БАЙЕР.
- * SALE createdBy="BUYER"  — покупатель запрашивает покупку у владельца
- *     (seller=владелец региона; buyer=инициатор); принимает ПРОДАВЕЦ.
- * RENT createdBy="OWNER"  — владелец предлагает аренду (owner, tenant=targer);
- *     принимает АРЕНДАТОР.
- * RENT createdBy="TENANT" — арендатор запрашивает аренду (tenant, owner=владелец);
- *     принимает ВЛАДЕЛЕЦ.
+ * SALE createdBy="SELLER" — продавец выставляет регион на продажу:
+ *     buyer=null — ПУБЛИЧНОЕ объявление (любой купит мгновенно);
+ *     buyer=ник — приватное предложение (принимает покупатель).
+ * RENT createdBy="OWNER"  — владелец сдаёт регион в аренду:
+ *     tenant=null — ПУБЛИЧНОЕ объявление (любой арендует мгновенно);
+ *     tenant=ник — приватное предложение (принимает арендатор).
  *
  * Активная аренда (ACTIVE) хранит until (когда срок кончается) и lastCharge
  * (последнее списание при charge=PERIOD).
+ *
+ * Публичное объявление живёт в маркете, пока не пройдёт listUntil (срок
+ * объявления, listDurationMillis), и принимается ЛЮБЫМ игроком, кроме
+ * продавца/владельца. По окончании аренды объявление снова выставляется,
+ * если autoRent.
  */
 public final class Offer {
 
@@ -31,18 +34,41 @@ public final class Offer {
     public UUID buyer;
     public UUID owner;
     public UUID tenant;
-    /** Кто создал: SELLER|BUYER (для SALE), OWNER|TENANT (для RENT). */
+    /** Кто создал: SELLER (для SALE), OWNER (для RENT). */
     public String createdBy;
     public double price;
-    /** RENT: длительность срока/периода (миллисекунды). */
+    /** RENT: длительность срока аренды (миллисекунды). */
     public long periodMillis;
     public long created;
+    /** RENT: когда заканчивается текущая аренда. */
     public long until;
     public long lastCharge;
+    /** Момент, когда публичное объявление само уйдёт с рынка (0 = не действует). */
+    public long listUntil;
+    /** Желаемый срок объявления (млс): длительность автовозврата/перевыставления. */
+    public long listDurationMillis;
+    /** Автовозврат с автопродлением: после конца аренды пере-выставить объявление. */
+    public boolean autoRent = true;
     public Status status = Status.PENDING;
 
     public Offer(UUID id, Kind kind) {
         this.id = id;
         this.kind = kind;
+    }
+
+    /** Публичное объявление (продаётся/сдаётся любому мгновенно). */
+    public boolean isPublicListing() {
+        if (status == Status.ACTIVE) {
+            if (kind == Kind.SALE) {
+                return buyer == null;
+            }
+            return tenant == null;
+        }
+        return false;
+    }
+
+    /** Идёт прямо сейчас аренда (у объявления есть арендатор). */
+    public boolean isActiveRental() {
+        return kind == Kind.RENT && status == Status.ACTIVE && tenant != null;
     }
 }

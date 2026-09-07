@@ -3,6 +3,7 @@
 #  Статичные кнопки с командами плагина. Полный список — в
 #  lang.yml (help.commands), текстовый вывод /region help.
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -17,18 +18,10 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "back":
-        slot: 48
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -104,16 +97,10 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        commands:
-          - "close"
       "back":
-        slot: 48
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         commands:
           - "@back"
       "market":

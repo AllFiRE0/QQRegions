@@ -582,6 +582,10 @@ public class RegionCommand {
         if (sub.equals("market")) {
             if (args.length >= 2) {
                 String act = args[1].toLowerCase(Locale.ROOT);
+                if (!plugin.market().enabled()) {
+                    lang(p, plugin.config().market().enabled ? "market.economy-off" : "market.disabled");
+                    return;
+                }
                 if (act.equals("flags")) {
                     if (plugin.shop().enabled()) {
                         if (!plugin.menus().openFlagShop(p)) {
@@ -646,117 +650,234 @@ public class RegionCommand {
             String res;
             if (action.equals("accept")) {
                 res = plugin.market().accept(o, p);
-                if ("ok".equals(res)) {
-                    lang(p, "market.accepted-" + sub, "region", o.region);
-                } else {
-                    lang(p, "market.error-" + res, "region", o.region);
-                }
+                lang(p, "ok".equals(res) ? "market.accepted-" + sub : marketErr(res),
+                        "region", o.region);
             } else if (action.equals("decline")) {
                 res = plugin.market().decline(o, p);
-                lang(p, "ok".equals(res) ? "market.declined" : "market.error-" + res, "region", o.region);
+                lang(p, "ok".equals(res) ? "market.declined" : marketErr(res), "region", o.region);
             } else if (action.equals("cancel")) {
                 res = plugin.market().cancel(o, p);
-                lang(p, "ok".equals(res) ? "market.cancelled" : "market.error-" + res, "region", o.region);
+                lang(p, "ok".equals(res) ? "market.cancelled" : marketErr(res), "region", o.region);
             }
             return;
         }
+        // настройки владельца (дополнение к кнопкам меню рынка)
+        if (sub.equals("rent") && args.length >= 2 && args[1].equalsIgnoreCase("dur")) {
+            doRentDur(p, label, args);
+            return;
+        }
+        if (sub.equals("tenant") && args.length >= 2 && args[1].equalsIgnoreCase("holo")) {
+            doTenantHolo(p, label, args);
+            return;
+        }
 
-        // найдём регион (по аргументу или текущий под игроком)
-        String regionName = null;
+        // ---- sell [ник] <сумма> [регион] | rent [ник] <сумма> <время> [регион] ----
         if (sub.equals("sell") || sub.equals("rent")) {
-            if (args.length < 3) {
-                lang(p, "general.usage",
-                        "usage", label + " " + sub + " <ник> <сумма>"
-                                + (sub.equals("rent") ? " <время>" : "") + " [регион]");
+            boolean rent = sub.equals("rent");
+            if (args.length < 2) {
+                lang(p, "general.usage", "usage", label + " " + sub + " " + (rent
+                        ? "[ник] <сумма> <время> [регион]"
+                        : "[ник] <сумма> [регион]"));
                 return;
             }
-            regionName = args.length > (sub.equals("rent") ? 4 : 3)
-                    ? args[sub.equals("rent") ? 4 : 3] : null;
-        } else {
-            regionName = args.length > 1 ? args[1] : null;
+            String nick = null;
+            String priceArg;
+            String timeArg = null;
+            int regionIdx;
+            if (isNumber(args[1])) {
+                // публичное объявление без ника: sell <сумма> [регион], rent <сумма> <время> [регион]
+                priceArg = args[1];
+                regionIdx = 2;
+                if (rent) {
+                    if (args.length < 3) {
+                        lang(p, "general.usage", "usage", label + " rent <сумма> <время> [регион]");
+                        return;
+                    }
+                    timeArg = args[2];
+                    regionIdx = 3;
+                }
+            } else {
+                nick = args[1];
+                if (args.length < (rent ? 4 : 3)) {
+                    lang(p, "general.usage", "usage", label + " " + sub + " " + (rent
+                            ? "<ник> <сумма> <время> [регион]"
+                            : "<ник> <сумма> [регион]"));
+                    return;
+                }
+                priceArg = args[2];
+                if (rent) {
+                    timeArg = args[3];
+                    regionIdx = 4;
+                } else {
+                    regionIdx = 3;
+                }
+            }
+            String regionName = args.length > regionIdx ? args[regionIdx] : null;
+            ProtectedRegion region = resolveRegion(p, regionName);
+            if (region == null) {
+                lang(p, "market.no-region");
+                return;
+            }
+            if (!plugin.wg().owns(region, p) && !adminPerm(p, "qqregions.admin")) {
+                lang(p, "market.not-owner", "region", region.getId());
+                return;
+            }
+            double price = parsePrice(priceArg);
+            if (price <= 0) {
+                lang(p, "market.bad-price");
+                return;
+            }
+            String res;
+            if (rent) {
+                long periodMillis = parsePeriod(timeArg);
+                if (periodMillis <= 0) {
+                    lang(p, "market.bad-args");
+                    return;
+                }
+                res = plugin.market().createRent(p, nick, price, periodMillis,
+                        p.getWorld(), region);
+                if ("ok".equals(res)) {
+                    lang(p, nick == null ? "market.rent-listed" : "market.rent-offer-made",
+                            "target", nick == null ? "" : nick,
+                            "region", region.getId(),
+                            "price", plugin.market().economy().format(price));
+                } else {
+                    lang(p, marketErr(res), "region", region.getId());
+                }
+            } else {
+                res = plugin.market().createSale(p, nick, price, p.getWorld(), region);
+                if ("ok".equals(res)) {
+                    lang(p, nick == null ? "market.sale-listed" : "market.sale-offer-made",
+                            "target", nick == null ? "" : nick,
+                            "region", region.getId(),
+                            "price", plugin.market().economy().format(price));
+                } else {
+                    lang(p, marketErr(res), "region", region.getId());
+                }
+            }
+            return;
         }
+        // ---- buy [регион] — мгновенная покупка публичного объявления ----
+        if (sub.equals("buy")) {
+            String regionName = args.length > 1 ? args[1] : null;
+            ProtectedRegion region = resolveRegion(p, regionName);
+            if (region == null) {
+                lang(p, "market.no-region");
+                return;
+            }
+            String res = plugin.market().buy(p, p.getWorld(), region);
+            lang(p, "ok".equals(res) ? "market.buy-ok" : marketErr(res), "region", region.getId());
+            return;
+        }
+        // ---- tenant [регион] — мгновенная аренда публичного объявления ----
+        if (sub.equals("tenant")) {
+            String regionName = args.length > 1 ? args[1] : null;
+            ProtectedRegion region = resolveRegion(p, regionName);
+            if (region == null) {
+                lang(p, "market.no-region");
+                return;
+            }
+            String res = plugin.market().tenant(p, p.getWorld(), region);
+            lang(p, "ok".equals(res) ? "market.tenant-ok" : marketErr(res), "region", region.getId());
+        }
+    }
+
+    /** /region rent dur <минут> [регион] — срок объявления аренды (для владельца). */
+    private void doRentDur(Player p, String label, String[] args) {
+        if (args.length < 3) {
+            lang(p, "general.usage", "usage", label + " rent dur <минут> [регион]");
+            return;
+        }
+        long minutes = parseLong(args[2]);
+        if (minutes <= 0) {
+            lang(p, "market.bad-duration");
+            return;
+        }
+        String regionName = args.length > 3 ? args[3] : null;
         ProtectedRegion region = resolveRegion(p, regionName);
         if (region == null) {
             lang(p, "market.no-region");
             return;
         }
-        if (!sub.equals("buy") && !sub.equals("tenant") && !plugin.wg().owns(region, p)
-                && !adminPerm(p, "qqregions.admin")) {
-            lang(p, "market.not-owner", "region", region.getId());
+        dev.qqregions.market.Offer o = plugin.market().activeOn(p.getWorld(), region);
+        if (o == null) {
+            lang(p, "market.no-offer");
             return;
         }
-        double price;
-        long periodMillis;
-        switch (sub) {
-            case "sell": {
-                price = parsePrice(args[2]);
-                if (price <= 0) {
-                    lang(p, "market.bad-price");
-                    return;
-                }
-                boolean ok = plugin.market().createSale(p, args[1], price, p.getWorld(), region, false);
-                if (ok) {
-                    lang(p, "market.sale-offer-made", "target", args[1],
-                            "region", region.getId(), "price", plugin.market().economy().format(price));
-                } else {
-                    lang(p, "market.already-offer", "region", region.getId());
-                }
-                break;
-            }
-            case "rent": {
-                if (args.length < 4) {
-                    lang(p, "general.usage", "usage", label + " rent <ник> <сумма> <время> [регион]");
-                    return;
-                }
-                price = parsePrice(args[2]);
-                periodMillis = parsePeriod(args[3]);
-                if (price <= 0 || periodMillis <= 0) {
-                    lang(p, "market.bad-args");
-                    return;
-                }
-                boolean ok = plugin.market().createRent(p, args[1], price, periodMillis,
-                        p.getWorld(), region, false);
-                if (ok) {
-                    lang(p, "market.rent-offer-made", "target", args[1],
-                            "region", region.getId(),
-                            "price", plugin.market().economy().format(price));
-                } else {
-                    lang(p, "market.already-offer", "region", region.getId());
-                }
-                break;
-            }
-            case "buy": {
-                boolean ok = plugin.market().createSale(p, firstOwnerName(region), 0,
-                        p.getWorld(), region, true);
-                if (ok) {
-                    lang(p, "market.buy-request-made", "region", region.getId());
-                } else {
-                    lang(p, "market.already-offer", "region", region.getId());
-                }
-                break;
-            }
-            case "tenant": {
-                long dur = 1000L * 60L * 60L * 24L * 7L; // 1 неделя по умолчанию
-                boolean ok = plugin.market().createRent(p, firstOwnerName(region),
-                        0, dur, p.getWorld(), region, true);
-                if (ok) {
-                    lang(p, "market.tenant-request-made", "region", region.getId());
-                } else {
-                    lang(p, "market.already-offer", "region", region.getId());
-                }
-                break;
-            }
-            default:
-                break;
+        String res = plugin.market().setListDuration(o, p, minutes);
+        lang(p, "ok".equals(res) ? "market.listdur-set" : marketErr(res),
+                "region", region.getId(), "minutes", fmtDur(minutes));
+    }
+
+    /** /region tenant holo on|off [регион] — голограмма аренды (для владельца). */
+    private void doTenantHolo(Player p, String label, String[] args) {
+        if (args.length < 3) {
+            lang(p, "general.usage", "usage", label + " tenant holo on|off [регион]");
+            return;
+        }
+        String v = args[2].toLowerCase(Locale.ROOT);
+        if (!v.equals("on") && !v.equals("off")) {
+            lang(p, "general.usage", "usage", label + " tenant holo on|off [регион]");
+            return;
+        }
+        if (!plugin.rentHolos().enabled()) {
+            lang(p, "market.holo-disabled");
+            return;
+        }
+        String regionName = args.length > 3 ? args[3] : null;
+        ProtectedRegion region = resolveRegion(p, regionName);
+        if (region == null) {
+            lang(p, "market.no-region");
+            return;
+        }
+        boolean shownNow = plugin.rentHolos().shown(p, p.getWorld(), region);
+        if (v.equals("on") && !shownNow) {
+            plugin.rentHolos().show(p, p.getWorld(), region);
+            lang(p, "market.holo-on");
+        } else if (v.equals("off") && shownNow) {
+            plugin.rentHolos().toggle(p, p.getWorld(), region);
+            lang(p, "market.holo-off");
+        } else {
+            lang(p, shownNow ? "market.holo-on" : "market.holo-off");
         }
     }
 
-    private static String firstOwnerName(ProtectedRegion region) {
-        for (java.util.UUID u : region.getOwners().getUniqueIds()) {
-            OfflinePlayer op = Bukkit.getOfflinePlayer(u);
-            return op.getName() != null ? op.getName() : u.toString();
+    /** Код ошибки MarketManager -> ключ перевода. */
+    private static String marketErr(String res) {
+        return switch (res) {
+            case "already" -> "market.already-offer";
+            case "no-market" -> "market.disabled";
+            case "no-target" -> "market.error-no-target";
+            case "bad-duration" -> "market.bad-duration";
+            case "not-rent" -> "market.not-rent";
+            default -> "market.error-" + res;
+        };
+    }
+
+    private static boolean isNumber(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
         }
-        return "";
+        int seps = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (ch == '.' || ch == ',') {
+                if (++seps > 1) {
+                    return false;
+                }
+            } else if (ch < '0' || ch > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static long parseLong(String s) {
+        try {
+            return Long.parseLong(s.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private static double parsePrice(String s) {
@@ -838,6 +959,21 @@ public class RegionCommand {
         return String.format("%,d", v).replace(',', ' ');
     }
 
+    /** Дружелюбное отображение количества минут. */
+    private static String fmtDur(long minutes) {
+        if (minutes >= 1440) {
+            long days = minutes / 1440;
+            long h = (minutes % 1440) / 60;
+            return h > 0 ? days + "д " + h + "ч" : days + "д";
+        }
+        if (minutes >= 60) {
+            long h = minutes / 60;
+            long m = minutes % 60;
+            return m > 0 ? h + "ч " + m + "м" : h + "ч";
+        }
+        return minutes + "м";
+    }
+
     // ---------- tab-подсказки ----------
 
     public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
@@ -911,35 +1047,64 @@ public class RegionCommand {
             }
             case "sell":
             case "rent": {
+                boolean rent = sub.equals("rent");
                 List<String> offers = List.of("accept", "decline", "cancel", "list");
                 boolean action = args[1].equalsIgnoreCase("accept") || args[1].equalsIgnoreCase("decline")
                         || args[1].equalsIgnoreCase("cancel") || args[1].equalsIgnoreCase("list");
-                // /region sell <ник> <сумма> [регион]
-                // /region rent  <ник> <сумма> <время> [регион]
+                boolean durAction = rent && args[1].equalsIgnoreCase("dur");
+                // /region sell [ник|сумма] [сумма] [регион]
+                // /region rent  [ник|сумма] [сумма] <время> [регион]
+                // /region rent  dur <минут> [регион]
                 if (args.length == 2) {
-                    List<String> opts = new ArrayList<>(players);
+                    List<String> opts = new ArrayList<>(List.of("100", "250", "500", "1000", "5000"));
+                    opts.addAll(players);
                     opts.addAll(offers);
+                    if (rent) {
+                        opts.add("dur");
+                    }
                     return filtered(opts, args, 1);
                 }
                 if (action) {
                     return List.of();
                 }
+                if (durAction) {
+                    if (args.length == 3) {
+                        return filtered(List.of("60", "1440", "4320", "10080"), args, 2);
+                    }
+                    return args.length == 4 ? filtered(regions, args, 3) : List.of();
+                }
+                boolean nickMode = !isNumber(args[1]);
                 if (args.length == 3) {
-                    return filtered(List.of("100", "250", "500", "1000", "5000"), args, 2);
+                    if (nickMode) {
+                        return filtered(List.of("100", "250", "500", "1000", "5000"), args, 2);
+                    }
+                    return rent
+                            ? filtered(List.of("1d", "7d", "30d", "90d"), args, 2)
+                            : filtered(regions, args, 2);
                 }
                 if (args.length == 4) {
-                    return sub.equals("rent")
-                            ? filtered(List.of("1d", "7d", "30d", "90d"), args, 3)
+                    return nickMode
+                            ? (rent ? filtered(List.of("1d", "7d", "30d", "90d"), args, 3)
+                                    : filtered(regions, args, 3))
                             : filtered(regions, args, 3);
                 }
-                return sub.equals("rent") && args.length == 5 ? filtered(regions, args, 4) : List.of();
+                return rent && nickMode && args.length == 5 ? filtered(regions, args, 4) : List.of();
             }
             case "buy":
             case "tenant": {
                 if (args.length == 2) {
                     List<String> opts = new ArrayList<>(regions);
                     opts.addAll(List.of("accept", "decline", "list"));
+                    if (sub.equals("tenant")) {
+                        opts.add("holo");
+                    }
                     return filtered(opts, args, 1);
+                }
+                if (sub.equals("tenant") && args[1].equalsIgnoreCase("holo")) {
+                    if (args.length == 3) {
+                        return filtered(List.of("on", "off"), args, 2);
+                    }
+                    return args.length == 4 ? filtered(regions, args, 3) : List.of();
                 }
                 return List.of();
             }

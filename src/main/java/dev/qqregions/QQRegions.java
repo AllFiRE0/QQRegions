@@ -41,6 +41,7 @@ public final class QQRegions extends JavaPlugin {
     private MarketManager market;
     private RaidManager raid;
     private ShopManager shop;
+    private RentHolos rentHolos;
 
     public static QQRegions get() {
         return instance;
@@ -74,10 +75,12 @@ public final class QQRegions extends JavaPlugin {
         this.market = new MarketManager(this);
         this.raid = new RaidManager(this);
         this.shop = new ShopManager(this);
+        this.rentHolos = new RentHolos(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
         Bukkit.getPluginManager().registerEvents(highlight, this);
+        Bukkit.getPluginManager().registerEvents(rentHolos, this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             Papi.setEnabled(true);
@@ -99,6 +102,7 @@ public final class QQRegions extends JavaPlugin {
         menus.tick();
         highlight.tick();
         raid.tick();
+        rentHolos.tick();
         marketTick();
     }
 
@@ -126,6 +130,9 @@ public final class QQRegions extends JavaPlugin {
         }
         if (market != null) {
             market.save();
+        }
+        if (rentHolos != null) {
+            rentHolos.onDisable();
         }
         if (commands != null) {
             commands.unregister();
@@ -180,6 +187,10 @@ public final class QQRegions extends JavaPlugin {
 
     public ShopManager shop() {
         return shop;
+    }
+
+    public RentHolos rentHolos() {
+        return rentHolos;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */

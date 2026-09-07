@@ -88,6 +88,13 @@ public class Lang {
                 cfg.set(key, dv);
             }
         }
+        // Авто-обновление: проставляем актуальную версию lang.yml (новые
+        // переводы уже подтянулись через defaults выше; пользовательские
+        // непустые значения сохраняются).
+        int jarVer = dev.qqregions.util.Yml.version(defs);
+        if (jarVer > 0 && dev.qqregions.util.Yml.version(loaded) < jarVer) {
+            cfg.set(dev.qqregions.util.Yml.VERSION_KEY, jarVer);
+        }
         this.defs = defs;
         try {
             cfg.save(file);

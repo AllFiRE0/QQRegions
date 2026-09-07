@@ -248,7 +248,7 @@ public class Menu {
                     ? "&7не задано"
                     : plugin.replace().resolve("flag-values", value);
             String groupsList = groupsList(plugin, tpl, group);
-            String flagName = plugin.config().flagName(id);
+            String flagName = plugin.replace().flagName(id);
 
             // активный поиск флагов (ctx["_flagsearch"]): совпадение по id
             // или переведённому имени {flag-name}; пробелы в запросе = "любое

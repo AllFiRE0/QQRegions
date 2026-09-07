@@ -13,6 +13,7 @@
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @teleport,
 #                 asConsole!..., asPlayer!..., close
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -28,14 +29,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "region":
         slot: 10
         material: NAME_TAG
@@ -116,7 +109,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -156,14 +149,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "region":
         slot: 10
         material: NAME_TAG
@@ -216,7 +201,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -247,14 +232,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "region":
         slot: 10
         material: NAME_TAG
@@ -301,7 +278,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:

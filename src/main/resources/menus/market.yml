@@ -10,6 +10,7 @@
 #
 #  Рынок требует Vault (softdepend) и market.enabled: true в config.yml.
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -24,18 +25,10 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "back":
-        slot: 48
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -82,7 +75,7 @@ Menus:
         commands:
           - "@menu:myflags"
       "help":
-        slot: 50
+        slot: 8
         material: BOOK
         name: "&eПомощь"
         lore:

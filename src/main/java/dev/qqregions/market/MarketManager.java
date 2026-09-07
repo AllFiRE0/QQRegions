@@ -119,61 +119,57 @@ public final class MarketManager {
     // ---------- создание ----------
 
     /**
-     * Предложение о продаже.
-     * @param buyerInitiated true — /buy (покупатель просит продать), принимает продавец;
-     *                       false — /sell (продавец предлагает), принимает покупатель.
+     * Продажа региона. Без ника (<code>targetName</code> = null/пусто) —
+     * ПУБЛИЧНОЕ объявление: любой купит мгновенно через /region buy или
+     * кнопку рынка. С ником — приватное предложение (принимает покупатель).
+     * @return "ok" | "no-market" | "already" | "no-target"
      */
-    public boolean createSale(Player initiator, String targetName, double price,
-                              World world, ProtectedRegion region, boolean buyerInitiated) {
+    public String createSale(Player initiator, String targetName, double price,
+                             World world, ProtectedRegion region) {
         if (!enabled()) {
-            return false;
+            return "no-market";
         }
         if (activeOn(world, region) != null) {
-            return false;
-        }
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-        if (target.getName() == null) {
-            return false;
+            return "already";
         }
         Offer o = new Offer(UUID.randomUUID(), Offer.Kind.SALE);
         o.world = world.getName();
         o.region = region.getId();
         o.price = price;
         o.created = System.currentTimeMillis();
-        if (buyerInitiated) {
-            o.createdBy = "BUYER";
-            o.buyer = initiator.getUniqueId();
-            o.seller = firstOwner(world, region);
-            if (o.seller == null) {
-                return false;
-            }
+        o.createdBy = "SELLER";
+        o.seller = initiator.getUniqueId();
+        if (targetName == null || targetName.trim().isEmpty()) {
+            o.buyer = null;
+            o.listDurationMillis = plugin.config().market().listDurationMillis;
+            o.listUntil = o.created + o.listDurationMillis;
+            o.status = Offer.Status.ACTIVE;
         } else {
-            o.createdBy = "SELLER";
-            o.seller = initiator.getUniqueId();
+            OfflinePlayer target = Bukkit.getOfflinePlayer(targetName.trim());
+            if (target.getName() == null) {
+                return "no-target";
+            }
             o.buyer = target.getUniqueId();
+            o.status = Offer.Status.PENDING;
         }
         offers.add(o);
         save();
-        return true;
+        return "ok";
     }
 
     /**
-     * Предложение об аренде.
-     * @param tenantInitiated true — /tenant (арендатор просит), принимает владелец;
-     *                        false — /rent (владелец предлагает), принимает арендатор.
+     * Аренда региона. Без ника — ПУБЛИЧНОЕ объявление (любой арендует
+     * мгновенно через /region tenant или кнопку рынка). С ником — приватное
+     * предложение (принимает арендатор).
+     * @return "ok" | "no-market" | "already" | "no-target"
      */
-    public boolean createRent(Player initiator, String targetName, double price,
-                              long periodMillis, World world, ProtectedRegion region,
-                              boolean tenantInitiated) {
+    public String createRent(Player initiator, String targetName, double price,
+                             long periodMillis, World world, ProtectedRegion region) {
         if (!enabled()) {
-            return false;
+            return "no-market";
         }
         if (activeOn(world, region) != null) {
-            return false;
-        }
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-        if (target.getName() == null) {
-            return false;
+            return "already";
         }
         Offer o = new Offer(UUID.randomUUID(), Offer.Kind.RENT);
         o.world = world.getName();
@@ -181,38 +177,118 @@ public final class MarketManager {
         o.price = price;
         o.periodMillis = periodMillis;
         o.created = System.currentTimeMillis();
-        if (tenantInitiated) {
-            o.createdBy = "TENANT";
-            o.tenant = initiator.getUniqueId();
-            o.owner = firstOwner(world, region);
-            if (o.owner == null) {
-                return false;
-            }
+        o.createdBy = "OWNER";
+        o.owner = initiator.getUniqueId();
+        o.autoRent = plugin.config().market().autoRent;
+        if (targetName == null || targetName.trim().isEmpty()) {
+            o.tenant = null;
+            o.listDurationMillis = plugin.config().market().listDurationMillis;
+            o.listUntil = o.created + o.listDurationMillis;
+            o.status = Offer.Status.ACTIVE;
         } else {
-            o.createdBy = "OWNER";
-            o.owner = initiator.getUniqueId();
+            OfflinePlayer target = Bukkit.getOfflinePlayer(targetName.trim());
+            if (target.getName() == null) {
+                return "no-target";
+            }
             o.tenant = target.getUniqueId();
+            o.status = Offer.Status.PENDING;
         }
         offers.add(o);
         save();
-        return true;
+        return "ok";
     }
 
-    private static UUID firstOwner(World world, ProtectedRegion region) {
-        for (UUID u : region.getOwners().getUniqueIds()) {
-            return u;
+    // ---------- мгновенная покупка / аренда ----------
+
+    /** Мгновенно купить регион с публичного объявления. @return код результата. */
+    public String buy(Player p, World world, ProtectedRegion region) {
+        if (!enabled()) {
+            return "no-market";
+        }
+        Offer o = available(world, region, Offer.Kind.SALE);
+        if (o == null) {
+            return "no-offer";
+        }
+        return accept(o, p);
+    }
+
+    /** Мгновенно арендовать регион с публичного объявления. @return код результата. */
+    public String tenant(Player p, World world, ProtectedRegion region) {
+        if (!enabled()) {
+            return "no-market";
+        }
+        Offer o = available(world, region, Offer.Kind.RENT);
+        if (o == null) {
+            return "no-offer";
+        }
+        return accept(o, p);
+    }
+
+    /** Публичное объявление нужного типа на регионе (или null). */
+    private Offer available(World w, ProtectedRegion r, Offer.Kind kind) {
+        Offer o = activeOn(w, r);
+        if (o != null && o.kind == kind && o.isPublicListing()) {
+            return o;
         }
         return null;
+    }
+
+    // ---------- кнопки владельца ----------
+
+    /** Включить/выключить автовозврат (только для объявления владельца RENT). */
+    public String setAutoRent(Offer o, Player p, boolean on) {
+        if (!isInitiator(o, p)) {
+            return "not-you";
+        }
+        if (o.kind != Offer.Kind.RENT) {
+            return "not-rent";
+        }
+        o.autoRent = on;
+        save();
+        return "ok";
+    }
+
+    /** Задать срок объявления (минуты). Объявление перевыставляется с этим сроком. */
+    public String setListDuration(Offer o, Player p, long minutes) {
+        if (!isInitiator(o, p)) {
+            return "not-you";
+        }
+        if (o.kind != Offer.Kind.RENT) {
+            return "not-rent";
+        }
+        if (minutes < 1) {
+            return "bad-duration";
+        }
+        long dur = minutes * 60_000L;
+        o.listDurationMillis = dur;
+        if (o.isPublicListing()) {
+            o.listUntil = System.currentTimeMillis() + dur;
+        }
+        save();
+        return "ok";
+    }
+
+    /** Является ли игрок создателем/владельцем объявления («моё объявление»). */
+    public boolean ownsOffer(Offer o, java.util.UUID u) {
+        if (o.kind == Offer.Kind.SALE) {
+            return u.equals(o.seller);
+        }
+        return u.equals(o.owner);
     }
 
     // ---------- принятие / отмена / отклонение ----------
 
     /**
-     * Принять предложение. Валидирует, что принимает именно контрагент.
-     * @return код результата: ok / not-you / no-money / done / no-region
+     * Принять (завершить) сделку по объявлению. Для публичного объявления
+     * принимает любой игрок, кроме продавца/владельца; для приватного —
+     * только адресат. @return код результата: ok / not-you / no-money / no-region
      */
     public String accept(Offer o, Player p) {
-        if (o.status != Offer.Status.PENDING) {
+        UUID u = p.getUniqueId();
+        if (o.isActiveRental()) {
+            return "not-ready";
+        }
+        if (o.status != Offer.Status.PENDING && !o.isPublicListing()) {
             return "not-ready";
         }
         if (!mayAccept(o, p)) {
@@ -226,47 +302,54 @@ public final class MarketManager {
             return "no-region";
         }
         if (o.kind == Offer.Kind.SALE) {
-            if (!economy.has(o.buyer, o.price)) {
+            UUID buyerId = o.buyer != null ? o.buyer : u;
+            if (!economy.has(buyerId, o.price)) {
                 return "no-money";
             }
-            economy.withdraw(o.buyer, o.price);
+            economy.withdraw(buyerId, o.price);
             economy.deposit(o.seller, o.price);
-            plugin.wg().transferOwnership(w, r, o.buyer, o.seller);
+            plugin.wg().transferOwnership(w, r, buyerId, o.seller);
             o.status = Offer.Status.DONE;
             save();
             notifyBoth(o, "market.sale-done-buyer", "market.sale-done-seller",
-                    o.buyer, o.seller);
+                    buyerId, o.seller);
             return "ok";
         }
         // RENT
+        UUID tenantId = o.tenant != null ? o.tenant : u;
         Config.MarketOptions m = plugin.config().market();
         if (m.rentCharge == Config.MarketOptions.RentCharge.ONCE
                 || m.rentCharge == Config.MarketOptions.RentCharge.PERIOD) {
-            if (!economy.has(o.tenant, o.price)) {
+            if (!economy.has(tenantId, o.price)) {
                 return "no-money";
             }
-            economy.withdraw(o.tenant, o.price);
+            economy.withdraw(tenantId, o.price);
             economy.deposit(o.owner, o.price);
         }
         long now = System.currentTimeMillis();
         boolean asOwner = m.rentGrant == Config.MarketOptions.RentGrant.OWNER;
-        plugin.wg().addPlayer(w, r, o.tenant, asOwner);
+        plugin.wg().addPlayer(w, r, tenantId, asOwner);
+        o.tenant = tenantId;
         o.until = now + o.periodMillis;
         o.lastCharge = now;
+        o.listUntil = 0;
         o.status = Offer.Status.ACTIVE;
         save();
         notifyBoth(o, "market.rent-started-tenant", "market.rent-started-owner",
-                o.tenant, o.owner);
+                tenantId, o.owner);
         return "ok";
     }
 
     private boolean mayAccept(Offer o, Player p) {
         UUID u = p.getUniqueId();
         if (o.kind == Offer.Kind.SALE) {
-            if ("SELLER".equals(o.createdBy)) {
-                return u.equals(o.buyer);
+            if (o.buyer == null) {
+                return !u.equals(o.seller);            // публичное объявление
             }
-            return u.equals(o.seller);
+            return "SELLER".equals(o.createdBy) ? u.equals(o.buyer) : u.equals(o.seller);
+        }
+        if (o.tenant == null) {
+            return !u.equals(o.owner);                 // публичное объявление аренды
         }
         if ("OWNER".equals(o.createdBy)) {
             return u.equals(o.tenant);
@@ -274,12 +357,13 @@ public final class MarketManager {
         return u.equals(o.owner);
     }
 
-    /** Создатель предложения отзывает его (PENDING или активную аренду). */
+    /** Создатель отзывает объявление (приватеое или публичное); активную
+     *  аренду — прерывает (O_автовозврата не происходит). */
     public String cancel(Offer o, Player p) {
         if (!isInitiator(o, p)) {
             return "not-you";
         }
-        if (o.status == Offer.Status.ACTIVE && o.kind == Offer.Kind.RENT) {
+        if (o.isActiveRental()) {
             endRental(o, true);
             return "ok";
         }
@@ -288,7 +372,7 @@ public final class MarketManager {
         return "ok";
     }
 
-    /** Контрагент отклоняет предложение. */
+    /** Контрагент отклоняет приватное предложение. */
     public String decline(Offer o, Player p) {
         if (o.status != Offer.Status.PENDING) {
             return "not-ready";
@@ -304,11 +388,9 @@ public final class MarketManager {
     private boolean isInitiator(Offer o, Player p) {
         UUID u = p.getUniqueId();
         if (o.kind == Offer.Kind.SALE) {
-            return ("SELLER".equals(o.createdBy) && u.equals(o.seller))
-                    || ("BUYER".equals(o.createdBy) && u.equals(o.buyer));
+            return u.equals(o.seller);
         }
-        return ("OWNER".equals(o.createdBy) && u.equals(o.owner))
-                || ("TENANT".equals(o.createdBy) && u.equals(o.tenant));
+        return u.equals(o.owner);
     }
 
     // ---------- тик аренды ----------
@@ -316,33 +398,44 @@ public final class MarketManager {
     public void tick() {
         long now = System.currentTimeMillis();
         for (Offer o : new ArrayList<>(offers)) {
-            if (o.status != Offer.Status.ACTIVE || o.kind != Offer.Kind.RENT) {
-                continue;
-            }
-            if (now >= o.until) {
-                endRental(o, false);
-                continue;
-            }
-            Config.MarketOptions m = plugin.config().market();
-            if (m.rentCharge == Config.MarketOptions.RentCharge.PERIOD
-                    && now - o.lastCharge >= m.periodMillis) {
-                if (economy.has(o.tenant, o.price)) {
-                    economy.withdraw(o.tenant, o.price);
-                    economy.deposit(o.owner, o.price);
-                    o.lastCharge = now;
-                    save();
-                    notifyBoth(o, "market.rent-renew-tenant", "market.rent-renew-owner",
-                            o.tenant, o.owner);
-                } else {
-                    endRental(o, true);
-                    notifyBoth(o, "market.rent-unpaid-tenant", "market.rent-unpaid-owner",
-                            o.tenant, o.owner);
+            // аренда идёт: срок вышел / периодическое списание
+            if (o.kind == Offer.Kind.RENT && o.status == Offer.Status.ACTIVE
+                    && o.tenant != null) {
+                if (now >= o.until) {
+                    endRental(o, false);
+                    continue;
                 }
+                Config.MarketOptions m = plugin.config().market();
+                if (m.rentCharge == Config.MarketOptions.RentCharge.PERIOD
+                        && now - o.lastCharge >= m.periodMillis) {
+                    if (economy.has(o.tenant, o.price)) {
+                        economy.withdraw(o.tenant, o.price);
+                        economy.deposit(o.owner, o.price);
+                        o.lastCharge = now;
+                        save();
+                        notifyBoth(o, "market.rent-renew-tenant", "market.rent-renew-owner",
+                                o.tenant, o.owner);
+                    } else {
+                        endRental(o, true);
+                        notifyBoth(o, "market.rent-unpaid-tenant", "market.rent-unpaid-owner",
+                                o.tenant, o.owner);
+                    }
+                }
+                continue;
+            }
+            // публичное объявление: вышел срок объявления — убрать с рынка
+            if (o.status == Offer.Status.ACTIVE && o.isPublicListing()
+                    && o.listUntil > 0 && now >= o.listUntil) {
+                o.status = Offer.Status.CANCELLED;
+                save();
             }
         }
     }
 
-    /** Завершить аренду: убрать доступ арендатору, пометить оффер. */
+    /**
+     * Завершить аренду: убрать доступ арендатору. При autoRent объявление
+     * снова выставляется в маркете (автовозврат); иначе — закрывается.
+     */
     private void endRental(Offer o, boolean cancelled) {
         World w = Bukkit.getWorld(o.world);
         ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
@@ -351,9 +444,31 @@ public final class MarketManager {
             boolean asOwner = m.rentGrant == Config.MarketOptions.RentGrant.OWNER;
             plugin.wg().removePlayer(w, r, o.tenant, asOwner);
         }
+        long now = System.currentTimeMillis();
+        if (!cancelled && o.autoRent) {
+            // автовозврат с автопродлением: объявление снова в маркете
+            o.tenant = null;
+            o.until = 0;
+            o.lastCharge = 0;
+            long dur = o.listDurationMillis > 0
+                    ? o.listDurationMillis
+                    : plugin.config().market().listDurationMillis;
+            o.listDurationMillis = dur;
+            o.listUntil = now + dur;
+            o.status = Offer.Status.ACTIVE;
+            save();
+            player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-relisted",
+                    "region", o.region, "world", o.world,
+                    "price", economy().format(o.price)));
+            return;
+        }
         o.status = cancelled ? Offer.Status.CANCELLED : Offer.Status.DONE;
-        o.until = System.currentTimeMillis();
+        o.until = now;
+        o.tenant = null;
         save();
+        player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-ended",
+                "region", o.region, "world", o.world,
+                "price", economy().format(o.price)));
     }
 
     // ---------- уведомления ----------
@@ -412,6 +527,10 @@ public final class MarketManager {
                 o.created = section.getLong(id + ".created", 0);
                 o.until = section.getLong(id + ".until", 0);
                 o.lastCharge = section.getLong(id + ".lastCharge", 0);
+                o.listUntil = section.getLong(id + ".listUntil", 0);
+                o.listDurationMillis = section.getLong(id + ".listDurationMillis",
+                        plugin.config().market().listDurationMillis);
+                o.autoRent = section.getBoolean(id + ".autoRent", plugin.config().market().autoRent);
                 try {
                     o.status = Offer.Status.valueOf(
                             section.getString(id + ".status", "PENDING"));
@@ -450,6 +569,9 @@ public final class MarketManager {
             c.set(base + "created", o.created);
             c.set(base + "until", o.until);
             c.set(base + "lastCharge", o.lastCharge);
+            c.set(base + "listUntil", o.listUntil);
+            c.set(base + "listDurationMillis", o.listDurationMillis);
+            c.set(base + "autoRent", o.autoRent);
             c.set(base + "status", o.status.name());
         }
         try {

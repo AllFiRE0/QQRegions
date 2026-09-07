@@ -55,6 +55,9 @@ public final class ShopManager {
             plugin.saveResource("shop.yml", false);
         }
         shop = YamlConfiguration.loadConfiguration(shopFile);
+        // Недостающие блоки shop.yml (например, новые пакеты) дополняются
+        // из дефолтов без перезаписи пользовательских цен.
+        dev.qqregions.util.Yml.mergeDefaults(shop, dev.qqregions.util.Yml.jar(plugin, "shop.yml"));
     }
 
     private void loadData() {

@@ -2,6 +2,11 @@
 #  QQRegions — меню флагов региона
 #  Динамические кнопки строятся из реестра флагов WorldGuard.
 #
+#  Навигация: кнопка "back" (первый слот, верх-слева) возвращает к
+#  предыдущему меню, её название подставляется из {back-target}.
+#  Кнопка "help" — верхний правый угол (слот 8). Кнопки страниц
+#  (navigation.prev/next) — внизу.
+#
 #  Шаблоны выбираются по роли игрока в регионе (role-required):
 #    owner  — владелец: флаги по правам qqregions.flags.<флаг>
 #    member — участник: флаги по правам qqregions.flags.<флаг>
@@ -29,6 +34,7 @@
 #  {groups-list} — подсказка со списком групп, текущая выделена.
 #  Переводы групп и значений — в replace.yml (блоки flag-groups/flag-values).
 # ============================================================
+config-version: 1
 update_interval: 20
 
 Menus:
@@ -44,14 +50,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "info":
         slot: 45
         material: PAPER
@@ -60,6 +58,14 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
       "players":
         slot: 53
         material: PLAYER_HEAD
@@ -69,9 +75,9 @@ Menus:
         commands:
           - "@menu:players"
       "back":
-        slot: 50
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -206,14 +212,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "info":
         slot: 45
         material: PAPER
@@ -222,10 +220,18 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
       "back":
-        slot: 50
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -310,14 +316,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "info":
         slot: 45
         material: PAPER
@@ -326,10 +324,18 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
       "back":
-        slot: 50
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:
@@ -412,14 +418,6 @@ Menus:
       material: GRAY_STAINED_GLASS_PANE
       name: " "
     buttons:
-      "close":
-        slot: 49
-        material: BARRIER
-        name: "&cЗакрыть"
-        lore:
-          - "&7Закрыть меню"
-        commands:
-          - "close"
       "info":
         slot: 45
         material: PAPER
@@ -428,10 +426,18 @@ Menus:
           - "&7Назад к информации о регионе"
         commands:
           - "@menu:info"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
       "back":
-        slot: 50
+        slot: 0
         material: ARROW
-        name: "&eНазад"
+        name: "&eВернуться в {back-target}"
         lore:
           - "&7Вернуться в предыдущее меню"
         commands:

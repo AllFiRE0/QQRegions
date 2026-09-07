@@ -57,6 +57,8 @@ public class MenuManager implements Listener {
     private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
     /** Ожидание поискового запроса в чат: значение = SearchPrompt(kind: flag|market). */
     private final Map<UUID, SearchPrompt> pendingSearch = new ConcurrentHashMap<>();
+    /** Ожидание ввода срока объявления аренды в чат: UUID -> предложение. */
+    private final Map<UUID, dev.qqregions.market.Offer> pendingDur = new ConcurrentHashMap<>();
     /** История переходов между меню для кнопки @back. */
     private final Map<UUID, Deque<NavState>> history = new HashMap<>();
     private final QQRegions plugin;
@@ -72,14 +74,17 @@ public class MenuManager implements Listener {
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        saveMissingResource("menus/flags.yml", dir);
-        saveMissingResource("menus/info.yml", dir);
-        saveMissingResource("menus/players.yml", dir);
-        saveMissingResource("menus/market.yml", dir);
-        saveMissingResource("menus/flagshop.yml", dir);
-        saveMissingResource("menus/blocks.yml", dir);
-        saveMissingResource("menus/myflags.yml", dir);
-        saveMissingResource("menus/help.yml", dir);
+        // Авто-обновление файлов меню из jar: при смене config-version
+        // файл пересоздаётся (старая версия — <имя>.old), новые кнопки и
+        // раскладки подхватываются без ручной правки.
+        String[] menuResources = {
+                "menus/flags.yml", "menus/info.yml", "menus/players.yml",
+                "menus/market.yml", "menus/flagshop.yml", "menus/blocks.yml",
+                "menus/myflags.yml", "menus/help.yml"
+        };
+        for (String r : menuResources) {
+            dev.qqregions.util.Yml.upgrade(plugin, r, new File(dir, r.substring(r.indexOf('/') + 1)));
+        }
         File[] files = dir.listFiles((d, n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
         if (files != null) {
             for (File f : files) {
@@ -87,14 +92,6 @@ public class MenuManager implements Listener {
                 parsed.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
                 menus.put(f.getName().replaceFirst("\\.yml$", ""), parsed);
             }
-        }
-    }
-
-    /** Скопировать дефолтный файл меню из jar, если его ещё нет на диске. */
-    private void saveMissingResource(String path, File dir) {
-        File target = new File(dir, path.substring(path.indexOf('/') + 1));
-        if (!target.exists()) {
-            plugin.saveResource(path, false);
         }
     }
 
@@ -339,7 +336,7 @@ public class MenuManager implements Listener {
         Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
         switch (kind) {
             case PLAYERS -> dynItems = playerItems(menu, ctx);
-            case MARKET -> dynItems = marketItems(menu, ctx);
+            case MARKET -> dynItems = marketItems(menu, player, ctx);
             case FLAG_SHOP -> dynItems = flagShopItems(menu, player, ctx);
             case BLOCK_SHOP -> dynItems = blockShopItems(menu, player, ctx);
             case MY_FLAGS -> dynItems = menu.purchasedItems(plugin, player, ctx, owned);
@@ -347,11 +344,33 @@ public class MenuManager implements Listener {
         }
         int maxPages = menu.maxPages(dynItems.size());
         int safePage = Math.max(0, Math.min(maxPages - 1, page));
+        applyBackTarget(player, ctx);
         Map<Integer, MenuItem> slotMap = new HashMap<>();
         Inventory inv = menu.build(plugin, player, ctx, safePage, maxPages, dynItems, slotMap);
         player.openInventory(inv);
         open.put(player.getUniqueId(), new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap, kind));
         return true;
+    }
+
+    /** Кнопка «Вернуться…» в верхнем левом углу: подставляем в контекст
+     *  {back-target} — название меню, в которое ведёт @back (из истории). */
+    private void applyBackTarget(Player p, Map<String, String> ctx) {
+        String label = "";
+        Deque<NavState> stack = history.get(p.getUniqueId());
+        if (stack != null && !stack.isEmpty()) {
+            NavState top = stack.peekFirst();
+            if (top != null && top.menuName != null) {
+                label = plugin.lang().get("menu.back-label."
+                        + top.menuName.toLowerCase(java.util.Locale.ROOT));
+                if (label == null || label.isEmpty()) {
+                    label = top.menuName;
+                }
+            }
+        }
+        if (label.isEmpty()) {
+            label = plugin.lang().get("menu.back-label.none");
+        }
+        ctx.put("back-target", label);
     }
 
     public void tick() {
@@ -378,6 +397,9 @@ public class MenuManager implements Listener {
         }
         open.clear();
         history.clear();
+        pendingAdd.clear();
+        pendingSearch.clear();
+        pendingDur.clear();
     }
 
     // ---------- события ----------
@@ -658,6 +680,10 @@ public class MenuManager implements Listener {
         } else {
             plugin.wg().setFlagValue(world, region, flag, value, group);
         }
+        plugin.lang().send(p, "menu.flag-set",
+                "flag", flagName,
+                "flag-name", plugin.replace().flagName(flagName),
+                "value", value);
         OpenMenu live = open.get(p.getUniqueId());
         if (live != null) {
             // сохраняем текущую страницу (не сбрасываем на первую)
@@ -773,10 +799,12 @@ public class MenuManager implements Listener {
     }
 
     /** Кнопки меню рынка: все живые предложения (PENDING/ACTIVE) на регионы.
-     *  ЛКМ — контрагент принимает (@market:accept:<id>), ПКМ-инициатор отменяет.
+     *  ЛКМ — контрагент покупает/арендует или владелец переключает автовозврат;
+     *  ПКМ — отмена (для создателя объявления). Для своих объявлений аренды
+     *  дополнительно: кнопки «срок объявления» и «голограмма».
      *  Поиск (ctx["_marketsearch"]) фильтрует по названию региона;
      *  сортировка (ctx["_sort"]) — name | price | default. */
-    private List<MenuItem> marketItems(Menu menu, Map<String, String> ctx) {
+    private List<MenuItem> marketItems(Menu menu, Player viewer, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
         String queryCtx = ctx.get("_marketsearch");
@@ -800,6 +828,8 @@ public class MenuManager implements Listener {
         }
         for (dev.qqregions.market.Offer o : cols) {
             boolean sale = o.kind == dev.qqregions.market.Offer.Kind.SALE;
+            boolean mine = plugin.market().ownsOffer(o, viewer.getUniqueId());
+            boolean pub = o.isPublicListing();
             String type = sale ? "продажа" : "аренда";
             String who = sale
                     ? plugin.market().nameOf(o.buyer)
@@ -812,25 +842,54 @@ public class MenuManager implements Listener {
             pc.put("market-price", plugin.market().economy().format(o.price));
             pc.put("market-who", who);
             pc.put("market-owner", owner);
-            pc.put("market-status", o.status == dev.qqregions.market.Offer.Status.ACTIVE
-                    ? (sale ? "активна" : "аренда") : "ожидает");
+            pc.put("market-status", pub ? (sale ? "активна" : "аренда") : "ожидает");
+            pc.put("market-autorent", o.autoRent
+                    ? plugin.lang().get("menu.lore-market-autorent-on")
+                    : plugin.lang().get("menu.lore-market-autorent-off"));
 
-            String name = tpl.process(plugin, null, pc,
+            String name = tpl.process(plugin, viewer, pc,
                     plugin.lang().get("menu.lore-market-type-region"));
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, null, pc, plugin.lang().get("menu.lore-price")));
-            lore.add(tpl.process(plugin, null, pc, plugin.lang().get(
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-price")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get(
                     sale ? "menu.lore-market-who-buyer" : "menu.lore-market-who-tenant")));
-            lore.add(tpl.process(plugin, null, pc, plugin.lang().get("menu.lore-market-status")));
-            lore.add(plugin.lang().get("menu.lore-market-accept-cancel"));
-
-            List<String> cmds = List.of("@market:accept:" + o.id);
-            out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore, cmds, ""));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-status")));
+            if (pub && !sale) {
+                lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-autorent")));
+            }
+            if (mine) {
+                lore.add(plugin.lang().get("menu.lore-market-own"));
+            } else {
+                lore.add(plugin.lang().get("menu.lore-market-buy"));
+            }
+            String cmd;
+            if (mine && pub && !sale) {
+                cmd = "@market:autorent:" + o.id;
+            } else if (mine) {
+                cmd = "@market:cancel:" + o.id;
+            } else {
+                cmd = "@market:" + (sale ? "buy" : "rent") + ":" + o.id;
+            }
+            out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore,
+                    List.of(cmd), ""));
+            // кнопки владельца: срок объявления и голограмма (только свои аренды)
+            if (mine && !sale && pub) {
+                out.add(new MenuItem("CLOCK", 1, null,
+                        tpl.process(plugin, viewer, pc, plugin.lang().get("menu.item-listdur")),
+                        List.of(tpl.process(plugin, viewer, pc,
+                                plugin.lang().get("menu.item-listdur-lore"))),
+                        List.of("@market:dur:" + o.id), ""));
+                out.add(new MenuItem("BEACON", 1, null,
+                        tpl.process(plugin, viewer, pc, plugin.lang().get("menu.item-holo")),
+                        List.of(tpl.process(plugin, viewer, pc,
+                                plugin.lang().get("menu.item-holo-lore"))),
+                        List.of("@market:holo:" + o.id), ""));
+            }
         }
         return out;
     }
 
-    /** Обработчик @market:<accept|decline|cancel>:<id> из кнопок меню рынка. */
+    /** Обработчик @market:<action>:<id> из кнопок меню рынка. */
     private void marketAction(Player p, String spec) {
         String[] parts = spec.split(":", 2);
         if (parts.length < 2) {
@@ -842,8 +901,68 @@ public class MenuManager implements Listener {
             plugin.lang().send(p, "menu.offer-not-found");
             return;
         }
+        boolean mine = plugin.market().ownsOffer(o, p.getUniqueId());
         String res;
         switch (action) {
+            case "buy": {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorld(o.world);
+                ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+                if (o.isPublicListing() && w != null && r != null) {
+                    res = plugin.market().buy(p, w, r);
+                } else {
+                    // приватное предложение: принимаем напрямую (адресат — кликер)
+                    res = plugin.market().accept(o, p);
+                }
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&aкупить", "reason", marketReason(res));
+                }
+                break;
+            }
+            case "rent": {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorld(o.world);
+                ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+                if (o.isPublicListing() && w != null && r != null) {
+                    res = plugin.market().tenant(p, w, r);
+                } else {
+                    res = plugin.market().accept(o, p);
+                }
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&aарендовать", "reason", marketReason(res));
+                }
+                break;
+            }
+            case "autorent": {
+                res = plugin.market().setAutoRent(o, p, !o.autoRent);
+                if ("ok".equals(res)) {
+                    plugin.lang().send(p, o.autoRent ? "menu.autorent-on" : "menu.autorent-off",
+                            "region", o.region);
+                } else {
+                    plugin.lang().send(p, "menu.offer-action-fail",
+                            "action", "&eавтовозврат", "reason", marketReason(res));
+                }
+                break;
+            }
+            case "holo": {
+                org.bukkit.World w = org.bukkit.Bukkit.getWorld(o.world);
+                ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+                if (w == null || r == null) {
+                    plugin.lang().send(p, "menu.offer-not-found");
+                    break;
+                }
+                boolean shown = plugin.rentHolos().toggle(p, w, r);
+                plugin.lang().send(p, shown ? "market.holo-on" : "market.holo-off",
+                        "region", o.region);
+                break;
+            }
+            case "dur":
+                startDurPrompt(p, o);
+                break;
             case "accept":
                 res = plugin.market().accept(o, p);
                 if ("ok".equals(res)) {
@@ -880,10 +999,81 @@ public class MenuManager implements Listener {
         }
     }
 
+    /** Диалог «срок объявления аренды» (минуты). */
+    private void startDurPrompt(Player p, dev.qqregions.market.Offer o) {
+        if (!plugin.market().ownsOffer(o, p.getUniqueId())) {
+            plugin.lang().send(p, "menu.offer-action-fail",
+                    "action", "&eсрок", "reason", marketReason("not-you"));
+            return;
+        }
+        if (tryInputDialog(p,
+                plugin.lang().comp("menu.dialog-dur-title"),
+                plugin.lang().comp("menu.dialog-dur-label"),
+                value -> onDurResult(p.getUniqueId(), o, value))) {
+            closeOpen(p);
+            return;
+        }
+        pendingDur.put(p.getUniqueId(), o);
+        p.sendMessage(plugin.lang().comp("menu.dialog-dur-chat"));
+    }
+
+    private void onDurResult(UUID id, dev.qqregions.market.Offer o, String raw) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline()) {
+                return;
+            }
+            String v = raw == null ? "" : raw.trim().replaceAll("[^0-9]", "");
+            long minutes = -1;
+            try {
+                minutes = Long.parseLong(v);
+            } catch (NumberFormatException ignored) {
+                // нет — ниже сообщение
+            }
+            if (minutes <= 0) {
+                plugin.lang().send(p, "market.bad-duration");
+                return;
+            }
+            String res = plugin.market().setListDuration(o, p, minutes);
+            if ("ok".equals(res)) {
+                plugin.lang().send(p, "market.listdur-set", "region", o.region, "minutes", fmt(minutes));
+            } else {
+                plugin.lang().send(p, "menu.offer-action-fail",
+                        "action", "&eсрок", "reason", marketReason(res));
+            }
+        });
+    }
+
+    /** Закрыть живое состояние меню (инвентарь уже закрылся из-за диалога/чата). */
+    private void closeOpen(Player p) {
+        OpenMenu cur = open.remove(p.getUniqueId());
+        if (cur != null) {
+            history.removeEntry(p.getUniqueId());
+        }
+        if (p.getOpenInventory() != null) {
+            p.closeInventory();
+        }
+    }
+
     /** Код причины из MarketManager -> готовый текст из lang.yml (market.*). */
     private String marketReason(String code) {
         String s = plugin.lang().get("market." + code).trim();
         return s.isEmpty() ? code : s;
+    }
+
+    /** Дружелюбное отображение количества минут. */
+    private static String fmt(long minutes) {
+        if (minutes >= 1440) {
+            long days = minutes / 1440;
+            long h = (minutes % 1440) / 60;
+            return h > 0 ? days + "д " + h + "ч" : days + "д";
+        }
+        if (minutes >= 60) {
+            long h = minutes / 60;
+            long m = minutes % 60;
+            return m > 0 ? h + "ч " + m + "м" : h + "ч";
+        }
+        return minutes + "м";
     }
 
     /** Обработчик @raid:<action> из кнопок меню (запуск рейда). */
@@ -996,7 +1186,7 @@ public class MenuManager implements Listener {
                     continue;
                 }
                 Pattern pat = Menu.searchPattern(q);
-                String translated = plugin.config().flagName(id);
+                String translated = plugin.replace().flagName(id);
                 String plain = dev.qqregions.util.Msg.toLegacy(dev.qqregions.util.Msg.color(translated));
                 if (!pat.matcher(id).find() && !pat.matcher(translated).find()
                         && !pat.matcher(plain).find()) {
@@ -1004,7 +1194,7 @@ public class MenuManager implements Listener {
                 }
             }
             Map<String, String> pc = new HashMap<>(ctx);
-            pc.put("flag-name", plugin.config().flagName(id));
+            pc.put("flag-name", plugin.replace().flagName(id));
             pc.put("price", plugin.market().economy().format(price));
             String name = tpl.process(plugin, player, pc, "&f{flag-name}");
             List<String> lore = new ArrayList<>();
@@ -1076,7 +1266,7 @@ public class MenuManager implements Listener {
             case "ok" -> {
                 if ("flag".equals(kind)) {
                     plugin.lang().send(p, "shop.flag-bought",
-                            "flag-name", plugin.config().flagName(id),
+                            "flag-name", plugin.replace().flagName(id),
                             "price", plugin.market().economy().format(plugin.shop().priceOf(id)));
                 } else {
                     plugin.lang().send(p, "shop.pack-bought",
@@ -1085,7 +1275,7 @@ public class MenuManager implements Listener {
                 }
             }
             case "already" -> plugin.lang().send(p, "shop.already",
-                    "flag-name", plugin.config().flagName(id));
+                    "flag-name", plugin.replace().flagName(id));
             case "no-money" -> plugin.lang().send(p, "shop.no-money");
             case "not-found" -> plugin.lang().send(p, "shop.not-found");
             case "no-economy" -> plugin.lang().send(p, "shop.no-economy");
@@ -1150,6 +1340,9 @@ public class MenuManager implements Listener {
                 plugin.lang().comp(market ? "menu.dialog-search-market-title" : "menu.dialog-search-flag-title"),
                 plugin.lang().comp(market ? "menu.dialog-search-market-label" : "menu.dialog-search-flag-label"),
                 query -> onSearchResult(p.getUniqueId(), new SearchPrompt(om, kind), query))) {
+            // инвентарь клиент закрыл при открытии диалога — снимаем живое состояние,
+            // результат диалога сам перерисует/переоткроет меню
+            closeOpen(p);
             return;
         }
         pendingSearch.put(p.getUniqueId(), new SearchPrompt(om, kind));
@@ -1247,6 +1440,7 @@ public class MenuManager implements Listener {
                 plugin.lang().comp("menu.dialog-add-label", "action",
                         plugin.lang().get(ownerRole ? "menu.dialog-add-action-owner" : "menu.dialog-add-action-member")),
                 name -> onAddResult(p.getUniqueId(), new AddPrompt(om, k), name))) {
+            closeOpen(p);
             return;
         }
         pendingAdd.put(p.getUniqueId(), new AddPrompt(om, k));
@@ -1283,6 +1477,18 @@ public class MenuManager implements Listener {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onDurChat(AsyncPlayerChatEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        dev.qqregions.market.Offer o = pendingDur.get(id);
+        if (o == null) {
+            return;
+        }
+        e.setCancelled(true);
+        pendingDur.remove(id);
+        onDurResult(id, o, e.getMessage());
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

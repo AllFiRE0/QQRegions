@@ -2,6 +2,7 @@ package dev.qqregions.config;
 
 import dev.qqregions.QQRegions;
 import dev.qqregions.util.Colors;
+import dev.qqregions.util.Yml;
 import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -11,6 +12,7 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -83,6 +85,7 @@ public class Config {
     }
 
     public void reload() {
+        Yml.upgrade(plugin, "config.yml", new File(plugin.getDataFolder(), "config.yml"));
         plugin.reloadConfig();
         cfg = plugin.getConfig();
 
@@ -727,6 +730,14 @@ public class Config {
         public final RentGrant rentGrant;
         public final RentCharge rentCharge;
         public final long periodMillis;
+        /** Сколько времени объявление об аренде живёт в маркете (на каждое
+         *  автовозвращение на рынок; минуты из market.rent.list-duration-minutes). */
+        public final long listDurationMillis;
+        /** Автовозврат с автопродлением: после окончания аренды объявление
+         *  автоматически снова выставляется в маркете (market.rent.auto-rent). */
+        public final boolean autoRent;
+        /** Голограмма-кольцо аренды (market.hologram): включается владельцем. */
+        public final HoloOptions holo;
 
         public enum SymbolPosition { BEFORE, AFTER }
 
@@ -747,6 +758,9 @@ public class Config {
                 rentGrant = RentGrant.MEMBER;
                 rentCharge = RentCharge.PERIOD;
                 periodMillis = 1440L * 60_000L;
+                listDurationMillis = 7L * 24L * 60_000L;
+                autoRent = true;
+                holo = new HoloOptions(null);
                 return;
             }
             enabled = s.getBoolean("enabled", true);
@@ -781,6 +795,34 @@ public class Config {
             }
             rentCharge = rc;
             periodMillis = Math.max(1, r == null ? 1440 : r.getInt("period-minutes", 1440)) * 60_000L;
+            listDurationMillis = Math.max(1, r == null ? 10080 : r.getInt("list-duration-minutes", 10080)) * 60_000L;
+            autoRent = r == null || r.getBoolean("auto-rent", true);
+            holo = new HoloOptions(s.getConfigurationSection("hologram"));
+        }
+    }
+
+    /**
+     * Голограмма аренды (market.hologram): светящееся кольцо из TextDisplay по
+     * периметру региона на уровне глаз игрока. Включается владельцем или
+     * арендатором на время показа.
+     */
+    public static class HoloOptions {
+        public final boolean enabled;
+        /** Расстояние между центрами сегментов кольца (в блоках). */
+        public final double spacing;
+        /** Ширина одного сегмента-TextDisplay (в блоках). */
+        public final double width;
+        /** Сдвиг кольца вверх/вниз относительно уровня глаз (в блоках). */
+        public final double yOffset;
+        /** Текст (цвет) одного сегмента кольца. */
+        public final String text;
+
+        HoloOptions(ConfigurationSection s) {
+            enabled = s == null || s.getBoolean("enabled", true);
+            spacing = Math.max(0.25, s == null ? 2.0 : s.getDouble("spacing", 2.0));
+            width = Math.max(0.1, s == null ? 0.9 : s.getDouble("width", 0.9));
+            yOffset = s == null ? 0.3 : s.getDouble("y-offset", 0.3);
+            text = s == null ? "&#ffe64d•" : s.getString("text", "&#ffe64d•");
         }
     }
 
