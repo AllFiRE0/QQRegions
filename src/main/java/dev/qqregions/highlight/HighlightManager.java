@@ -322,7 +322,7 @@ public class HighlightManager implements Listener {
         }
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
-        for (BlockVector3 pt : outlinePoints(mn, mx, h.particles.maxPoints)) {
+        for (BlockVector3 pt : outlinePoints(mn, mx, plugin.config().outline().maxPoints)) {
             int cx = pt.getBlockX() >> 4;
             int cz = pt.getBlockZ() >> 4;
             if (!world.isChunkLoaded(cx, cz)) {
@@ -345,7 +345,8 @@ public class HighlightManager implements Listener {
     private void renderTerrainParticles(World world, ProtectedRegion r, Config.ParticleOptions po) {
         List<BlockVector3> pts = terrainPoints(world, r, terrainVersion);
         int budget = Math.min(po.maxPoints, pts.size());
-        for (int i = 0; i < budget; i++) {
+        int step = Math.max(1, (pts.size() + budget - 1) / Math.max(1, budget));
+        for (int i = 0; i < pts.size(); i += step) {
             BlockVector3 pt = pts.get(i);
             int cx = pt.getBlockX() >> 4;
             int cz = pt.getBlockZ() >> 4;
@@ -356,22 +357,19 @@ public class HighlightManager implements Listener {
         }
     }
 
-    // ---------- рёбра + сетка (PARTICLES/BLOCKS) ----------
+    // ---------- рёбра + кольца (PARTICLES/BLOCKS) ----------
 
     /**
-     * Точки контура региона для PARTICLES/BLOCKS: рёбра куба, а при
-     * highlight.grid — ещё и внутренняя сетка на горизонтальных плоскостях
-     * (highlight.grid.planes). TERRITORY сюда не попадает — у него свой
-     * проход по рельефу (terrainPoints/fenceEntities).
+     * Точки контура региона для PARTICLES/BLOCKS: рёбра куба + «кольца» по
+     * периметру (outline.rings) + сетка-«квадраты» на верхней/нижней плоскостях
+     * (outline.grid). Шаг точек любой линии не больше outline.max-gap — у высоких
+     * регионов нет «дыр» из сотен блоков. TERRITORY сюда не попадает — у него
+     * свой проход по рельефу (terrainPoints/fenceEntities).
      */
     private List<BlockVector3> outlinePoints(BlockVector3 mn, BlockVector3 mx, int maxPoints) {
-        Config.GridOptions g = plugin.config().highlight().grid;
-        if (!g.enabled) {
-            return BoxOutline.points(mn, mx, maxPoints);
-        }
-        boolean top = "top".equals(g.planes) || "both".equals(g.planes);
-        boolean bottom = "bottom".equals(g.planes) || "both".equals(g.planes);
-        return BoxOutline.pointsWithGrid(mn, mx, maxPoints, g.step, top, bottom);
+        Config.OutlineOptions o = plugin.config().outline();
+        int ringStep = o.ringsEnabled ? o.ringStep : Integer.MAX_VALUE;
+        return BoxOutline.outline(mn, mx, maxPoints, o.maxGap, ringStep, o.gridStep);
     }
 
     // ---------- TERRITORY (террейн-подсветка вдоль границы) ----------
@@ -401,6 +399,7 @@ public class HighlightManager implements Listener {
             BlockVector3 mx = r.getMaximumPoint();
             int minY = Math.max(world.getMinHeight(), mn.y());
             int maxY = Math.min(world.getMaxHeight() - 1, mx.y());
+            Set<Material> ignore = plugin.config().highlight().territoryIgnore;
             Set<Long> seen = new HashSet<>();
             for (BlockVector3 pt : BoxOutline.points(mn, mx, 4000)) {
                 long col = ((long) pt.getBlockX() << 32) | (pt.getBlockZ() & 0xffffffffL);
@@ -412,7 +411,7 @@ public class HighlightManager implements Listener {
                 if (!world.isChunkLoaded(cx, cz)) {
                     continue;
                 }
-                addColumnLevels(world, pt.getBlockX(), pt.getBlockZ(), minY, maxY, out);
+                addColumnLevels(world, pt.getBlockX(), pt.getBlockZ(), minY, maxY, ignore, out);
             }
         } catch (Throwable t) {
             plugin.dbg("terrainPoints error: " + t.getMessage());
@@ -426,12 +425,17 @@ public class HighlightManager implements Listener {
         return ttl > 0 && System.currentTimeMillis() - en.scannedAt > ttl * 1000L;
     }
 
-    /** Дополняет out точками всех «слоёв» одной колонки (верхи + пещерные низы). */
-    private void addColumnLevels(World world, int x, int z, int minY, int maxY, List<BlockVector3> out) {
+    /**
+     * Дополняет out точками всех «слоёв» одной колонки (верхи + пещерные низы).
+     * ignore — материалы, которые НЕ считаются рельефом (грибы, трава и т.п.):
+     * такие блоки не дают ни верха, ни низа пласта.
+     */
+    private void addColumnLevels(World world, int x, int z, int minY, int maxY, Set<Material> ignore, List<BlockVector3> out) {
         boolean prevSolid = false; // блок сразу над текущим был не воздухом
         for (int y = maxY; y >= minY; y--) {
             Material type = world.getBlockAt(x, y, z).getType();
-            boolean solid = type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR;
+            boolean solid = type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR
+                    && (ignore.isEmpty() || !ignore.contains(type));
             if (solid && !prevSolid) {
                 // верх пласта: воздух сверху (или граница мира) — точка над блоком
                 out.add(BlockVector3.at(x, y + 1, z));
@@ -481,10 +485,9 @@ public class HighlightManager implements Listener {
         perPlayer.put(key, list);
     }
 
-    /** Точки-кубики BLOCKS по рёбрам объёма (+ сетка, если highlight.grid). */
+    /** Точки-кубики BLOCKS по рёбрам объёма + кольца по высоте. */
     private List<Entity> boxBlocks(World world, ProtectedRegion r, Config.HighlightOptions h) {
-        int gridBoost = h.grid.enabled ? 1500 : 600;
-        int budget = Math.min(h.particles.maxPoints, gridBoost);
+        int budget = Math.max(24, plugin.config().outline().maxPoints);
         List<Entity> list = new ArrayList<>(budget);
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
@@ -542,13 +545,16 @@ public class HighlightManager implements Listener {
         int minY = Math.max(world.getMinHeight(), mn.getBlockY());
         int maxY = Math.min(world.getMaxHeight() - 1, mx.getBlockY());
         List<Entity> list = new ArrayList<>(16);
+        // Бюджет частиц по КАЖДОМУ краю (а не общий): у длинных границ раньше
+        // хватало первых сторон, края 3-4 не дорисовывались вовсе.
         int budget = Math.max(1000, h.particles.maxPoints);
+        Set<Material> ignore = h.territoryIgnore;
         // Стороны, параллельные X (z фиксирован).
-        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, budget);
-        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, budget);
+        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, budget, ignore);
+        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, budget, ignore);
         // Стороны, параллельные Z (x фиксирован).
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, budget);
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, budget);
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, budget, ignore);
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, budget, ignore);
         return list;
     }
 
@@ -558,18 +564,20 @@ public class HighlightManager implements Listener {
      * колонки идут по Z при фиксированном fixed=X; scale (thickness, height, width).
      */
     private void picketEdge(World world, List<Entity> list, Config.TerrainFenceOptions f,
-                            int lo, int hi, int minY, int maxY, int fixed, boolean alongX, int budget) {
+                            int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
+                            int budget, Set<Material> ignore) {
         double step = f.spacing;
-        for (double pos = lo; pos <= hi + 1e-6 && list.size() < budget; pos += step) {
+        int made = 0;
+        for (double pos = lo; pos <= hi + 1e-6 && made < budget; pos += step) {
             int col = Math.max(lo, Math.min(hi, (int) Math.round(pos)));
             boolean loaded;
             int top;
             if (alongX) {
                 loaded = world.isChunkLoaded(col >> 4, fixed >> 4);
-                top = loaded ? topSolid(world, col, fixed, minY, maxY) : Integer.MIN_VALUE;
+                top = loaded ? topSolid(world, col, fixed, minY, maxY, ignore) : Integer.MIN_VALUE;
             } else {
                 loaded = world.isChunkLoaded(fixed >> 4, col >> 4);
-                top = loaded ? topSolid(world, fixed, col, minY, maxY) : Integer.MIN_VALUE;
+                top = loaded ? topSolid(world, fixed, col, minY, maxY, ignore) : Integer.MIN_VALUE;
             }
             if (!loaded || top == Integer.MIN_VALUE) {
                 continue;
@@ -584,23 +592,32 @@ public class HighlightManager implements Listener {
                     f.glow ? plugin.config().highlight().particles.dustColor : null);
             if (d != null) {
                 list.add(d);
+                made++;
             }
         }
     }
 
-    /** Самый верхний не-воздух в колонке (не найден — Integer.MIN_VALUE). */
-    private int topSolid(World world, int x, int z, int minY, int maxY) {
+    /** Самый верхний не-воздух в колонке (игнорируемые блоки не считаются рельефом; не найден — Integer.MIN_VALUE). */
+    private int topSolid(World world, int x, int z, int minY, int maxY, Set<Material> ignore) {
         Material type = world.getBlockAt(x, maxY, z).getType();
-        if (type != Material.AIR && type != Material.CAVE_AIR && type != Material.VOID_AIR) {
+        if (isTerrain(type, ignore)) {
             return maxY;
         }
         for (int y = maxY - 1; y >= minY; y--) {
             Material m = world.getBlockAt(x, y, z).getType();
-            if (m != Material.AIR && m != Material.CAVE_AIR && m != Material.VOID_AIR) {
+            if (isTerrain(m, ignore)) {
                 return y;
             }
         }
         return Integer.MIN_VALUE;
+    }
+
+    /** true, если блок — рельеф (не воздух и не в списке ignore). */
+    private static boolean isTerrain(Material type, Set<Material> ignore) {
+        if (type == Material.AIR || type == Material.CAVE_AIR || type == Material.VOID_AIR) {
+            return false;
+        }
+        return ignore.isEmpty() || !ignore.contains(type);
     }
 
     private void despawnBlocks(Player p, String key) {

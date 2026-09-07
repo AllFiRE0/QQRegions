@@ -50,7 +50,6 @@ public class Config {
     private int viewDistance = 200;
     private int viewMaxBlocks = 500;
     private float viewBlockScale = 0.35f;
-    private int viewDotsPerEdge = 16;
     private boolean commandSelectionView = true;
     private int viewHideAfter = 5;
     private int viewHideDistance = 0;
@@ -62,6 +61,8 @@ public class Config {
     private HighlightOptions highlight;
     private MarketOptions market;
     private RaidOptions raid;
+    /** outline: общий контроль пунктира контура (выделение + подсветка регионов). */
+    private OutlineOptions outline;
     /** select-status: экшнбар/боссбар статуса выделения для всех способов select. */
     private SelectStatusOptions selectStatus;
     /** guard: защита механик от лага (TPS/пинг), enable:false по умолчанию. */
@@ -124,7 +125,6 @@ public class Config {
         viewDistance = cfg.getInt("interactive.view-distance", 200);
         viewMaxBlocks = cfg.getInt("interactive.view-max-blocks", 500);
         viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
-        viewDotsPerEdge = Math.max(2, cfg.getInt("interactive.view-dots-per-edge", 16));
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
         viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 5));
         viewHideDistance = Math.max(0, cfg.getInt("interactive.view-hide-distance", 0));
@@ -146,6 +146,7 @@ public class Config {
         highlight = new HighlightOptions(cfg.getConfigurationSection("highlight"));
         market = new MarketOptions(cfg.getConfigurationSection("market"));
         raid = new RaidOptions(cfg.getConfigurationSection("raid"));
+        outline = new OutlineOptions(cfg.getConfigurationSection("outline"));
         selectStatus = new SelectStatusOptions(cfg.getConfigurationSection("select-status"));
         guard = new GuardOptions(cfg.getConfigurationSection("guard"));
 
@@ -266,10 +267,6 @@ public class Config {
         return viewMaxBlocks;
     }
 
-    public int viewDotsPerEdge() {
-        return viewDotsPerEdge;
-    }
-
     public float viewBlockScale() {
         return viewBlockScale;
     }
@@ -320,6 +317,11 @@ public class Config {
     /** Настройки подсветки регионов (команды /region visible и флаг territory-visible). */
     public HighlightOptions highlight() {
         return highlight;
+    }
+
+    /** Общий контроль пунктира контура: выделение и подсветка регионов (outline). */
+    public OutlineOptions outline() {
+        return outline;
     }
 
     /** Настройки рейда клана «Воришка» (кнопка в меню info, шаблон other). */
@@ -416,6 +418,42 @@ public class Config {
     }
 
 /**
+     * Общий контроль пунктира объёмного контура (выделение игрока и подсветка
+     * регионов типов PARTICLES/BLOCKS). Заменяет разнокалиберные плотности:
+     * каждая линия (рёбра + кольца) рисуется точками с шагом НЕ БОЛЬШЕ max-gap
+     * блоков, поэтому у высоких областей (например, сгенерированный чанком
+     * куб на всю высоту мира) нет «дыр» из сотен блоков. По высоте к рёбрам
+     * добавляются горизонтальные «кольца» (прямоугольники по периметру) на
+     * каждом ring-step-м уровне — широкие регионы видно даже из середины.
+     * max-points — жёсткий потолок точек; при превышении контур прореживается
+     * равномерно (рёбра/кольца не пропадают, но шаг может стать больше max-gap).
+     */
+    public static class OutlineOptions {
+        /** Максимальный зазор между соседними точками линии (блоки). */
+        public final int maxGap;
+        /** Потолок суммарного числа точек контура (для частиц и блок-дисплеев). */
+        public final int maxPoints;
+        /** Рисовать ли горизонтальные «кольца» по высоте (труба из квадратов). */
+        public final boolean ringsEnabled;
+        /** Шаг колец по Y в блоках (<= 0 — только верх и низ, без колец). */
+        public final int ringStep;
+        /** Шаг сетки-«квадратов» на верхней/нижней ПЛОСКОСТЯХ региона (<=1 — сетки нет). */
+        public final int gridStep;
+
+        OutlineOptions(ConfigurationSection s) {
+            maxGap = Math.max(1, s == null ? 5 : s.getInt("max-gap", 5));
+            maxPoints = Math.max(48, s == null ? 3000 : s.getInt("max-points", 3000));
+            ConfigurationSection r = s == null ? null : s.getConfigurationSection("rings");
+            ringsEnabled = r == null || r.getBoolean("enabled", true);
+            ringStep = Math.max(0, r == null ? 8 : r.getInt("step", 8));
+            ConfigurationSection g = s == null ? null : s.getConfigurationSection("grid");
+            boolean gridEnabled = g == null || g.getBoolean("enabled", true);
+            int gs = g == null ? 25 : g.getInt("step", 25);
+            gridStep = gridEnabled ? Math.max(0, gs) : 0;
+        }
+    }
+
+    /**
      * Подсветка регионов: /region visible + флаг territory-visible.
      * Контур региона рисуется окном showMillis, потом гаснет сам; повторное
      * срабатывание флага — не чаще cooldownMillis на игрока и регион.
@@ -438,8 +476,8 @@ public class Config {
         public final String terrainDisplay;
         /** Параметры «забора» (terrainDisplay: BLOCKS). */
         public final TerrainFenceOptions fence;
-        /** Внутренняя сетка-«квадраты» для BLOCKS/PARTICLES (не для TERRITORY). */
-        public final GridOptions grid;
+        /** Блоки рельефа, которые TERRITORY считает пустотой (игнорируются). */
+        public final Set<Material> territoryIgnore;
         public final ParticleOptions particles;
 
         HighlightOptions(ConfigurationSection s) {
@@ -456,8 +494,8 @@ public class Config {
                 hideOnExit = true;
                 terrainCacheSeconds = 3;
                 terrainDisplay = "PARTICLES";
+                territoryIgnore = Set.of();
                 fence = new TerrainFenceOptions(null);
-                grid = new GridOptions(null);
                 particles = new ParticleOptions(null);
                 return;
             }
@@ -476,8 +514,17 @@ public class Config {
             terrainCacheSeconds = Math.max(1, s.getInt("terrain-cache-seconds", 3));
             String td = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
             terrainDisplay = ("BLOCKS".equals(td) || "PARTICLES".equals(td)) ? td : "PARTICLES";
+            territoryIgnore = new HashSet<>();
+            ConfigurationSection terr = s.getConfigurationSection("territory");
+            if (terr != null) {
+                for (String v : terr.getStringList("ignore-blocks")) {
+                    Material im = Material.matchMaterial(v);
+                    if (im != null) {
+                        territoryIgnore.add(im);
+                    }
+                }
+            }
             fence = new TerrainFenceOptions(s.getConfigurationSection("territory.fence"));
-            grid = new GridOptions(s.getConfigurationSection("grid"));
             particles = new ParticleOptions(s.getConfigurationSection("particles"));
         }
     }
@@ -515,28 +562,6 @@ public class Config {
             spacing = Math.max(0.1, s == null ? 1.0 : s.getDouble("spacing", 1.0));
             offset = s == null ? 0.0 : s.getDouble("offset", 0.0);
             glow = s == null || s.getBoolean("glow", true);
-        }
-    }
-
-    /**
-     * Внутренняя сетка («квадраты» по всей площади) для подсветки типа
-     * PARTICLES/BLOCKS (highlight.grid). НЕ применяется к TERRITORY и его
-     * отображениям — те игнорируют этот раздел. Линии сетки рисуются на
-     * горизонтальных плоскостях: grid-planes: top (верх региона), bottom
-     * (низ) или both. Шаг между линиями — grid-step.
-     */
-    public static class GridOptions {
-        public final boolean enabled;
-        /** Шаг линий сетки в блоках (расстояние между соседними линиями). */
-        public final int step;
-        /** Где рисовать линии: top | bottom | both. */
-        public final String planes;
-
-        GridOptions(ConfigurationSection s) {
-            enabled = s == null || s.getBoolean("enabled", true);
-            step = Math.max(2, s == null ? 25 : s.getInt("step", 25));
-            String p = s == null ? "both" : s.getString("planes", "both").toLowerCase(java.util.Locale.ROOT);
-            planes = ("top".equals(p) || "bottom".equals(p)) ? p : "both";
         }
     }
 
