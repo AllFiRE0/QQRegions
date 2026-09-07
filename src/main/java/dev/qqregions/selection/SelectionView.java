@@ -336,8 +336,11 @@ public class SelectionView {
      * горизонтали» по факту.
      */
     /** Отпечаток генератора: по нему в логе видно, из какого кода собран jar.
-     *  b1 — старый дедуп по blockKey (терял южные вертикали), b3 — текущий. */
-    private static final String EDGE_GEN_REV = "b3";
+     *  b1 — старый дедуп по blockKey (терял южные вертикали),
+     *  b3 — текущий дедуп по BlockVector3; южные вертикали были заданы
+     *  вырождённо (обе точки = mn.getY()) и не генерировались,
+     *  b4 — южные вертикали починены (верхняя точка = mx.getY()). */
+    private static final String EDGE_GEN_REV = "b4";
 
     private List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
         int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
@@ -361,8 +364,8 @@ public class SelectionView {
                 edge(BlockVector3.at(mn.getX(), mx.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mx.getZ()), sx, strideFor(sx, need)),
                 edge(mn, BlockVector3.at(mn.getX(), mx.getY(), mn.getZ()), sy, strideFor(sy, need)),
                 edge(BlockVector3.at(mx.getX(), mn.getY(), mn.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mn.getZ()), sy, strideFor(sy, need)),
-                edge(BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), sy, strideFor(sy, need)),
-                edge(BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), sy, strideFor(sy, need)),
+                edge(BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mn.getX(), mx.getY(), mx.getZ()), sy, strideFor(sy, need)),
+                edge(BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mx.getZ()), sy, strideFor(sy, need)),
         };
 
         // Σ точек по всем 12 рёбрам <= 12*perEdge <= cap; каждое ребро
