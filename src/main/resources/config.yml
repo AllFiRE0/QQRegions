@@ -209,14 +209,14 @@ highlight:
   territory:
     display: PARTICLES
     # Блоки на границе, которые НЕ считаются рельефом (пустота): грибы,
-      # трава, снег и т.п. — всё, что не должно участвовать в подсветке.
-      # Bukkit-материалы: brown_mushroom, red_mushroom, tall_grass,
-      # short_grass (1.20.3+; в старых версиях — grass), snow и т.д.
-      ignore-blocks:
-        - "brown_mushroom"
-        - "red_mushroom"
-        - "tall_grass"
-        - "short_grass"
+    # трава, снег и т.п. — всё, что не должно участвовать в подсветке.
+    # Bukkit-материалы: brown_mushroom, red_mushroom, tall_grass,
+    # short_grass (1.20.3+; в старых версиях — grass), snow и т.д.
+    ignore-blocks:
+      - "brown_mushroom"
+      - "red_mushroom"
+      - "tall_grass"
+      - "short_grass"
     fence:
       # Материал блок-дисплеев (Bukkit Material). Полный блок (OAK_PLANKS,
       # STONE_BRICK, QUARTZ_BLOCK...) смотрится лучше, чем OAK_FENCE.
