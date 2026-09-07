@@ -488,6 +488,8 @@ public class Config {
         public final Material block;
         /** Скрывать подсветку при выходе игрока из региона (вход/выход по флагу). */
         public final boolean hideOnExit;
+        /** Показывать подсветку при выходе игрока из региона (как exit-флаг WG). */
+        public final boolean showOnExit;
         /** Как часто пере-сканировать рельеф территории (сек) при показе TERRITORY. */
         public final int terrainCacheSeconds;
         /** Отображение TERRITORY: PARTICLES — частицы над блоками, BLOCKS — дисплей-«забор». */
@@ -510,6 +512,7 @@ public class Config {
                 blockScale = 0.35f;
                 block = Material.GLASS;
                 hideOnExit = true;
+                showOnExit = true;
                 terrainCacheSeconds = 3;
                 terrainDisplay = "PARTICLES";
                 territoryIgnore = Set.of();
@@ -529,6 +532,7 @@ public class Config {
             Material m = Material.matchMaterial(mat);
             block = m == null ? Material.GLASS : m;
             hideOnExit = s.getBoolean("hide-on-exit", true);
+            showOnExit = s.getBoolean("show-on-exit", true);
             terrainCacheSeconds = Math.max(1, s.getInt("terrain-cache-seconds", 3));
             String td = s.getString("territory.display", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
             terrainDisplay = ("BLOCKS".equals(td) || "PARTICLES".equals(td)) ? td : "PARTICLES";

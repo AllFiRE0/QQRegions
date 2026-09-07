@@ -98,6 +98,24 @@ public class HighlightManager implements Listener {
         }
     }
 
+    /** Позиция и параметры одной «штакетины» забора (для сравнения при резкане). */
+    private static final class Picket {
+        final double x, y, z;
+        final org.bukkit.block.data.BlockData data;
+        final Vector3f scale;
+        final Color glow;
+
+        Picket(double x, double y, double z, org.bukkit.block.data.BlockData data,
+               Vector3f scale, Color glow) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.data = data;
+            this.scale = scale;
+            this.glow = glow;
+        }
+    }
+
     public HighlightManager(QQRegions plugin) {
         this.plugin = plugin;
     }
@@ -143,7 +161,7 @@ public class HighlightManager implements Listener {
                     World w = Bukkit.getWorld(s.world);
                     ProtectedRegion r = w == null ? null : plugin.wg().byName(w, s.name);
                     if (w != null && r != null && w.getName().equals(p.getWorld().getName())) {
-                        spawnBlocks(p, w, r, e.getKey(), "TERRITORY");
+                        resyncTerrainFence(p, w, r, e.getKey());
                     }
                 }
             }
@@ -221,16 +239,24 @@ public class HighlightManager implements Listener {
                 next.add(k);
                 show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
             }
-            // ВЫХОД: hide-on-exit — скрыть, когда региона больше нет под игроком.
+            // ВЫХОД: регион исчез из-под игрока. Если show-on-exit — подсветить
+            // один раз (exit-семантика как у WorldGuard), иначе скрыть по hide-on-exit.
             if (was != null) {
                 for (String k : was) {
                     if (cur.contains(k)) {
                         continue;
                     }
                     next.remove(k);
-                    cooldownRemove(p, k);
-                    if (h.hideOnExit && isActive(p, k)) {
-                        removeActive(p, k);
+                    if (h.showOnExit) {
+                        if (!onCooldown(p, k, now)) {
+                            markCooldown(p, k, now);
+                            showOnExit(p, k);
+                        }
+                    } else {
+                        cooldownRemove(p, k);
+                        if (h.hideOnExit && isActive(p, k)) {
+                            removeActive(p, k);
+                        }
                     }
                 }
             }
@@ -283,6 +309,29 @@ public class HighlightManager implements Listener {
                 spawnBlocks(p, world, r, key, "TERRITORY");
             }
         }
+    }
+
+    /**
+     * Показать подсветку при выходе из региона (exit-семантика WorldGuard).
+     * В key зашит world:id, поэтому регион доставляется из него, без
+     * необходимости иметь объект World на руках.
+     */
+    private void showOnExit(Player p, String k) {
+        int colon = k.indexOf(':');
+        if (colon <= 0 || colon == k.length() - 1) {
+            return;
+        }
+        String worldName = k.substring(0, colon);
+        String regionId = k.substring(colon + 1);
+        World world = p.getWorld();
+        if (world == null || !world.getName().equals(worldName)) {
+            return;
+        }
+        ProtectedRegion r = plugin.wg().byName(world, regionId);
+        if (r == null || !plugin.wg().territoryVisibleAllows(world, r, p)) {
+            return;
+        }
+        show(p, world, r, typeFor(world, r));
     }
 
     /** true — подсветка включена, false — была активна и скрыта (toggle). */
@@ -412,7 +461,7 @@ public class HighlightManager implements Listener {
      * и четыре боковые — outline.grid). Шаг точек любой линии не больше
      * outline.max-gap — у высоких регионов нет «дыр» из сотен блоков.
      * TERRITORY сюда не попадает — у него свой проход по рельефу
-     * (terrainPoints/fenceEntities).
+     * (terrainPoints/fencePickets).
      */
     private List<BlockVector3> outlinePoints(BlockVector3 mn, BlockVector3 mx, int maxPoints) {
         Config.OutlineOptions o = plugin.config().outline();
@@ -528,9 +577,61 @@ public class HighlightManager implements Listener {
             }
         }
         List<Entity> list = "TERRITORY".equals(type)
-                ? fenceEntities(world, r, h)
+                ? spawnPickets(world, fencePickets(world, r, h))
                 : boxBlocks(world, r, h);
         perPlayer.put(key, list);
+    }
+
+    /**
+     * Пересобрать «забор» активной TERRITORY-подсветки, НЕ трогая дисплеи,
+     * если набор штакетин не изменился (позиции те же). Сравнение по позициям
+     * (округление до 1 мм) вместо слепого «удалить-и-заново»: иначе каждый
+     * резкан раз в terrain-cache-seconds давал бы видимое мигание забора.
+     */
+    private void resyncTerrainFence(Player p, World w, ProtectedRegion r, String key) {
+        Config.HighlightOptions h = plugin.config().highlight();
+        List<Picket> fresh = fencePickets(w, r, h);
+        Map<String, List<Entity>> perPlayer = blockViews.get(p.getUniqueId());
+        List<Entity> old = perPlayer == null ? null : perPlayer.get(key);
+        if (picketsEqual(old, fresh)) {
+            return;
+        }
+        if (old != null) {
+            perPlayer.remove(key);
+            for (Entity e : old) {
+                e.remove();
+            }
+        }
+        List<Entity> list = spawnPickets(w, fresh);
+        blockViews.computeIfAbsent(p.getUniqueId(), k -> new HashMap<>()).put(key, list);
+    }
+
+    /** true — текущие дисплеи и новый набор штакетин занимают те же позиции. */
+    private static boolean picketsEqual(List<Entity> old, List<Picket> fresh) {
+        if (old == null || old.size() != fresh.size()) {
+            return false;
+        }
+        Set<String> have = new HashSet<>(old.size());
+        for (Entity e : old) {
+            have.add(posKey(e.getLocation()));
+        }
+        for (Picket pt : fresh) {
+            have.remove(posKey(pt));
+        }
+        return have.isEmpty();
+    }
+
+    private static String posKey(Location loc) {
+        return posKey(loc.getX(), loc.getY(), loc.getZ());
+    }
+
+    private static String posKey(Picket pt) {
+        return posKey(pt.x, pt.y, pt.z);
+    }
+
+    /** Ключ позиции с точностью 1 мм (координаты могут быть огромными — строка). */
+    private static String posKey(double x, double y, double z) {
+        return Math.round(x * 1000) + "|" + Math.round(y * 1000) + "|" + Math.round(z * 1000);
     }
 
     /** Точки-кубики BLOCKS по рёбрам объёма + кольца по высоте. */
@@ -586,8 +687,11 @@ public class HighlightManager implements Listener {
      * на поверхность: многослойная граница (дерево, постройка в несколько
      * этажей) получает забор на каждом слое, а ровная земля — сплошную
      * линию забора по всей длине кромки.
+     * Позиции возвращаются отдельно от спавна (fencePickets -> spawnPickets),
+     * чтобы при периодическом резкане сравнивать с уже стоящими дисплеями и
+     * НЕ пересоздавать неизменившийся забор (иначе он видимо мигает).
      */
-    private List<Entity> fenceEntities(World world, ProtectedRegion r, Config.HighlightOptions h) {
+    private List<Picket> fencePickets(World world, ProtectedRegion r, Config.HighlightOptions h) {
         Config.TerrainFenceOptions f = h.fence;
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
@@ -595,7 +699,7 @@ public class HighlightManager implements Listener {
         int minZ = mn.getBlockZ(), maxZ = mx.getBlockZ();
         int minY = Math.max(world.getMinHeight(), mn.getBlockY());
         int maxY = Math.min(world.getMaxHeight() - 1, mx.getBlockY());
-        List<Entity> list = new ArrayList<>(16);
+        List<Picket> list = new ArrayList<>(16);
         // Бюджет частиц по КАЖДОМУ краю (а не общий): у длинных границ раньше
         // хватало первых сторон, края 3-4 не дорисовывались вовсе.
         int budget = Math.max(1000, h.particles.maxPoints);
@@ -606,6 +710,17 @@ public class HighlightManager implements Listener {
         // Стороны, параллельные Z (x фиксирован).
         picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, budget, ignore);
         picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, budget, ignore);
+        return list;
+    }
+
+    private List<Entity> spawnPickets(World world, List<Picket> pickets) {
+        List<Entity> list = new ArrayList<>(pickets.size());
+        for (Picket pt : pickets) {
+            BlockDisplay d = spawnDisplay(world, pt.x, pt.y, pt.z, pt.data, pt.scale, pt.glow);
+            if (d != null) {
+                list.add(d);
+            }
+        }
         return list;
     }
 
@@ -620,7 +735,7 @@ public class HighlightManager implements Listener {
      * она тонула внутри земли и была невидима; вдобавок заглубленные слои
      * съедали весь бюджет и грани обрывались уже у углов.
      */
-    private void picketEdge(World world, List<Entity> list, Config.TerrainFenceOptions f,
+    private void picketEdge(World world, List<Picket> out, Config.TerrainFenceOptions f,
                             int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
                             int budget, Set<Material> ignore) {
         double step = f.spacing;
@@ -653,14 +768,11 @@ public class HighlightManager implements Listener {
                     continue;
                 }
                 colsTerrain++;
-                BlockDisplay d = spawnDisplay(world, cx,
+                out.add(new Picket(cx,
                         y + 1 + f.height / 2.0 + f.offset, cz,
                         f.material.createBlockData(), scale,
-                        f.glow ? plugin.config().highlight().particles.dustColor : null);
-                if (d != null) {
-                    list.add(d);
-                    made++;
-                }
+                        f.glow ? plugin.config().highlight().particles.dustColor : null));
+                made++;
             }
         }
         if (dbg) {
