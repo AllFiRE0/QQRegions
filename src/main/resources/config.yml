@@ -523,7 +523,7 @@ raid:
   abort-on-owner-online: true
   # Списание монет за рейд: PLAYER — процент с баланса нападающего
   # (инициатора), CLAN — процент с банка клана JustTeams.
-economy:
+  economy:
     enabled: true
     source: CLAN
     # Процент: < 1 = доля (0.5 = 50%), >= 1 = проценты (10 = 10%).

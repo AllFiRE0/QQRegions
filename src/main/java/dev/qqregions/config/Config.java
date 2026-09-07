@@ -88,6 +88,15 @@ public class Config {
         Yml.upgrade(plugin, "config.yml", new File(plugin.getDataFolder(), "config.yml"));
         plugin.reloadConfig();
         cfg = plugin.getConfig();
+        if (cfg.getKeys(false).isEmpty()) {
+            // Битый config.yml на диске (YamlConfiguration молча вернул пустой):
+            // перезаписываем дефолтом из jar и перечитываем ещё раз, чтобы
+            // плагин не стартовал на пустых настройках тихо.
+            plugin.getLogger().severe("config.yml не прочитался — восстанавливаем из jar.");
+            plugin.saveResource("config.yml", true);
+            plugin.reloadConfig();
+            cfg = plugin.getConfig();
+        }
 
         commandName = cfg.getString("command.name", "region");
         aliases = new ArrayList<>(cfg.getStringList("command.aliases"));
@@ -583,6 +592,20 @@ public class Config {
         public final String valueColor;
 
         BossBarOptions(ConfigurationSection s) {
+            if (s == null) {
+                enabled = true;
+                mode = "BOSSBAR";
+                updateTicks = 5;
+                style = BarStyle.SEGMENTED_10;
+                normalColor = BarColor.WHITE;
+                normalText = "&8[{current}&8/&8{max}&8] &7блоков";
+                fullColor = BarColor.RED;
+                fullText = "&c{value-color}{current}&8/&8{max}&c — максимум блоков!";
+                conflictColor = BarColor.YELLOW;
+                conflictText = "&eВыделение пересекает чужой регион!";
+                valueColor = "&f";
+                return;
+            }
             enabled = s.getBoolean("enabled", true);
             mode = s.getString("mode", "BOSSBAR").toUpperCase(java.util.Locale.ROOT);
             updateTicks = Math.max(1, s.getInt("update-ticks", 5));
