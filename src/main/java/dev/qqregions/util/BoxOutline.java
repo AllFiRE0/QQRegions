@@ -64,15 +64,16 @@ public final class BoxOutline {
      * Кольца — прямоугольники по периметру на каждом ringStep-м Y-уровне между
      * низом и верхом (верх и низ рисуются всегда); вместе с вертикальными рёбрами
      * они образуют «трубу» из квадратов, по которой широкий/высокий объём читается
-     * даже из середины границы. При gridStep > 1 на верхней и нижней ПЛОСКОСТЯХ
-     * дополнительно рисуется внутренняя сетка-«квадраты» с шагом gridStep —
-     * используется только подсветкой РЕГИОНОВ (выделение игрока рисует грани).
+     * даже из середины границы. При gridStep > 1 на ВСЕХ гранях (верх, низ и
+     * четыре боковые) дополнительно рисуется внутренняя сетка-«квадраты» с шагом
+     * gridStep — «обёртка в клетку» используется только подсветкой РЕГИОНОВ
+     * (выделение игрока рисует грани).
      *
      * @param maxPoints потолок суммарного числа точек (при превышении контур
      *                  прореживается равномерно, углы и концы линий сохраняются)
      * @param maxGap    максимальный зазор между соседними точками линии (в блоках)
      * @param ringStep  шаг колец по Y (в блоках; <= 0 или Integer.MAX_VALUE = без колец)
-     * @param gridStep  шаг сетки-«квадратов» на верхе/низу (в блоках; <= 1 — без сетки)
+     * @param gridStep  шаг сетки-«квадратов» на гранях (в блоках; <= 1 — без сетки)
      */
     public static List<BlockVector3> outline(BlockVector3 mn, BlockVector3 mx, int maxPoints,
                                              int maxGap, int ringStep, int gridStep) {
@@ -118,11 +119,19 @@ public final class BoxOutline {
         vertLine(out, seen, minX, maxZ, minY, maxY, maxGap);
         vertLine(out, seen, maxX, maxZ, minY, maxY, maxGap);
 
-        // Внутренняя сетка-«квадраты» на верхней и нижней плоскостях (для регионов).
+        // Внутренняя сетка-«квадраты» на ВСЕХ гранях: верх/низ (плоскости XZ)
+        // и четыре боковые (XZ-плоскости по фиксированной X/Z). Регионы так
+        // выглядят «обёрнутыми в клетку»; выделение этим не пользуется.
         if (gridStep > 1) {
             planeGrid(out, seen, minX, maxX, minZ, maxZ, minY, gridStep, maxGap);
             if (maxY != minY) {
                 planeGrid(out, seen, minX, maxX, minZ, maxZ, maxY, gridStep, maxGap);
+            }
+            for (int z : new int[]{minZ, maxZ}) {
+                sideGridZ(out, seen, z, minX, maxX, minY, maxY, gridStep, maxGap);
+            }
+            for (int x : new int[]{minX, maxX}) {
+                sideGridX(out, seen, x, minZ, maxZ, minY, maxY, gridStep, maxGap);
             }
         }
 
@@ -153,6 +162,30 @@ public final class BoxOutline {
         }
         for (int x = minX; x <= maxX; x += gridStep) {
             hLineZ(out, seen, minZ, maxZ, y, x, gap);
+        }
+    }
+
+    /** Боковая грань x=fixed: горизонтали вдоль Z + вертикали по углам шага. */
+    private static void sideGridX(List<BlockVector3> out, Set<BlockVector3> seen,
+                                  int x, int minZ, int maxZ, int minY, int maxY,
+                                  int gridStep, int gap) {
+        for (int y = minY; y <= maxY; y += gridStep) {
+            hLineZ(out, seen, minZ, maxZ, y, x, gap);
+        }
+        for (int z = minZ; z <= maxZ; z += gridStep) {
+            vertLine(out, seen, x, z, minY, maxY, gap);
+        }
+    }
+
+    /** Боковая грань z=fixed: горизонтали вдоль X + вертикали по углам шага. */
+    private static void sideGridZ(List<BlockVector3> out, Set<BlockVector3> seen,
+                                  int z, int minX, int maxX, int minY, int maxY,
+                                  int gridStep, int gap) {
+        for (int y = minY; y <= maxY; y += gridStep) {
+            hLineX(out, seen, minX, maxX, y, z, gap);
+        }
+        for (int x = minX; x <= maxX; x += gridStep) {
+            vertLine(out, seen, x, z, minY, maxY, gap);
         }
     }
 

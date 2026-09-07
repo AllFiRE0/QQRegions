@@ -60,6 +60,10 @@ public class HighlightManager implements Listener {
     private final Map<UUID, Map<String, List<Entity>>> blockViews = new HashMap<>();
     /** Тип подсветки по умолчанию (/region visible type) на игрока. */
     private final Map<UUID, String> defaultType = new HashMap<>();
+    /** Персональный переключатель «подсветка для себя» (/region visible self).
+     *  Влияет ТОЛЬКО на автоматическую подсветку по флагу territory-visible;
+     *  ручная команда и меню показывают всегда. true — по умолчанию. */
+    private final Map<UUID, Boolean> selfEnabled = new HashMap<>();
     /** Кэш точек terrain-подсветки: "world:region" -> (точки + время скана). */
     private final Map<String, TerrainEntry> terrainCache = new HashMap<>();
     /** Флаг-регионы, подсвеченные входом/выходом и ещё НЕ вышедшие (для hide-on-exit). */
@@ -149,6 +153,34 @@ public class HighlightManager implements Listener {
 
     // ---------- флаг territory-visible ----------
 
+    /** Включена ли у игрока автоматическая подсветка «для себя» (по флагу). */
+    public boolean isSelfEnabled(Player p) {
+        return selfEnabled.getOrDefault(p.getUniqueId(), Boolean.TRUE);
+    }
+
+    /**
+     * Задать персональную подсветку «для себя». Влияет ТОЛЬКО на флаг
+     * territory-visible: команда и меню показывают подсветку всегда.
+     * При выключении скрываются уже показанные автоматические подсветки.
+     */
+    public void setSelfEnabled(Player p, boolean enabled) {
+        if (enabled) {
+            selfEnabled.remove(p.getUniqueId());
+            return;
+        }
+        selfEnabled.put(p.getUniqueId(), false);
+        Set<String> prev = flagShown.get(p.getUniqueId());
+        if (prev != null) {
+            for (String k : new ArrayList<>(prev)) {
+                prev.remove(k);
+                cooldownRemove(p, k);
+            }
+            if (prev.isEmpty()) {
+                flagShown.remove(p.getUniqueId());
+            }
+        }
+    }
+
     private void scan() {
         Config.HighlightOptions h = plugin.config().highlight();
         if (!h.flagEnabled) {
@@ -157,6 +189,10 @@ public class HighlightManager implements Listener {
         long now = System.currentTimeMillis();
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (plugin.config().isWorldDisabled(p.getWorld())) {
+                continue;
+            }
+            // личная подсветка «для себя» выключена — флаг не срабатывает
+            if (!isSelfEnabled(p)) {
                 continue;
             }
             java.util.Set<String> cur = new java.util.HashSet<>();
@@ -361,10 +397,11 @@ public class HighlightManager implements Listener {
 
     /**
      * Точки контура региона для PARTICLES/BLOCKS: рёбра куба + «кольца» по
-     * периметру (outline.rings) + сетка-«квадраты» на верхней/нижней плоскостях
-     * (outline.grid). Шаг точек любой линии не больше outline.max-gap — у высоких
-     * регионов нет «дыр» из сотен блоков. TERRITORY сюда не попадает — у него
-     * свой проход по рельефу (terrainPoints/fenceEntities).
+     * периметру (outline.rings) + сетка-«квадраты» на ВСЕХ гранях (верх, низ
+     * и четыре боковые — outline.grid). Шаг точек любой линии не больше
+     * outline.max-gap — у высоких регионов нет «дыр» из сотен блоков.
+     * TERRITORY сюда не попадает — у него свой проход по рельефу
+     * (terrainPoints/fenceEntities).
      */
     private List<BlockVector3> outlinePoints(BlockVector3 mn, BlockVector3 mx, int maxPoints) {
         Config.OutlineOptions o = plugin.config().outline();

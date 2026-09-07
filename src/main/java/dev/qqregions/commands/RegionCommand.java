@@ -418,6 +418,28 @@ public class RegionCommand {
             lang(p, "visible.disabled");
             return;
         }
+        // /region visible self [on|off] — личная подсветка «для себя» (по флагу);
+        // команда и меню показывают подсветку всегда, независимо от флага.
+        if (args.length >= 2 && args[1].equalsIgnoreCase("self")) {
+            if (args.length < 3) {
+                boolean on = plugin.highlight().isSelfEnabled(p);
+                lang(p, "visible.self-current", "state", plugin.lang().get(on ? "visible.on-word" : "visible.off-word"));
+                return;
+            }
+            String v = args[2].toLowerCase(Locale.ROOT);
+            if (v.equals("on") || v.equals("true")) {
+                plugin.highlight().setSelfEnabled(p, true);
+                lang(p, "visible.self-on");
+                return;
+            }
+            if (v.equals("off") || v.equals("false")) {
+                plugin.highlight().setSelfEnabled(p, false);
+                lang(p, "visible.self-off");
+                return;
+            }
+            lang(p, "visible.self-invalid", "value", args[2]);
+            return;
+        }
         // /region visible type <particles|blocks|territory> — тип подсветки по умолчанию
         if (args.length >= 2 && args[1].equalsIgnoreCase("type")) {
             if (args.length < 3) {
@@ -819,139 +841,113 @@ public class RegionCommand {
     // ---------- tab-подсказки ----------
 
     public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
-        List<String> out = new ArrayList<>(16);
-        if (!(sender instanceof Player p)) {
-            out.addAll(filtered(SUBCOMMANDS, args, args.length - 1));
-            return out;
-        }
         if (args.length <= 1) {
-            out.addAll(filtered(SUBCOMMANDS, args, args.length == 0 ? 0 : args.length - 1));
-            return out;
+            return filtered(SUBCOMMANDS, args, args.length == 0 ? 0 : args.length - 1);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("select")) {
-            return selectCommand.tab(p, alias, Arrays.copyOfRange(args, 1, args.length));
+            return selectCommand.tab((Player) sender, alias, Arrays.copyOfRange(args, 1, args.length));
         }
-        if (args.length == 2) {
-            switch (sub) {
-                case "delete":
-                case "flags":
-                    out.addAll(filtered(plugin.wg().ownedNames(p.getWorld(), p), args, 1));
-                    return out;
-                case "info":
-                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
-                    return out;
-                case "add":
-                case "remove": {
-                    List<String> rolesPlayers = new ArrayList<>(List.of("member", "owner"));
-                    for (Player online : Bukkit.getOnlinePlayers()) {
-                        rolesPlayers.add(online.getName());
+        if (!(sender instanceof Player p)) {
+            return List.of();
+        }
+        List<String> regions = plugin.wg().visibleNames(p.getWorld(), p);
+        List<String> players = new ArrayList<>();
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            players.add(online.getName());
+        }
+        switch (sub) {
+            case "delete":
+            case "flags":
+                return args.length == 2 ? filtered(plugin.wg().ownedNames(p.getWorld(), p), args, 1) : List.of();
+            case "info":
+            case "raid":
+                return args.length == 2 ? filtered(regions, args, 1) : List.of();
+            case "add":
+            case "remove": {
+                // add [member|owner] <ник> [регион]  |  add <ник> [регион]
+                if (args.length == 2) {
+                    List<String> opts = new ArrayList<>(List.of("member", "owner"));
+                    opts.addAll(players);
+                    return filtered(opts, args, 1);
+                }
+                if (args.length == 3) {
+                    boolean role = args[1].equalsIgnoreCase("member") || args[1].equalsIgnoreCase("owner");
+                    return filtered(role ? players : regions, args, 2);
+                }
+                return args.length == 4 ? filtered(regions, args, 3) : List.of();
+            }
+            case "view": {
+                // view [регион] [particles|blocks|territory]
+                if (args.length == 2) {
+                    return filtered(regions, args, 1);
+                }
+                return args.length == 3 ? filtered(HIGHLIGHT_TYPES, args, 2) : List.of();
+            }
+            case "visible": {
+                // visible [off|type|self|true|allow|false|deny|регион] [тип|on|off] [регион]
+                if (args.length == 2) {
+                    List<String> opts = new ArrayList<>(List.of("off", "type", "self", "true", "allow", "false", "deny"));
+                    opts.addAll(regions);
+                    return filtered(opts, args, 1);
+                }
+                String first = args[1].toLowerCase(Locale.ROOT);
+                if (args.length == 3) {
+                    if (first.equals("self")) {
+                        return filtered(List.of("on", "off"), args, 2);
                     }
-                    out.addAll(filtered(rolesPlayers, args, 1));
-                    return out;
+                    if (first.equals("off")) {
+                        return List.of();
+                    }
+                    return filtered(HIGHLIGHT_TYPES, args, 2);
                 }
-                default:
-                    break;
-            }
-        }
-        if (args.length == 3 && (sub.equals("add") || sub.equals("remove"))) {
-            // add [member|owner] <ник>  →  ник;  add <ник> [регион]  →  регион
-            if (args[1].equalsIgnoreCase("member") || args[1].equalsIgnoreCase("owner")) {
-                for (Player online : Bukkit.getOnlinePlayers()) {
-                    out.add(online.getName());
+                if (args.length == 4) {
+                    // после значения флага (true|allow|false|deny) можно указать регион
+                    boolean value = first.equals("true") || first.equals("allow")
+                            || first.equals("false") || first.equals("deny");
+                    return value ? filtered(regions, args, 3) : List.of();
                 }
-            } else {
-                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 2));
+                return List.of();
             }
-            return out;
-        }
-        if (args.length == 4 && (sub.equals("add") || sub.equals("remove"))) {
-            // add [member|owner] <ник> [регион]
-            out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
-            return out;
-        }
-        if (sub.equals("view")) {
-            // /region view [регион] [тип]
-            if (args.length == 2) {
-                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
-                return out;
-            }
-            if (args.length == 3) {
-                out.addAll(filtered(HIGHLIGHT_TYPES, args, 2));
-                return out;
-            }
-            return filtered(out, args, args.length - 1);
-        }
-        if (sub.equals("visible")) {
-            // /region visible [off|type|true|allow|false|deny|регион] [тип] [регион]
-            if (args.length == 2) {
-                List<String> opts = new ArrayList<>(List.of("off", "type", "true", "allow", "false", "deny"));
-                opts.addAll(plugin.wg().visibleNames(p.getWorld(), p));
-                out.addAll(filtered(opts, args, 1));
-                return out;
-            }
-            if (args.length == 3) {
-                out.addAll(filtered(HIGHLIGHT_TYPES, args, 2));
-                return out;
-            }
-            if (args.length == 4) {
-                out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
-                return out;
-            }
-            return filtered(out, args, args.length - 1);
-        }
-        if (sub.equals("raid") && args.length == 2) {
-            out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
-            return out;
-        }
-        if (sub.equals("sell") || sub.equals("rent") || sub.equals("buy")
-                || sub.equals("tenant") || sub.equals("market")) {
-            // offer-акции (accept/decline/list/…) доступны через любой из жаргонов
-            List<String> offer = sub.equals("sell") || sub.equals("rent")
-                    ? List.of("accept", "decline", "cancel", "list")
-                    : List.of("accept", "decline", "list");
-            if (sub.equals("sell") || sub.equals("rent")) {
+            case "sell":
+            case "rent": {
+                List<String> offers = List.of("accept", "decline", "cancel", "list");
+                boolean action = args[1].equalsIgnoreCase("accept") || args[1].equalsIgnoreCase("decline")
+                        || args[1].equalsIgnoreCase("cancel") || args[1].equalsIgnoreCase("list");
                 // /region sell <ник> <сумма> [регион]
                 // /region rent  <ник> <сумма> <время> [регион]
                 if (args.length == 2) {
-                    for (Player online : Bukkit.getOnlinePlayers()) {
-                        out.add(online.getName());
-                    }
-                    out.addAll(filtered(offer, args, 1));
-                    return out;
+                    List<String> opts = new ArrayList<>(players);
+                    opts.addAll(offers);
+                    return filtered(opts, args, 1);
+                }
+                if (action) {
+                    return List.of();
                 }
                 if (args.length == 3) {
-                    out.addAll(filtered(List.of("100", "250", "500", "1000", "5000"), args, 2));
-                    return out;
+                    return filtered(List.of("100", "250", "500", "1000", "5000"), args, 2);
                 }
                 if (args.length == 4) {
-                    if (sub.equals("rent")) {
-                        out.addAll(filtered(List.of("1d", "7d", "30d", "90d"), args, 3));
-                    } else {
-                        out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 3));
-                    }
-                    return out;
+                    return sub.equals("rent")
+                            ? filtered(List.of("1d", "7d", "30d", "90d"), args, 3)
+                            : filtered(regions, args, 3);
                 }
-                if (args.length == 5 && sub.equals("rent")) {
-                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 4));
-                    return out;
-                }
-                return filtered(out, args, args.length - 1);
+                return sub.equals("rent") && args.length == 5 ? filtered(regions, args, 4) : List.of();
             }
-            if (sub.equals("buy") || sub.equals("tenant")) {
-                // /region buy|tenant [регион]  (плюс offer-акции)
+            case "buy":
+            case "tenant": {
                 if (args.length == 2) {
-                    out.addAll(filtered(plugin.wg().visibleNames(p.getWorld(), p), args, 1));
-                    out.addAll(filtered(offer, args, 1));
-                    return out;
+                    List<String> opts = new ArrayList<>(regions);
+                    opts.addAll(List.of("accept", "decline", "list"));
+                    return filtered(opts, args, 1);
                 }
-                return filtered(out, args, args.length - 1);
+                return List.of();
             }
-            // /region market [open|list|flags|blocks|myflags]
-            out.addAll(filtered(List.of("open", "list", "flags", "blocks", "myflags"), args, args.length - 1));
-            return out;
+            case "market":
+                return args.length == 2 ? filtered(List.of("open", "list", "flags", "blocks", "myflags"), args, 1) : List.of();
+            default:
+                return List.of();
         }
-        return filtered(out, args, args.length - 1);
     }
 
     private static List<String> filtered(List<String> in, String[] args, int index) {

@@ -3,7 +3,6 @@ package dev.qqregions.selection;
 import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
-import dev.qqregions.util.BoxOutline;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -312,17 +311,138 @@ public class SelectionView {
 
     // ---------- PARTICLES ----------
 
+    /**
+     * Пунктир по всем 12 рёбрам по правилу «20б -> 1·0·1, 40б -> 1·0·0·1,
+     * и т.д.»: у КАЖДОГО ребра почти равный бюджет точек (cap/12),
+     * шаг = округление длины/бюджета — период растёт с длиной ребра,
+     * короткие рёбра идут каждым блоком. Все 12 рёбер рисуются ЦЕЛИКОМ
+     * (без общего потолка, который раньше отбирал точки у последних
+     * вертикальных граней), поэтому вертикали не могут пропасть.
+     * При debug: true в консоль выводится фактическое число точек каждого
+     * ребра (низ 0-3, верх 4-7, вертикали 8-11) — проверка «вертикали =
+     * горизонтали» по факту.
+     */
+    private List<BlockVector3> edgePoints(Selection sel, int maxPoints) {
+        int cap = Math.max(24, maxPoints > 0 ? maxPoints : 24);
+        BlockVector3 mn = sel.min();
+        BlockVector3 mx = sel.max();
+        int sx = Math.abs(mx.getX() - mn.getX());
+        int sy = Math.abs(mx.getY() - mn.getY());
+        int sz = Math.abs(mx.getZ() - mn.getZ());
+
+        int perEdge = Math.max(2, cap / 12);
+        int need = perEdge - 1;
+
+        Edge[] edges = new Edge[]{
+                edge(mn, BlockVector3.at(mx.getX(), mn.getY(), mn.getZ()), sx, strideFor(sx, need)),
+                edge(mn, BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), sz, strideFor(sz, need)),
+                edge(BlockVector3.at(mx.getX(), mn.getY(), mn.getZ()), BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), sz, strideFor(sz, need)),
+                edge(BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), sx, strideFor(sx, need)),
+                edge(BlockVector3.at(mn.getX(), mx.getY(), mn.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mn.getZ()), sx, strideFor(sx, need)),
+                edge(BlockVector3.at(mn.getX(), mx.getY(), mn.getZ()), BlockVector3.at(mn.getX(), mx.getY(), mx.getZ()), sz, strideFor(sz, need)),
+                edge(BlockVector3.at(mx.getX(), mx.getY(), mn.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mx.getZ()), sz, strideFor(sz, need)),
+                edge(BlockVector3.at(mn.getX(), mx.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mx.getZ()), sx, strideFor(sx, need)),
+                edge(mn, BlockVector3.at(mn.getX(), mx.getY(), mn.getZ()), sy, strideFor(sy, need)),
+                edge(BlockVector3.at(mx.getX(), mn.getY(), mn.getZ()), BlockVector3.at(mx.getX(), mx.getY(), mn.getZ()), sy, strideFor(sy, need)),
+                edge(BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mn.getX(), mn.getY(), mx.getZ()), sy, strideFor(sy, need)),
+                edge(BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), BlockVector3.at(mx.getX(), mn.getY(), mx.getZ()), sy, strideFor(sy, need)),
+        };
+
+        // Σ точек по всем 12 рёбрам <= 12*perEdge <= cap; каждое ребро
+        // рисуется полностью — ни одна грань (в т.ч. вертикальная) не
+        // пропускается, бюджет соблюдается.
+        List<BlockVector3> out = new ArrayList<>(Math.min(cap + 16, 4096));
+        Set<BlockVector3> seen = new HashSet<>();
+        int[] ns = new int[edges.length];
+        for (int i = 0; i < edges.length; i++) {
+            ns[i] = edges[i].n;
+        }
+        for (Edge e : edges) {
+            while (e.hasNext()) {
+                BlockVector3 p = e.next();
+                if (seen.add(p)) {
+                    out.add(p);
+                }
+            }
+        }
+        if (plugin.config().debug()) {
+            plugin.getLogger().info("[selection-view] " + mn + ".." + mx
+                    + " куб " + sx + "x" + sy + "x" + sz
+                    + " cap=" + cap + " perEdge=" + perEdge
+                    + " точек=" + out.size()
+                    + " низ=" + arr(ns, 0, 4)
+                    + " верх=" + arr(ns, 4, 8)
+                    + " вертY=" + arr(ns, 8, 12));
+        }
+        return out;
+    }
+
+    private static String arr(int[] a, int from, int to) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = from; i < to; i++) {
+            if (i > from) {
+                sb.append(',');
+            }
+            sb.append(a[i]);
+        }
+        return sb.append(']').toString();
+    }
+
+    /** Шаг пунктира ребра длины len: короткое ребро (len <= need) — каждый блок. */
+    private static int strideFor(int len, int need) {
+        return len <= need ? 1 : (len + need - 1) / need;
+    }
+
+    /** Ленивое ребро: {n} равномерных точек от a к b (углы всегда включены). */
+    private static Edge edge(BlockVector3 a, BlockVector3 b, int len, int stride) {
+        return new Edge(a, b, len, stride);
+    }
+
+    private static final class Edge {
+        final BlockVector3 a;
+        final int dx, dy, dz;
+        final int len;
+        final int stride;
+        final int n;
+        int cur = 0;
+
+        Edge(BlockVector3 a, BlockVector3 b, int len, int stride) {
+            this.a = a;
+            this.dx = b.getX() - a.getX();
+            this.dy = b.getY() - a.getY();
+            this.dz = b.getZ() - a.getZ();
+            this.len = len;
+            this.stride = stride;
+            // не меньше 2 точек: оба угла ребра есть всегда
+            this.n = Math.max(2, len / stride + 1);
+        }
+
+        boolean hasNext() {
+            return cur < n;
+        }
+
+        BlockVector3 next() {
+            int j = cur++;
+            // серёдина интервалов — равномерно, последняя точка = конец (len),
+            // чтобы верхний угол не «съедался» тем, что шаг не делит длину.
+            int t = j == n - 1 ? len : Math.min(len, j * stride);
+            return BlockVector3.at(
+                    a.getX() + dx * t / Math.max(1, len),
+                    a.getY() + dy * t / Math.max(1, len),
+                    a.getZ() + dz * t / Math.max(1, len));
+        }
+    }
+
     private void renderParticles(Selection sel, Color color, BlockVector3 marker) {
         Config.ParticleOptions po = plugin.config().particles();
         if (!po.enabled) {
             return;
         }
         World world = sel.getWorld();
-        Config.OutlineOptions o = plugin.config().outline();
-        int ringStep = o.ringsEnabled ? o.ringStep : Integer.MAX_VALUE;
-        // Выделение рисует только ГРАНИ (рёбра + кольца): внутренняя сетка-квадраты
-        // на верхней/нижней плоскостях — только для подсветки регионов.
-        for (BlockVector3 p : BoxOutline.outline(sel.min(), sel.max(), o.maxPoints, o.maxGap, ringStep, 0)) {
+        // Вернулся ровно старый пунктир (edgePoints): у каждого ребра куба почти
+        // равный бюджет точек (cap/12) и свой шаг по длине ребра, все 12 рёбер
+        // рисуются целиком (вертикали не пропадают). Потолок — view-max-blocks.
+        for (BlockVector3 p : edgePoints(sel, Math.max(24, plugin.config().viewMaxBlocks()))) {
             spawnParticle(world, po, color, p.getBlockX() + 0.5, p.getBlockY() + 0.5, p.getBlockZ() + 0.5);
         }
         if (marker != null) {
@@ -362,14 +482,10 @@ public class SelectionView {
         Config cfg = plugin.config();
         World world = sel.getWorld();
 
-        // Контур: рёбра + горизонтальные «кольца», шаг точек любой линии не
-        // больше outline.max-gap (общий для выделения и подсветки регионов).
-        // Потолок дисплеев — outline.max-points; view-max-blocks может только
-        // поднять его выше (для старых конфигов/больших выделений).
-        Config.OutlineOptions o = cfg.outline();
-        int ringStep = o.ringsEnabled ? o.ringStep : Integer.MAX_VALUE;
-        int budget = Math.max(o.maxPoints, Math.max(24, cfg.viewMaxBlocks()));
-        List<BlockVector3> points = BoxOutline.outline(sel.min(), sel.max(), budget, o.maxGap, ringStep, 0);
+        // Контур выделения — ровно старый вид (edgePoints): у каждого ребра куба
+        // почти равный бюджет точек (cap/12) и равномерный шаг по длине ребра,
+        // все 12 рёбер рисуются целиком. Потолок дисплеев — view-max-blocks.
+        List<BlockVector3> points = edgePoints(sel, Math.max(24, cfg.viewMaxBlocks()));
 
         List<BlockVector3> need = new ArrayList<>();
         List<BlockVector3> spare = new ArrayList<>();

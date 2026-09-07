@@ -75,6 +75,7 @@ Menus:
           - "&7/region visible [регион] [тип] — показать"
           - "&7/region visible off — скрыть все"
           - "&7/region visible type [тип] — тип по умолчанию"
+          - "&7/region visible self on|off — подсветка «для себя» (по флагу)"
           - "&7/region visible true|allow|false|deny [тип] [регион] — флаг"
       "market-help":
         slot: 15
