@@ -570,6 +570,10 @@ public class Config {
         public final double spacing;
         /** Сдвиг вверх/вниз относительно вершины рельефа (в блоках). */
         public final double offset;
+        /** Сдвиг ВДОЛЬ границы от центра колонки (в блоках); 0 = по центрам блоков. */
+        public final double alongOffset;
+        /** Сдвиг ПОПЕРЁК границы (в блоках); + = НАРУЖУ из региона, − = внутрь. */
+        public final double acrossOffset;
         /** Светиться ли (glow) в цвет highlight.particles.dust-color. */
         public final boolean glow;
 
@@ -582,7 +586,9 @@ public class Config {
             width = Math.max(0.05, s == null ? 0.3 : s.getDouble("width", 0.3));
             thickness = Math.max(0.05, s == null ? 0.3 : s.getDouble("thickness", 0.3));
             spacing = Math.max(0.1, s == null ? 1.0 : s.getDouble("spacing", 1.0));
-            offset = s == null ? 0.0 : s.getDouble("offset", 0.0);
+            offset = s == null ? -0.5 : s.getDouble("offset", -0.5);
+            alongOffset = s == null ? 0.0 : s.getDouble("along-offset", 0.0);
+            acrossOffset = s == null ? 0.0 : s.getDouble("across-offset", 0.0);
             glow = s == null || s.getBoolean("glow", true);
         }
     }

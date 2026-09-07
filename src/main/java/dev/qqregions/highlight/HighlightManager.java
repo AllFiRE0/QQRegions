@@ -704,12 +704,12 @@ public class HighlightManager implements Listener {
         // хватало первых сторон, края 3-4 не дорисовывались вовсе.
         int budget = Math.max(1000, h.particles.maxPoints);
         Set<Material> ignore = h.territoryIgnore;
-        // Стороны, параллельные X (z фиксирован).
-        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, budget, ignore);
-        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, budget, ignore);
-        // Стороны, параллельные Z (x фиксирован).
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, budget, ignore);
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, budget, ignore);
+        // Стороны, параллельные X (z фиксирован): наружу региона = -Z/+Z.
+        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, -1, budget, ignore);
+        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, +1, budget, ignore);
+        // Стороны, параллельные Z (x фиксирован): наружу региона = -X/+X.
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, -1, budget, ignore);
+        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, +1, budget, ignore);
         return list;
     }
 
@@ -734,10 +734,12 @@ public class HighlightManager implements Listener {
      * штакетина писалась по центру самого блока рельефа -> на ровной границе
      * она тонула внутри земли и была невидима; вдобавок заглубленные слои
      * съедали весь бюджет и грани обрывались уже у углов.
+     * outwardSign: +1 — «наружу» региона здесь = рост координаты (maxX/maxZ),
+     * -1 — наружу = падение координаты (minX/minZ). Нужен для across-offset.
      */
     private void picketEdge(World world, List<Picket> out, Config.TerrainFenceOptions f,
                             int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
-                            int budget, Set<Material> ignore) {
+                            int outwardSign, int budget, Set<Material> ignore) {
         double step = f.spacing;
         int made = 0;
         int cols = 0;
@@ -751,8 +753,14 @@ public class HighlightManager implements Listener {
                 continue;
             }
             cols++;
-            double cx = alongX ? pos + 0.5 : fixed + 0.5;
-            double cz = alongX ? fixed + 0.5 : pos + 0.5;
+            // Позиция в ячейке: по умолчанию центр колонки (X) и центр колонки (Z);
+            // along-offset двигает ВДОЛЬ края границы, across-offset — поперёк
+            // (в сторону outwardSign), чтобы забор можно было выставить по центру
+            // блока, заподлицо с внешней гранью региона или целиком снаружи.
+            double cx = (alongX ? pos + 0.5 + f.alongOffset
+                                : fixed + 0.5 + outwardSign * f.acrossOffset);
+            double cz = (alongX ? fixed + 0.5 + outwardSign * f.acrossOffset
+                                : pos + 0.5 + f.alongOffset);
             Vector3f scale = alongX
                     ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
                     : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
