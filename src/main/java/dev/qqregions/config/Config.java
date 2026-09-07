@@ -50,6 +50,7 @@ public class Config {
     private PointStyle point2;
     private String viewMode = "PARTICLES";
     private int viewDistance = 200;
+    private int viewDotsPerEdge = 16;
     private int viewMaxBlocks = 500;
     private float viewBlockScale = 0.35f;
     private boolean commandSelectionView = true;
@@ -135,6 +136,7 @@ public class Config {
 
         viewMode = cfg.getString("interactive.view-mode", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
         viewDistance = cfg.getInt("interactive.view-distance", 200);
+        viewDotsPerEdge = Math.max(2, cfg.getInt("interactive.view-dots-per-edge", 16));
         viewMaxBlocks = cfg.getInt("interactive.view-max-blocks", 500);
         viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
@@ -277,6 +279,10 @@ public class Config {
 
     public int viewMaxBlocks() {
         return viewMaxBlocks;
+    }
+
+    public int viewDotsPerEdge() {
+        return viewDotsPerEdge;
     }
 
     public float viewBlockScale() {

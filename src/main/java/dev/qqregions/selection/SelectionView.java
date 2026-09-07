@@ -499,8 +499,12 @@ public class SelectionView {
 
         // Контур выделения — ровно старый вид (edgePoints): у каждого ребра куба
         // почти равный бюджет точек (cap/12) и равномерный шаг по длине ребра,
-        // все 12 рёбер рисуются целиком. Потолок дисплеев — view-max-blocks.
-        List<BlockVector3> points = edgePoints(sel, Math.max(24, cfg.viewMaxBlocks()));
+        // все 12 рёбер рисуются целиком. Бюджет BLOCKS = view-dots-per-edge*12
+        // (не view-max-blocks): плотные 500 точек не упираются в потолок display-
+        // сущностей на чанк и не съедают последние (южные) вертикали. Сначала
+        // идут интерьеры вертикальных колонок — они спавнятся в приоритете.
+        List<BlockVector3> points = edgePoints(sel, Math.max(24, cfg.viewDotsPerEdge() * 12));
+        verticalFirst(points, mn0, mx0);
         // Точки в незагруженных чанках пропускаем (дисплей там невидим и
         // падает при выгрузке чанка); флаг заставляет рисовать снова, пока
         // все чанки кадра не загрузятся.
@@ -634,6 +638,25 @@ public class SelectionView {
                 break;
             }
         }
+    }
+
+    /** Интерьеры 4 угловых вертикалей в начало списка: вертикальные колонки
+     *  спавнятся/телепортируются ПЕРВЫМИ, поэтому при любом потолке дисплеев
+     *  на чанк горизонт-ребра не могут «украсть» точки у вертикалей. */
+    private static void verticalFirst(List<BlockVector3> pts, BlockVector3 mn, BlockVector3 mx) {
+        int x0 = mn.getBlockX(), x1 = mx.getBlockX();
+        int z0 = mn.getBlockZ(), z1 = mx.getBlockZ();
+        int y0 = mn.getBlockY(), y1 = mx.getBlockY();
+        pts.sort((a, b) -> {
+            boolean av = isVertical(a, x0, x1, z0, z1, y0, y1);
+            boolean bv = isVertical(b, x0, x1, z0, z1, y0, y1);
+            return av == bv ? 0 : (av ? -1 : 1);
+        });
+    }
+
+    private static boolean isVertical(BlockVector3 p, int x0, int x1, int z0, int z1, int y0, int y1) {
+        int x = p.getBlockX(), y = p.getBlockY(), z = p.getBlockZ();
+        return (x == x0 || x == x1) && (z == z0 || z == z1) && y > y0 && y < y1;
     }
 
     /** Маркер второй (неактивной) точки в BLOCKS-режиме — свой цвет и блок. */
