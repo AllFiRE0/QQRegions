@@ -710,7 +710,18 @@ public class HighlightManager implements Listener {
         // Стороны, параллельные Z (x фиксирован): наружу региона = -X/+X.
         picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, -1, budget, ignore);
         picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, +1, budget, ignore);
-        return list;
+        // Углы: каждая сторона ставит свой дисплей в один и тот же угловой блок
+        // (X-грань и Z-грань сходятся в центр угла) — оставляем ОДИН штакет на
+        // угол, иначе в 4 углах стоят сдвоенные «кресты», ломающие сетку по
+        // центрам блоков. По позициям (1 мм) дедупликация не трогает соседей.
+        Set<String> seen = new HashSet<>(list.size());
+        List<Picket> dedup = new ArrayList<>(list.size());
+        for (Picket pt : list) {
+            if (seen.add(posKey(pt))) {
+                dedup.add(pt);
+            }
+        }
+        return dedup;
     }
 
     private List<Entity> spawnPickets(World world, List<Picket> pickets) {
