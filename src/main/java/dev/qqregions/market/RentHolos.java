@@ -4,15 +4,16 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
-import org.bukkit.Display;
+import dev.qqregions.util.Msg;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
-import org.joml.Transformation;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
@@ -58,7 +59,8 @@ public final class RentHolos implements Listener {
     }
 
     public void show(Player p, World w, ProtectedRegion r) {
-        remove(key(p.getUniqueId(), w, r));
+        String key = key(p.getUniqueId(), w, r);
+        remove(key);
         if (!enabled()) {
             return;
         }
@@ -71,35 +73,19 @@ public final class RentHolos implements Listener {
             int x1 = min.x(), x2 = max.x();
             int z1 = min.z(), z2 = max.z();
             double step = Math.max(0.25, h.spacing);
-            // периметр: четыре стороны
-            points(x1, z1, x2, z1, step, pts -> list.add(spawn(w, (double) pts.x() + 0.5, y, (double) pts.z() + 0.5, h)));
-            points(x2, z1, x2, z2, step, pts -> list.add(spawn(w, (double) pts.x() + 0.5, y, (double) pts.z() + 0.5, h)));
-            points(x2, z2, x1, z2, step, pts -> list.add(spawn(w, (double) pts.x() + 0.5, y, (double) pts.z() + 0.5, h)));
-            points(x1, z2, x1, z1, step, pts -> list.add(spawn(w, (double) pts.x() + 0.5, y, (double) pts.z() + 0.5, h)));
-            holos.put(key, new Halo(p.getUniqueId(), w, r, y, list));
+            forEachPoint(w, x1, z1, x2, z1, y, step, h, list);
+            forEachPoint(w, x2, z1, x2, z2, y, step, h, list);
+            forEachPoint(w, x2, z2, x1, z2, y, step, h, list);
+            forEachPoint(w, x1, z2, x1, z1, y, step, h, list);
+            holos.put(key, new Halo(p.getUniqueId(), w.getName(), r.getId(), y, list));
         } catch (Throwable t) {
             plugin.dbg("Голограмма не поддерживается: " + t.getMessage());
         }
     }
 
-    private TextDisplay spawn(World w, double x, double y, double z, Config.HoloOptions h) {
-        return w.spawn(new org.bukkit.Location(w, x, y, z), TextDisplay.class, t -> {
-            t.setText(dev.qqregions.util.Msg.color(h.text));
-            t.setBillboard(Display.Billboard.CENTER);
-            t.setSeeThrough(false);
-            t.setShadowed(false);
-            t.setLineWidth(100);
-            float width = (float) h.width;
-            t.setTransformation(new Transformation(
-                    new Vector3f(),
-                    new Quaternionf(),
-                    new Vector3f(width, 1f, 1f),
-                    new Quaternionf()));
-        });
-    }
-
-    /** Точки вдоль линии (x1,z1)-(x2,z2) с шагом step (интерполяция по длинной оси). */
-    private void points(int x1, int z1, int x2, int z2, double step, java.util.function.Consumer<BlockVector3> sink) {
+    /** Точки вдоль линии (x1,z1)-(x2,z2) на высоте y, спавнит отрезки кольца. */
+    private void forEachPoint(World w, int x1, int z1, int x2, int z2, double y,
+                              double step, Config.HoloOptions h, List<TextDisplay> list) {
         double dx = x2 - x1;
         double dz = z2 - z1;
         double len = Math.max(Math.abs(dx), Math.abs(dz));
@@ -108,11 +94,30 @@ public final class RentHolos implements Listener {
         }
         int n = Math.max(1, (int) Math.round(len / step));
         for (int i = 0; i <= n; i++) {
-            double f = n == 0 ? 0 : (double) i / n;
-            sink.accept(BlockVector3.at(
-                    Math.round((float) (x1 + dx * f)),
-                    Math.round((float) (z1 + dz * f))));
+            double f = (double) i / n;
+            double px = x1 + dx * f + 0.5;
+            double pz = z1 + dz * f + 0.5;
+            try {
+                list.add(spawn(w, new Location(w, px, y, pz), h));
+            } catch (Throwable t) {
+                plugin.dbg("holo segment: " + t.getMessage());
+            }
         }
+    }
+
+    private TextDisplay spawn(World w, Location loc, Config.HoloOptions h) {
+        TextDisplay t = w.spawn(loc, TextDisplay.class);
+        t.setText(Msg.toLegacy(Msg.color(h.text)));
+        t.setSeeThrough(false);
+        t.setShadowed(false);
+        t.setLineWidth(100);
+        float width = (float) h.width;
+        t.setTransformation(new Transformation(
+                new Vector3f(),
+                new Quaternionf(),
+                new Vector3f(width, 1f, 1f),
+                new Quaternionf()));
+        return t;
     }
 
     /** Поддерживать кольцо на уровне глаз показывающего (и чистить мёртвые). */
@@ -124,9 +129,10 @@ public final class RentHolos implements Listener {
         refreshTick = 0;
         Iterator<Map.Entry<String, Halo>> it = holos.entrySet().iterator();
         while (it.hasNext()) {
-            Halo h = it.next();
+            Map.Entry<String, Halo> e = it.next();
+            Halo h = e.getValue();
             Player p = plugin.getServer().getPlayer(h.viewer);
-            World w = plugin.getServer().getWorld(h.world.getName());
+            World w = p == null ? null : plugin.getServer().getWorld(h.world);
             ProtectedRegion r = w == null ? null : plugin.wg().byName(w, h.region);
             if (p == null || !p.isOnline() || w == null || r == null) {
                 clear(h.list);
@@ -138,8 +144,8 @@ public final class RentHolos implements Listener {
                 h.y = y;
                 for (TextDisplay d : h.list) {
                     if (d.isValid()) {
-                        org.bukkit.Location loc = d.getLocation();
-                        d.teleport(new org.bukkit.Location(loc.getWorld(), loc.getX(), y, loc.getZ()));
+                        Location loc = d.getLocation();
+                        d.teleport(new Location(loc.getWorld(), loc.getX(), y, loc.getZ()));
                     }
                 }
             }
@@ -156,7 +162,8 @@ public final class RentHolos implements Listener {
     public void removeFor(Player p) {
         Iterator<Map.Entry<String, Halo>> it = holos.entrySet().iterator();
         while (it.hasNext()) {
-            Halo h = it.next();
+            Map.Entry<String, Halo> e = it.next();
+            Halo h = e.getValue();
             if (h.viewer.equals(p.getUniqueId())) {
                 clear(h.list);
                 it.remove();
@@ -189,6 +196,20 @@ public final class RentHolos implements Listener {
         removeFor(e.getPlayer());
     }
 
-    private record Halo(UUID viewer, World world, String region, double y, List<TextDisplay> list) {
+    /** Изменяемый «живой» халo: y-высота кольца перерасчитывается в тике. */
+    private static final class Halo {
+        final UUID viewer;
+        final String world;
+        final String region;
+        double y;
+        final List<TextDisplay> list;
+
+        Halo(UUID viewer, String world, String region, double y, List<TextDisplay> list) {
+            this.viewer = viewer;
+            this.world = world;
+            this.region = region;
+            this.y = y;
+            this.list = list;
+        }
     }
 }

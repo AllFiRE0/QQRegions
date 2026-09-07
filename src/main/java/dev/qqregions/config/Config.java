@@ -738,12 +738,22 @@ public class Config {
         public final boolean autoRent;
         /** Голограмма-кольцо аренды (market.hologram): включается владельцем. */
         public final HoloOptions holo;
+        /** Как распределять оплату при нескольких владельцах (market.multiowner). */
+        public final MultiOwner multiowner;
+        /** Комиссия сервера (market.commission). */
+        public final CommissionOptions commission;
+        /** Срок жизни ПРИВАТНОГО предложения в минутах (market.offer-timeout-minutes). */
+        public final long offerTimeoutMillis;
+        /** Голограммы-вывески рынка (market.market-holo). */
+        public final MarketHoloOptions marketHolo;
 
         public enum SymbolPosition { BEFORE, AFTER }
 
         public enum RentGrant { MEMBER, OWNER }
 
         public enum RentCharge { ONCE, PERIOD }
+
+        public enum MultiOwner { SINGLE, SPLIT }
 
         MarketOptions(ConfigurationSection s) {
             if (s == null) {
@@ -761,6 +771,10 @@ public class Config {
                 listDurationMillis = 7L * 24L * 60_000L;
                 autoRent = true;
                 holo = new HoloOptions(null);
+                multiowner = MultiOwner.SINGLE;
+                commission = new CommissionOptions(null);
+                offerTimeoutMillis = 60L * 60_000L;
+                marketHolo = new MarketHoloOptions(null);
                 return;
             }
             enabled = s.getBoolean("enabled", true);
@@ -798,6 +812,53 @@ public class Config {
             listDurationMillis = Math.max(1, r == null ? 10080 : r.getInt("list-duration-minutes", 10080)) * 60_000L;
             autoRent = r == null || r.getBoolean("auto-rent", true);
             holo = new HoloOptions(s.getConfigurationSection("hologram"));
+            MultiOwner mo;
+            try {
+                mo = MultiOwner.valueOf(s.getString("multiowner", "SINGLE").toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                mo = MultiOwner.SINGLE;
+            }
+            multiowner = mo;
+            commission = new CommissionOptions(s.getConfigurationSection("commission"));
+            offerTimeoutMillis = Math.max(0, s.getInt("offer-timeout-minutes", 60)) * 60_000L;
+            marketHolo = new MarketHoloOptions(s.getConfigurationSection("market-holo"));
+        }
+    }
+
+    /** Комиссия сервера (market.commission): доля от цены, списывается с получателя. */
+    public static class CommissionOptions {
+        public final boolean enable;
+        /** Доля от суммы (1.0 = 100%, 0.01 = 1%). */
+        public final double rate;
+
+        CommissionOptions(ConfigurationSection s) {
+            enable = s != null && s.getBoolean("enable", false);
+            rate = s == null ? 0.0 : Math.max(0.0, Math.min(1.0, s.getDouble("rate", 0.01)));
+        }
+    }
+
+    /**
+     * Голограммы-вывески рынка (market.market-holo): большой текст над
+     * регионом на время активного объявления (публичного или приватного),
+     * видимый любому игроку.
+     */
+    public static class MarketHoloOptions {
+        public final boolean enabled;
+        /** Высота вывески над регионом (Y-центр, от пола у минимума региона). */
+        public final double yOffset;
+        /** Смещение по X относительно центра региона. */
+        public final double centerXOffset;
+        /** Смещение по Z относительно центра региона. */
+        public final double centerZOffset;
+        /** Длина строки в блоках. */
+        public final int lineWidth;
+
+        MarketHoloOptions(ConfigurationSection s) {
+            enabled = s == null || s.getBoolean("enabled", true);
+            yOffset = s == null ? 3.0 : s.getDouble("y-offset", 3.0);
+            centerXOffset = s == null ? 0.0 : s.getDouble("center-x-offset", 0.0);
+            centerZOffset = s == null ? 0.0 : s.getDouble("center-z-offset", 0.0);
+            lineWidth = s == null ? 200 : Math.max(10, s.getInt("line-width", 200));
         }
     }
 

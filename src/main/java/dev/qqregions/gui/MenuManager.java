@@ -1048,7 +1048,7 @@ public class MenuManager implements Listener {
     private void closeOpen(Player p) {
         OpenMenu cur = open.remove(p.getUniqueId());
         if (cur != null) {
-            history.removeEntry(p.getUniqueId());
+            history.remove(p.getUniqueId());
         }
         if (p.getOpenInventory() != null) {
             p.closeInventory();

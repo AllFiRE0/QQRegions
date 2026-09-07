@@ -125,6 +125,7 @@ public class RegionCommand {
             plugin.market().reload();
             plugin.raid().reload();
             plugin.shop().reload();
+            plugin.marketHolos().refresh();
             lang(sender, "general.reloaded");
             lang(sender, "general.reloaded-summary", "aliases", String.join(", ", plugin.config().aliases()));
         } catch (Throwable t) {

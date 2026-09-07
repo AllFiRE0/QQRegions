@@ -150,10 +150,13 @@ public final class MarketManager {
                 return "no-target";
             }
             o.buyer = target.getUniqueId();
+            long timeout = plugin.config().market().offerTimeoutMillis;
+            o.pendingUntil = timeout > 0 ? o.created + timeout : 0;
             o.status = Offer.Status.PENDING;
         }
         offers.add(o);
         save();
+        plugin.marketHolos().refresh();
         return "ok";
     }
 
@@ -191,10 +194,13 @@ public final class MarketManager {
                 return "no-target";
             }
             o.tenant = target.getUniqueId();
+            long timeout = plugin.config().market().offerTimeoutMillis;
+            o.pendingUntil = timeout > 0 ? o.created + timeout : 0;
             o.status = Offer.Status.PENDING;
         }
         offers.add(o);
         save();
+        plugin.marketHolos().refresh();
         return "ok";
     }
 
@@ -307,10 +313,11 @@ public final class MarketManager {
                 return "no-money";
             }
             economy.withdraw(buyerId, o.price);
-            economy.deposit(o.seller, o.price);
+            payOut(w, r, o.price, o.seller);
             plugin.wg().transferOwnership(w, r, buyerId, o.seller);
             o.status = Offer.Status.DONE;
             save();
+            plugin.marketHolos().refresh();
             notifyBoth(o, "market.sale-done-buyer", "market.sale-done-seller",
                     buyerId, o.seller);
             return "ok";
@@ -324,7 +331,7 @@ public final class MarketManager {
                 return "no-money";
             }
             economy.withdraw(tenantId, o.price);
-            economy.deposit(o.owner, o.price);
+            payOut(w, r, o.price, o.owner);
         }
         long now = System.currentTimeMillis();
         boolean asOwner = m.rentGrant == Config.MarketOptions.RentGrant.OWNER;
@@ -335,9 +342,35 @@ public final class MarketManager {
         o.listUntil = 0;
         o.status = Offer.Status.ACTIVE;
         save();
+        plugin.marketHolos().refresh();
         notifyBoth(o, "market.rent-started-tenant", "market.rent-started-owner",
                 tenantId, o.owner);
         return "ok";
+    }
+
+    /**
+     * Выплата полученной суммы продавцу/владельцу с учётом конфигурации:
+     * multiowner single — вся сумма инициатору; split — поровну всем
+     * владельцам региона. Комиссия сервера (market.commission) списывается
+     * с получателя(ей): каждый получает price x (1-rate).
+     */
+    private void payOut(World w, ProtectedRegion r, double price, UUID initiator) {
+        Config.MarketOptions m = plugin.config().market();
+        java.util.List<UUID> recipients = new ArrayList<>();
+        if (m.multiowner == Config.MarketOptions.MultiOwner.SPLIT) {
+            recipients.addAll(plugin.wg().ownerUuids(r));
+            if (recipients.isEmpty()) {
+                recipients.add(initiator);
+            }
+        } else {
+            recipients.add(initiator);
+        }
+        double commissionRate = m.commission.enable ? m.commission.rate : 0.0;
+        double net = price * (1.0 - commissionRate);
+        double share = net / recipients.size();
+        for (UUID rec : recipients) {
+            economy.deposit(rec, share);
+        }
     }
 
     private boolean mayAccept(Offer o, Player p) {
@@ -369,6 +402,7 @@ public final class MarketManager {
         }
         o.status = Offer.Status.CANCELLED;
         save();
+        plugin.marketHolos().refresh();
         return "ok";
     }
 
@@ -382,6 +416,7 @@ public final class MarketManager {
         }
         o.status = Offer.Status.DECLINED;
         save();
+        plugin.marketHolos().refresh();
         return "ok";
     }
 
@@ -397,12 +432,14 @@ public final class MarketManager {
 
     public void tick() {
         long now = System.currentTimeMillis();
+        boolean changed = false;
         for (Offer o : new ArrayList<>(offers)) {
             // аренда идёт: срок вышел / периодическое списание
             if (o.kind == Offer.Kind.RENT && o.status == Offer.Status.ACTIVE
                     && o.tenant != null) {
                 if (now >= o.until) {
                     endRental(o, false);
+                    changed = true;
                     continue;
                 }
                 Config.MarketOptions m = plugin.config().market();
@@ -410,13 +447,20 @@ public final class MarketManager {
                         && now - o.lastCharge >= m.periodMillis) {
                     if (economy.has(o.tenant, o.price)) {
                         economy.withdraw(o.tenant, o.price);
-                        economy.deposit(o.owner, o.price);
+                        World w = Bukkit.getWorld(o.world);
+                        ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+                        if (w != null && r != null) {
+                            payOut(w, r, o.price, o.owner);
+                        } else {
+                            economy.deposit(o.owner, o.price);
+                        }
                         o.lastCharge = now;
                         save();
                         notifyBoth(o, "market.rent-renew-tenant", "market.rent-renew-owner",
                                 o.tenant, o.owner);
                     } else {
                         endRental(o, true);
+                        changed = true;
                         notifyBoth(o, "market.rent-unpaid-tenant", "market.rent-unpaid-owner",
                                 o.tenant, o.owner);
                     }
@@ -428,7 +472,20 @@ public final class MarketManager {
                     && o.listUntil > 0 && now >= o.listUntil) {
                 o.status = Offer.Status.CANCELLED;
                 save();
+                changed = true;
+                continue;
             }
+            // приватное предложение: контрагент не принял за offer-timeout — снять.
+            // Владельцы региона не меняются, деньги никому не переводятся.
+            if (o.status == Offer.Status.PENDING && o.pendingUntil > 0
+                    && now >= o.pendingUntil) {
+                o.status = Offer.Status.CANCELLED;
+                save();
+                changed = true;
+            }
+        }
+        if (changed) {
+            plugin.marketHolos().refresh();
         }
     }
 
@@ -457,6 +514,7 @@ public final class MarketManager {
             o.listUntil = now + dur;
             o.status = Offer.Status.ACTIVE;
             save();
+            plugin.marketHolos().refresh();
             player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-relisted",
                     "region", o.region, "world", o.world,
                     "price", economy().format(o.price)));
@@ -466,6 +524,7 @@ public final class MarketManager {
         o.until = now;
         o.tenant = null;
         save();
+        plugin.marketHolos().refresh();
         player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-ended",
                 "region", o.region, "world", o.world,
                 "price", economy().format(o.price)));
@@ -530,6 +589,7 @@ public final class MarketManager {
                 o.listUntil = section.getLong(id + ".listUntil", 0);
                 o.listDurationMillis = section.getLong(id + ".listDurationMillis",
                         plugin.config().market().listDurationMillis);
+                o.pendingUntil = section.getLong(id + ".pendingUntil", 0);
                 o.autoRent = section.getBoolean(id + ".autoRent", plugin.config().market().autoRent);
                 try {
                     o.status = Offer.Status.valueOf(
@@ -571,6 +631,7 @@ public final class MarketManager {
             c.set(base + "lastCharge", o.lastCharge);
             c.set(base + "listUntil", o.listUntil);
             c.set(base + "listDurationMillis", o.listDurationMillis);
+            c.set(base + "pendingUntil", o.pendingUntil);
             c.set(base + "autoRent", o.autoRent);
             c.set(base + "status", o.status.name());
         }

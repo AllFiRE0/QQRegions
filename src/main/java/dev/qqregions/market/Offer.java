@@ -47,6 +47,8 @@ public final class Offer {
     public long listUntil;
     /** Желаемый срок объявления (млс): длительность автовозврата/перевыставления. */
     public long listDurationMillis;
+    /** Момент, когда ПРИВАТНОЕ предложение уйдёт само, если контрагент не принял (0 = без срока). */
+    public long pendingUntil;
     /** Автовозврат с автопродлением: после конца аренды пере-выставить объявление. */
     public boolean autoRent = true;
     public Status status = Status.PENDING;

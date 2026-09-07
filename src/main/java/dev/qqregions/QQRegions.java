@@ -6,7 +6,9 @@ import dev.qqregions.config.Lang;
 import dev.qqregions.config.ReplaceManager;
 import dev.qqregions.gui.MenuManager;
 import dev.qqregions.highlight.HighlightManager;
+import dev.qqregions.market.MarketHolos;
 import dev.qqregions.market.MarketManager;
+import dev.qqregions.market.RentHolos;
 import dev.qqregions.papi.QQExpansion;
 import dev.qqregions.raid.RaidManager;
 import dev.qqregions.selection.InteractListener;
@@ -42,6 +44,7 @@ public final class QQRegions extends JavaPlugin {
     private RaidManager raid;
     private ShopManager shop;
     private RentHolos rentHolos;
+    private MarketHolos marketHolos;
 
     public static QQRegions get() {
         return instance;
@@ -76,11 +79,14 @@ public final class QQRegions extends JavaPlugin {
         this.raid = new RaidManager(this);
         this.shop = new ShopManager(this);
         this.rentHolos = new RentHolos(this);
+        this.marketHolos = new MarketHolos(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
         Bukkit.getPluginManager().registerEvents(highlight, this);
         Bukkit.getPluginManager().registerEvents(rentHolos, this);
+
+        marketHolos.refresh();
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             Papi.setEnabled(true);
@@ -133,6 +139,9 @@ public final class QQRegions extends JavaPlugin {
         }
         if (rentHolos != null) {
             rentHolos.onDisable();
+        }
+        if (marketHolos != null) {
+            marketHolos.clearAll();
         }
         if (commands != null) {
             commands.unregister();
@@ -191,6 +200,10 @@ public final class QQRegions extends JavaPlugin {
 
     public RentHolos rentHolos() {
         return rentHolos;
+    }
+
+    public MarketHolos marketHolos() {
+        return marketHolos;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */
