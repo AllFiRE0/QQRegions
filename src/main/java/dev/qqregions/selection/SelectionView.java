@@ -45,6 +45,8 @@ public class SelectionView {
     private int idle = 0;
     /** Подсветка скрыта за задержку бездействия; рисуется снова при изменении кадра. */
     private boolean hidden = false;
+    /** Часть точек кадра была в незагруженных чанках — ждём их и перерисуем. */
+    private boolean unloadedPending = false;
 
     // --- отдельная логика КОМАНДНОГО выделения (pos/point/max/chunk/expand/outset) ---
     /** Маркеры точек 1 и 2 (блок-дисплеи), живущие независимо от маркеров select. */
@@ -93,15 +95,15 @@ public class SelectionView {
             return;
         }
         timer += 5;
-        if (timer < plugin.config().particles().updateTicks) {
-            return;
-        }
-        timer = 0;
         if (plugin.config().blockView()) {
-            if (changed) {
+            if (changed || unloadedPending) {
                 renderBlockView(sel, color, blockMat, marker);
             }
         } else {
+            if (timer < plugin.config().particles().updateTicks) {
+                return;
+            }
+            timer = 0;
             renderParticles(sel, color, marker);
         }
     }
@@ -126,7 +128,7 @@ public class SelectionView {
             return;
         }
         if (plugin.config().blockView()) {
-            if (changed) {
+            if (changed || unloadedPending) {
                 renderBlockView(sel, color, blockMat, marker);
             }
         } else {
@@ -177,7 +179,7 @@ public class SelectionView {
             return;
         }
         if (cfg.blockView()) {
-            if (!changed) {
+            if (!changed && !unloadedPending) {
                 return;
             }
             renderBlockView(sel, s2.highlight, s2.block, null);
@@ -260,7 +262,7 @@ public class SelectionView {
         boolean changed = !fp.equals(lastFp);
         lastFp = fp;
         if (cfg.blockView()) {
-            if (!changed) {
+            if (!changed && !unloadedPending) {
                 return;
             }
             renderBlockView(sel, act.highlight, act.block, actPos);
@@ -486,6 +488,19 @@ public class SelectionView {
         // почти равный бюджет точек (cap/12) и равномерный шаг по длине ребра,
         // все 12 рёбер рисуются целиком. Потолок дисплеев — view-max-blocks.
         List<BlockVector3> points = edgePoints(sel, Math.max(24, cfg.viewMaxBlocks()));
+        // Точки в незагруженных чанках пропускаем (дисплей там невидим и
+        // падает при выгрузке чанка); флаг заставляет рисовать снова, пока
+        // все чанки кадра не загрузятся.
+        unloadedPending = false;
+        List<BlockVector3> visible = new ArrayList<>(points.size());
+        for (BlockVector3 p : points) {
+            if (world.isChunkLoaded(p.getBlockX() >> 4, p.getBlockZ() >> 4)) {
+                visible.add(p);
+            } else {
+                unloadedPending = true;
+            }
+        }
+        points = visible;
 
         List<BlockVector3> need = new ArrayList<>();
         List<BlockVector3> spare = new ArrayList<>();
@@ -518,7 +533,10 @@ public class SelectionView {
                 }
             }
             if (ent == null) {
-                viewBlocks.put(p, spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale()));
+                BlockDisplay spawned = spawnViewBlock(world, p, blockMat, color, cfg.viewBlockScale());
+                if (spawned != null) {
+                    viewBlocks.put(p, spawned);
+                }
             } else {
                 ent.teleport(displayLoc(world, p));
                 viewBlocks.put(p, ent);
@@ -567,6 +585,10 @@ public class SelectionView {
 
     /** Маркер второй (неактивной) точки в BLOCKS-режиме — свой цвет и блок. */
     private void updateOtherMarker(World world, Color color, Material blockMat, BlockVector3 pos) {
+        if (!world.isChunkLoaded(pos.getBlockX() >> 4, pos.getBlockZ() >> 4)) {
+            unloadedPending = true;
+            return;
+        }
         if (viewMarker2 != null && viewMarker2.isValid()) {
             viewMarker2.teleport(displayLoc(world, pos));
             if (viewMarker2 instanceof BlockDisplay bd) {
@@ -580,17 +602,26 @@ public class SelectionView {
     }
 
     private BlockDisplay spawnViewBlock(World world, BlockVector3 p, Material mat, Color glow, float scale) {
-        BlockDisplay d = world.spawn(displayLoc(world, p), BlockDisplay.class);
-        d.setBlock(mat.createBlockData());
-        d.setTransformation(new Transformation(
-                new Vector3f(), new Quaternionf(),
-                new Vector3f(scale, scale, scale),
-                new Quaternionf()));
-        d.setInterpolationDelay(0);
-        d.setInterpolationDuration(0);
-        d.setGlowColorOverride(glow);
-        d.setInvulnerable(true);
-        return d;
+        if (!world.isChunkLoaded(p.getBlockX() >> 4, p.getBlockZ() >> 4)) {
+            unloadedPending = true;
+            return null;
+        }
+        try {
+            BlockDisplay d = world.spawn(displayLoc(world, p), BlockDisplay.class);
+            d.setBlock(mat.createBlockData());
+            d.setTransformation(new Transformation(
+                    new Vector3f(), new Quaternionf(),
+                    new Vector3f(scale, scale, scale),
+                    new Quaternionf()));
+            d.setInterpolationDelay(0);
+            d.setInterpolationDuration(0);
+            d.setGlowColorOverride(glow);
+            d.setInvulnerable(true);
+            return d;
+        } catch (Throwable t) {
+            unloadedPending = true;
+            return null;
+        }
     }
 
     // ---------- утилиты ----------

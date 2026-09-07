@@ -69,7 +69,7 @@ Menus:
         commands:
           - "@menu:players"
       "back":
-        slot: 52
+        slot: 50
         material: ARROW
         name: "&eНазад"
         lore:
@@ -184,7 +184,7 @@ Menus:
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 51
+        slot: 52
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"
@@ -223,7 +223,7 @@ Menus:
         commands:
           - "@menu:info"
       "back":
-        slot: 52
+        slot: 50
         material: ARROW
         name: "&eНазад"
         lore:
@@ -297,7 +297,7 @@ Menus:
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 51
+        slot: 52
   "other":
     role-required: other
     priority: 10
@@ -327,7 +327,7 @@ Menus:
         commands:
           - "@menu:info"
       "back":
-        slot: 52
+        slot: 50
         material: ARROW
         name: "&eНазад"
         lore:
@@ -391,7 +391,7 @@ Menus:
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 51
+        slot: 52
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"
@@ -429,7 +429,7 @@ Menus:
         commands:
           - "@menu:info"
       "back":
-        slot: 52
+        slot: 50
         material: ARROW
         name: "&eНазад"
         lore:
@@ -493,7 +493,7 @@ Menus:
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 51
+        slot: 52
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"

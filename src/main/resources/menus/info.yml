@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 #  QQRegions — информационное меню региона (/territory info)
 #
 #  Шаблоны выбираются по роли игрока в регионе (role-required):
@@ -116,7 +116,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 25
+        slot: 50
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -133,7 +133,7 @@ Menus:
         commands:
           - "asConsole! rg delete -w {world} {region}"
       "raid":
-        slot: 47
+        slot: 19
         material: NETHERITE_SWORD
         name: "&cРейд клана"
         lore:
@@ -143,14 +143,7 @@ Menus:
         role-required: other
         commands:
           - "@raid:start"
-      "back":
-        slot: 53
-        material: ARROW
-        name: "&eНазад"
-        lore:
-          - "&7Вернуться в предыдущее меню"
-        commands:
-          - "@back"
+
   "member":
     role-required: member
     priority: 20
@@ -223,7 +216,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 24
+        slot: 50
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -231,7 +224,7 @@ Menus:
         commands:
           - "@menu:help"
       "raid":
-        slot: 47
+        slot: 19
         material: NETHERITE_SWORD
         name: "&cРейд клана"
         lore:
@@ -241,14 +234,7 @@ Menus:
         role-required: other
         commands:
           - "@raid:start"
-      "back":
-        slot: 53
-        material: ARROW
-        name: "&eНазад"
-        lore:
-          - "&7Вернуться в предыдущее меню"
-        commands:
-          - "@back"
+
   "other":
     role-required: other
     priority: 10
@@ -315,7 +301,7 @@ Menus:
         commands:
           - "@highlight"
       "help":
-        slot: 24
+        slot: 50
         material: BOOK
         name: "&eПомощь"
         lore:
@@ -323,7 +309,7 @@ Menus:
         commands:
           - "@menu:help"
       "raid":
-        slot: 47
+        slot: 19
         material: NETHERITE_SWORD
         name: "&cРейд клана"
         lore:
@@ -333,11 +319,3 @@ Menus:
         role-required: other
         commands:
           - "@raid:start"
-      "back":
-        slot: 53
-        material: ARROW
-        name: "&eНазад"
-        lore:
-          - "&7Вернуться в предыдущее меню"
-        commands:
-          - "@back"
