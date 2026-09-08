@@ -790,10 +790,14 @@ public class HighlightManager implements Listener {
             // along-offset двигает ВДОЛЬ края границы, across-offset — поперёк
             // (в сторону outwardSign), чтобы забор можно было выставить по центру
             // блока, заподлицо с внешней гранью региона или целиком снаружи.
-            double cx = (alongX ? pos + 0.5 + f.alongOffset
-                                : fixed + 0.5 + outwardSign * f.acrossOffset);
-            double cz = (alongX ? fixed + 0.5 + outwardSign * f.acrossOffset
-                                : pos + 0.5 + f.alongOffset);
+            // BlockDisplay растёт от точки спавна в +X и +Z (в Y — от низа), поэтому
+            // из расчётного центра вычитаем ПОЛОВИНУ протяжённости по обеим осям:
+            // иначе панель «прилипает» к спавну правым/южным краем и весь забор
+            // визуально съезжает как целое (на max-сторонах — вовсе за стену).
+            double cx = (alongX ? pos + 0.5 + f.alongOffset - f.width / 2.0
+                                : fixed + 0.5 + outwardSign * f.acrossOffset - f.thickness / 2.0);
+            double cz = (alongX ? fixed + 0.5 + outwardSign * f.acrossOffset - f.thickness / 2.0
+                                : pos + 0.5 + f.alongOffset - f.width / 2.0);
             Vector3f scale = alongX
                     ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
                     : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
