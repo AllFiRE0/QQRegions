@@ -1,0 +1,38 @@
+# ============================================================
+#  QQRegions — меню подтверждения отмены объявления (рынок).
+#  Открывается ПКМ по своему объявлению во вкладке «Мои объявления».
+#
+#  Переменные: {market-region} {market-type} {market-id}
+# ============================================================
+config-version: 1
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&6Отмена: &f{market-region}"
+    size: 3
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+    buttons:
+      "confirm":
+        slot: 11
+        material: RED_DYE
+        name: "&cПодтвердить отмену"
+        lore:
+          - "&7Объявление &f{market-type}&7: &f{market-region}"
+          - "&7Будет снято с рынка"
+        commands:
+          - "@mkt-cancel:{market-id}"
+      "back":
+        slot: 15
+        material: GREEN_DYE
+        name: "&eВернуться"
+        lore:
+          - "&7К управлению объявлением"
+        commands:
+          - "@back"

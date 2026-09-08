@@ -289,6 +289,28 @@ public final class MarketManager {
         return "ok";
     }
 
+    /** Задать срок АРЕНДЫ (минуты) для арендатора. Мин/макс из config.yml:
+     *  market.rent.min-duration-minutes (1 час) / market.rent.max-duration-days
+     *  (1 год). @return "ok" | "not-you" | "not-rent" | "too-short" | "too-long" */
+    public String setRentPeriod(Offer o, Player p, long minutes) {
+        if (!isInitiator(o, p)) {
+            return "not-you";
+        }
+        if (o.kind != Offer.Kind.RENT) {
+            return "not-rent";
+        }
+        Config.MarketOptions m = plugin.config().market();
+        if (minutes < m.rentMinMinutes) {
+            return "too-short";
+        }
+        if (minutes > m.rentMaxMinutes) {
+            return "too-long";
+        }
+        o.periodMillis = minutes * 60_000L;
+        save();
+        return "ok";
+    }
+
     /** Является ли игрок создателем/владельцем объявления («моё объявление»). */
     public boolean ownsOffer(Offer o, java.util.UUID u) {
         if (o.kind == Offer.Kind.SALE) {

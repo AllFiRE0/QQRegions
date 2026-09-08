@@ -882,9 +882,20 @@ public class Config {
         /** Сколько времени объявление об аренде живёт в маркете (на каждое
          *  автовозвращение на рынок; минуты из market.rent.list-duration-minutes). */
         public final long listDurationMillis;
+        /** Мин. срок аренды в минутах (market.rent.min-duration-minutes).
+         *  Меньше этого владелец не сможет выставить арендный срок (кнопка
+         *  «Шифт+ПКМ» в его объявлении). */
+        public final long rentMinMinutes;
+        /** Макс. срок аренды днях из конфига → минуты (market.rent.max-duration-days). */
+        public final long rentMaxMinutes;
         /** Автовозврат с автопродлением: после окончания аренды объявление
          *  автоматически снова выставляется в маркете (market.rent.auto-rent). */
         public final boolean autoRent;
+        /** Телепорт «посмотреть в живую» (ЛКМ по СВОЕМУ объявлению во «Все»,
+         *  по продаже во вкладке «Мои»): market.teleport-enabled. Если false —
+         *  бесплатный телепорт к регионам из объявлений отключён совсем,
+         *  чтобы предложения не работали как бесплатные точки /warp. */
+        public final boolean teleportEnabled;
         /** Как распределять оплату при нескольких владельцах (market.multiowner). */
         public final MultiOwner multiowner;
         /** Комиссия сервера (market.commission). */
@@ -922,7 +933,10 @@ public class Config {
                 rentCharge = RentCharge.PERIOD;
                 periodMillis = 1440L * 60_000L;
                 listDurationMillis = 7L * 24L * 60_000L;
+                rentMinMinutes = 60L;
+                rentMaxMinutes = 365L * 1440L;
                 autoRent = true;
+                teleportEnabled = true;
                 multiowner = MultiOwner.SINGLE;
                 commission = new CommissionOptions(null);
                 offerTimeoutMillis = 60L * 60_000L;
@@ -963,6 +977,9 @@ public class Config {
             rentCharge = rc;
             periodMillis = Math.max(1, r == null ? 1440 : r.getInt("period-minutes", 1440)) * 60_000L;
             listDurationMillis = Math.max(1, r == null ? 10080 : r.getInt("list-duration-minutes", 10080)) * 60_000L;
+            rentMinMinutes = Math.max(1, r == null ? 60 : r.getInt("min-duration-minutes", 60));
+            rentMaxMinutes = Math.max(rentMinMinutes,
+                    (r == null ? 365 : Math.max(1, r.getInt("max-duration-days", 365))) * 1440L);
             autoRent = r == null || r.getBoolean("auto-rent", true);
             MultiOwner mo;
             try {
@@ -971,6 +988,7 @@ public class Config {
                 mo = MultiOwner.SINGLE;
             }
             multiowner = mo;
+            teleportEnabled = s.getBoolean("teleport-enabled", true);
             commission = new CommissionOptions(s.getConfigurationSection("commission"));
             offerTimeoutMillis = Math.max(0, s.getInt("offer-timeout-minutes", 60)) * 60_000L;
             OfferTimeoutAction ota;

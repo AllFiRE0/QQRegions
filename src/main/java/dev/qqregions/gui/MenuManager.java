@@ -53,6 +53,8 @@ public class MenuManager implements Listener {
     private final Map<UUID, SearchPrompt> pendingSearch = new ConcurrentHashMap<>();
     /** Ожидание ввода срока объявления аренды в чат: UUID -> предложение. */
     private final Map<UUID, dev.qqregions.market.Offer> pendingDur = new ConcurrentHashMap<>();
+    /** Ожидание ввода срока АРЕНДЫ (период арендатора) в чат: UUID -> предложение. */
+    private final Map<UUID, dev.qqregions.market.Offer> pendingPeriod = new ConcurrentHashMap<>();
     /** История переходов между меню для кнопки @back. */
     private final Map<UUID, Deque<NavState>> history = new HashMap<>();
     private final QQRegions plugin;
@@ -75,7 +77,7 @@ public class MenuManager implements Listener {
                 "menus/flags.yml", "menus/info.yml", "menus/players.yml",
                 "menus/market.yml", "menus/flagshop.yml", "menus/blocks.yml",
                 "menus/myflags.yml", "menus/help.yml", "menus/main.yml",
-                "menus/regionsearch.yml"
+                "menus/regionsearch.yml", "menus/marketconfirm.yml"
         };
         for (String r : menuResources) {
             dev.qqregions.util.Yml.upgrade(plugin, r, new File(dir, r.substring(r.indexOf('/') + 1)));
@@ -507,6 +509,12 @@ public class MenuManager implements Listener {
 
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
+        // Рынок: подставлять название кнопки-вкладки («Мои объявления»/«Все объявления»).
+        if (kind == Kind.MARKET) {
+            ctx.put("market-tab-name", truthy(ctx.get("_mine"))
+                    ? plugin.lang().get("menu.market-tab-all")
+                    : plugin.lang().get("menu.market-tab-mine"));
+        }
         List<MenuItem> dynItems;
         Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
         switch (kind) {
@@ -577,6 +585,7 @@ public class MenuManager implements Listener {
         pendingAdd.clear();
         pendingSearch.clear();
         pendingDur.clear();
+        pendingPeriod.clear();
     }
 
     // ---------- события ----------
@@ -645,6 +654,7 @@ public class MenuManager implements Listener {
             pendingAdd.remove(cid);
             pendingSearch.remove(cid);
             pendingDur.remove(cid);
+            pendingPeriod.remove(cid);
         }
 
         // Кнопка флага: ПКМ = сменить группу флага (без переключения значения),
@@ -654,19 +664,16 @@ public class MenuManager implements Listener {
             cycleFlagGroup(p, om, item);
             return;
         }
-        // Меню рынка: ЛКМ = принять, ПКМ = отменить предложение.
-        if (om.kind == Kind.MARKET && cmds != null && !cmds.isEmpty()
-                && (e.isRightClick() || e.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)) {
-            for (String c : cmds) {
-                if (c.startsWith("@market:")) {
-                    String body = c.substring("@market:".length()).trim();
-                    String[] parts = body.split(":", 2);
-                    if (parts.length == 2) {
-                        marketAction(p, "cancel:" + parts[1]);
-                    }
-                }
+        // Меню рынка: динамические кнопки предложений — действие по типу клика:
+        // ЛКМ купить/арендовать (или телепорт для своего), ПКМ — отмена
+        // (через подтверждение во вкладке «Мои объявления»), Шифт+ЛКМ — срок
+        // объявления, Шифт+ПКМ — срок аренды (только для своих листингов).
+        if (om.kind == Kind.MARKET) {
+            String mbody = marketOfferCmd(item);
+            if (mbody != null) {
+                marketItemClick(p, om, item, mbody, e);
+                return;
             }
-            return;
         }
 
         // динамическая кнопка флага: подставляем следующий статус
@@ -735,6 +742,14 @@ public class MenuManager implements Listener {
                     om.ctx.put("_filter", f);
                     render(p, om.menu, om.ctx, om.page, om.role, om.kind);
                 }
+                continue;
+            }
+            if (c.equalsIgnoreCase("@market-tab")) {
+                toggleMarketTab(p, om);
+                continue;
+            }
+            if (c.startsWith("@mkt-cancel:")) {
+                confirmCancel(p, c.substring("@mkt-cancel:".length()).trim());
                 continue;
             }
             if (c.startsWith("@market:")) {
@@ -826,6 +841,12 @@ public class MenuManager implements Listener {
         // но при вводе до истечения срока меню откроется с результатом.
         if (pendingSearch.containsKey(id)) {
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingSearch.remove(id), 600L);
+        }
+        if (pendingDur.containsKey(id)) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingDur.remove(id), 600L);
+        }
+        if (pendingPeriod.containsKey(id)) {
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingPeriod.remove(id), 600L);
         }
     }
 
@@ -1006,21 +1027,28 @@ public class MenuManager implements Listener {
     }
 
     /** Кнопки меню рынка: все живые предложения (PENDING/ACTIVE) на регионы.
-     *  ЛКМ — контрагент покупает/арендует или владелец переключает автовозврат;
-     *  ПКМ — отмена (для создателя объявления). Для своих объявлений аренды
-     *  дополнительно: кнопки «срок объявления» и «голограмма».
-     *  Поиск (ctx["_marketsearch"]) фильтрует по названию региона;
-     *  сортировка (ctx["_sort"]) — name | price | default. */
+     *  ОДНА кнопка на предложение: название = регион, лор — выставивший
+     *  (кто получит монеты), тип объявления, цена, объём, координаты, время
+     *  объявления, срок аренды (только для аренды), автовозврат (только для
+     *  выставившего). Во вкладке «Мои объявления» (ctx["_mine"]) — только свои
+     *  листинги. Поиск (ctx["_marketsearch"]) — по названию, сортировка
+     *  (ctx["_sort"]) — name | price | default. */
     private List<MenuItem> marketItems(Menu menu, Player viewer, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        boolean mineView = truthy(ctx.get("_mine"));
+        boolean tpOk = plugin.config().market().teleportEnabled;
         String queryCtx = ctx.get("_marketsearch");
         Pattern qpat = queryCtx == null ? null : Menu.searchPattern(queryCtx);
         String sort = ctx.getOrDefault("_sort", "default").toLowerCase(java.util.Locale.ROOT);
+        dev.qqregions.util.TimeFmt tf = new dev.qqregions.util.TimeFmt(plugin);
         List<dev.qqregions.market.Offer> cols = new ArrayList<>();
         for (dev.qqregions.market.Offer o : plugin.market().offers()) {
             if (o.status != dev.qqregions.market.Offer.Status.PENDING
                     && o.status != dev.qqregions.market.Offer.Status.ACTIVE) {
+                continue;
+            }
+            if (mineView && !plugin.market().ownsOffer(o, viewer.getUniqueId())) {
                 continue;
             }
             if (qpat != null && !qpat.matcher(o.region).find()) {
@@ -1036,59 +1064,232 @@ public class MenuManager implements Listener {
         for (dev.qqregions.market.Offer o : cols) {
             boolean sale = o.kind == dev.qqregions.market.Offer.Kind.SALE;
             boolean mine = plugin.market().ownsOffer(o, viewer.getUniqueId());
-            boolean pub = o.isPublicListing();
-            String type = sale ? "продажа" : "аренда";
-            String who = sale
-                    ? plugin.market().nameOf(o.buyer)
-                    : plugin.market().nameOf(o.tenant);
-            String owner = plugin.market().nameOf(o.owner != null ? o.owner : o.seller);
+            String lister = plugin.market().nameOf(o.owner != null ? o.owner : o.seller);
             Map<String, String> pc = new HashMap<>(ctx);
-            pc.put("market-type", type);
+            pc.put("market-type", sale
+                    ? plugin.lang().get("menu.market-type-sale")
+                    : plugin.lang().get("menu.market-type-rent"));
             pc.put("market-region", o.region);
             pc.put("market-world", o.world);
             pc.put("market-price", plugin.market().economy().format(o.price));
-            pc.put("market-who", who);
-            pc.put("market-owner", owner);
-            pc.put("market-status", pub ? (sale ? "активна" : "аренда") : "ожидает");
+            pc.put("market-lister", lister);
+            pc.put("market-period", sale ? ""
+                    : tf.format(o.periodMillis));
+            pc.put("market-age", tf.format(System.currentTimeMillis() - o.created));
             pc.put("market-autorent", o.autoRent
                     ? plugin.lang().get("menu.lore-market-autorent-on")
                     : plugin.lang().get("menu.lore-market-autorent-off"));
 
+            org.bukkit.World w = Bukkit.getWorld(o.world);
+            ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+            pc.put("market-volume", r == null ? plugin.lang().get("menu.time-empty")
+                    : String.valueOf(r.volume()));
+            pc.put("market-loc", centerOf(r));
+
             String name = tpl.process(plugin, viewer, pc,
                     plugin.lang().get("menu.lore-market-type-region"));
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-price")));
-            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get(
-                    sale ? "menu.lore-market-who-buyer" : "menu.lore-market-who-tenant")));
-            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-status")));
-            if (pub && !sale) {
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-lister")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-price")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-volume")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-location")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-age")));
+            if (!sale && o.periodMillis > 0) {
+                lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-period")));
+            }
+            if (mine && !sale) {
                 lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-autorent")));
             }
-            if (mine) {
-                lore.add(plugin.lang().get("menu.lore-market-own"));
+            if (mineView) {
+                if (!sale) {
+                    lore.add(tpl.process(plugin, viewer, pc,
+                            plugin.lang().get("menu.lore-market-mine-hint-autorent")));
+                } else if (tpOk) {
+                    lore.add(plugin.lang().get("menu.lore-market-mine"));
+                }
+                lore.add(tpl.process(plugin, viewer, pc,
+                        plugin.lang().get("menu.lore-market-mine-hint-cancel")));
+                if (!sale) {
+                    lore.add(tpl.process(plugin, viewer, pc,
+                            plugin.lang().get("menu.lore-market-mine-hint-listdur")));
+                    lore.add(tpl.process(plugin, viewer, pc,
+                            plugin.lang().get("menu.lore-market-mine-hint-period")));
+                }
+            } else if (mine) {
+                lore.add(tpOk ? plugin.lang().get("menu.lore-market-mine")
+                        : plugin.lang().get("menu.lore-market-mine-no-tp"));
             } else {
-                lore.add(plugin.lang().get("menu.lore-market-buy"));
+                lore.add(plugin.lang().get("menu.lore-market-click"));
             }
             String cmd;
-            if (mine && pub && !sale) {
-                cmd = "@market:autorent:" + o.id;
+            if (mineView) {
+                cmd = "@market:own:" + o.id;
             } else if (mine) {
-                cmd = "@market:cancel:" + o.id;
+                cmd = "@market:tp:" + o.id;
             } else {
                 cmd = "@market:" + (sale ? "buy" : "rent") + ":" + o.id;
             }
             out.add(new MenuItem(sale ? "GOLD_INGOT" : "EMERALD", 1, null, name, lore,
                     List.of(cmd), ""));
-            // кнопка владельца: срок объявления (только свои аренды)
-            if (mine && !sale && pub) {
-                out.add(new MenuItem("CLOCK", 1, null,
-                        tpl.process(plugin, viewer, pc, plugin.lang().get("menu.item-listdur")),
-                        List.of(tpl.process(plugin, viewer, pc,
-                                plugin.lang().get("menu.item-listdur-lore"))),
-                        List.of("@market:dur:" + o.id), ""));
-            }
         }
         return out;
+    }
+
+    /** Псевдокоманда "@market:<...>:<id>" кнопки предложения (или null).
+     *  Статические кнопки (@market-search/@market-tab/@sort) без id не считаются. */
+    private String marketOfferCmd(MenuItem item) {
+        if (item == null || item.commands() == null) {
+            return null;
+        }
+        for (String c : item.commands()) {
+            String cl = c.trim();
+            if (!cl.startsWith("@market:")) {
+                continue;
+            }
+            String body = cl.substring("@market:".length()).trim();
+            if (!body.contains(":")) {
+                continue;
+            }
+            return body;
+        }
+        return null;
+    }
+
+    /** Действие по клику на кнопку предложения рынка:
+     *  ЛКМ — купить/арендовать (телепорт для своего во «Все»);
+     *  ПКМ — отмена с подтверждением (вкладка «Мои объявления»);
+     *  Шифт+ЛКМ — срок объявления; Шифт+ПКМ — срок аренды. */
+    private void marketItemClick(Player p, OpenMenu om, MenuItem item, String mbody, InventoryClickEvent e) {
+        int idx = mbody.lastIndexOf(':');
+        if (idx < 0) {
+            return;
+        }
+        String id = mbody.substring(idx + 1);
+        dev.qqregions.market.Offer o = plugin.market().byId(id);
+        if (o == null) {
+            plugin.lang().send(p, "menu.offer-not-found");
+            return;
+        }
+        boolean mine = plugin.market().ownsOffer(o, p.getUniqueId());
+        boolean mineView = truthy(om.ctx.get("_mine"));
+        org.bukkit.event.inventory.ClickType ct = e.getClick();
+        if (ct == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
+            if (!mineView || !mine) {
+                plugin.lang().send(p, "menu.own-only");
+            } else if (o.kind == dev.qqregions.market.Offer.Kind.SALE) {
+                plugin.lang().send(p, "market.not-rent");
+            } else {
+                startDurPrompt(p, o);
+            }
+        } else if (ct == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT) {
+            if (!mineView || !mine) {
+                plugin.lang().send(p, "menu.own-only");
+            } else if (o.kind == dev.qqregions.market.Offer.Kind.SALE) {
+                plugin.lang().send(p, "market.not-rent");
+            } else {
+                startPeriodPrompt(p, o);
+            }
+        } else if (e.isRightClick()) {
+            if (mineView && mine) {
+                openConfirmCancel(p, o);
+            }
+        } else if (mineView && mine) {
+            if (o.kind == dev.qqregions.market.Offer.Kind.SALE) {
+                teleportToOffer(p, o);
+            } else {
+                marketAction(p, "autorent:" + id);
+            }
+        } else if (mine) {
+            teleportToOffer(p, o);
+        } else {
+            marketAction(p, (o.kind == dev.qqregions.market.Offer.Kind.SALE ? "buy:" : "rent:") + id);
+        }
+    }
+
+    /** Переключить вкладку рынка «Мои объявления / Все объявления». */
+    private void toggleMarketTab(Player p, OpenMenu om) {
+        boolean on = truthy(om.ctx.get("_mine"));
+        om.ctx.put("_mine", on ? "" : "yes");
+        p.sendMessage(plugin.lang().comp(on
+                ? "menu.market-tab-switch-all"
+                : "menu.market-tab-switch-mine"));
+        render(p, om.menu, om.ctx, 0, om.role, om.kind);
+    }
+
+    /** Отмена собственного объявления из меню подтверждения. */
+    private void confirmCancel(Player p, String id) {
+        dev.qqregions.market.Offer o = plugin.market().byId(id);
+        if (o == null) {
+            plugin.lang().send(p, "menu.offer-not-found");
+            return;
+        }
+        String res = plugin.market().cancel(o, p);
+        if ("ok".equals(res)) {
+            plugin.lang().send(p, "menu.offer-cancelled", "region", o.region);
+            goBack(p);
+        } else {
+            plugin.lang().send(p, "menu.offer-action-fail",
+                    "action", plugin.lang().get("menu.actions.cancel"), "reason", marketReason(res));
+        }
+    }
+
+    /** Меню подтверждения отмены объявления. */
+    private void openConfirmCancel(Player p, dev.qqregions.market.Offer o) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", o.world);
+        ctx.put("region", o.region);
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        ctx.put("market-id", o.id.toString());
+        ctx.put("market-region", o.region);
+        ctx.put("market-world", o.world);
+        ctx.put("market-type", o.kind == dev.qqregions.market.Offer.Kind.SALE
+                ? plugin.lang().get("menu.market-type-sale")
+                : plugin.lang().get("menu.market-type-rent"));
+        open(p, "marketconfirm", ctx, 0, null, true);
+    }
+
+    /** Телепорт к региону объявления («посмотреть в живую»).
+     *  Отключён config.yml market.teleport-enabled: false. */
+    private void teleportToOffer(Player p, dev.qqregions.market.Offer o) {
+        if (!plugin.config().market().teleportEnabled) {
+            plugin.lang().send(p, "menu.market-teleport-disabled");
+            return;
+        }
+        org.bukkit.World w = Bukkit.getWorld(o.world);
+        ProtectedRegion r = w == null ? null : plugin.wg().byName(w, o.region);
+        if (w == null || r == null) {
+            plugin.lang().send(p, "menu.region-not-found");
+            return;
+        }
+        try {
+            com.sk89q.worldedit.math.BlockVector3 min = r.getMinimumPoint();
+            com.sk89q.worldedit.math.BlockVector3 max = r.getMaximumPoint();
+            double x = (min.getX() + max.getX()) / 2.0 + 0.5;
+            double z = (min.getZ() + max.getZ()) / 2.0 + 0.5;
+            double y = max.getY() + 2;
+            p.teleport(new org.bukkit.Location(w, x, y, z));
+            plugin.lang().send(p, "menu.market-teleported", "region", o.region);
+        } catch (Throwable t) {
+            plugin.lang().send(p, "menu.teleport-fail");
+        }
+    }
+
+    /** Центр региона «X Y Z» (или "—", если регион недоступен). */
+    private static String centerOf(ProtectedRegion r) {
+        if (r == null) {
+            return "—";
+        }
+        try {
+            com.sk89q.worldedit.math.BlockVector3 min = r.getMinimumPoint();
+            com.sk89q.worldedit.math.BlockVector3 max = r.getMaximumPoint();
+            int x = (min.getX() + max.getX()) / 2;
+            int y = (min.getY() + max.getY()) / 2;
+            int z = (min.getZ() + max.getZ()) / 2;
+            return x + " " + y + " " + z;
+        } catch (Throwable t) {
+            return "—";
+        }
     }
 
     /** Обработчик @market:<action>:<id> из кнопок меню рынка. */
@@ -1152,6 +1353,12 @@ public class MenuManager implements Listener {
             }
             case "dur":
                 startDurPrompt(p, o);
+                break;
+            case "tp":
+                teleportToOffer(p, o);
+                break;
+            case "period":
+                startPeriodPrompt(p, o);
                 break;
             case "accept":
                 res = plugin.market().accept(o, p);
@@ -1227,6 +1434,98 @@ public class MenuManager implements Listener {
         });
     }
 
+    /** Ввод срока АРЕНДЫ (период арендатора, 1m..1y) через чат. */
+    private void startPeriodPrompt(Player p, dev.qqregions.market.Offer o) {
+        if (!plugin.market().ownsOffer(o, p.getUniqueId())) {
+            plugin.lang().send(p, "menu.own-only");
+            return;
+        }
+        if (o.kind != dev.qqregions.market.Offer.Kind.RENT) {
+            plugin.lang().send(p, "market.not-rent");
+            return;
+        }
+        pendingPeriod.put(p.getUniqueId(), o);
+        p.sendMessage(plugin.lang().comp("menu.market-period-chat"));
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPeriodChat(AsyncPlayerChatEvent e) {
+        UUID id = e.getPlayer().getUniqueId();
+        dev.qqregions.market.Offer o = pendingPeriod.get(id);
+        if (o == null) {
+            return;
+        }
+        e.setCancelled(true);
+        pendingPeriod.remove(id);
+        onPeriodResult(id, o, e.getMessage());
+    }
+
+    private void onPeriodResult(UUID id, dev.qqregions.market.Offer o, String raw) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !p.isOnline()) {
+                return;
+            }
+            long minutes = parseRentMinutes(raw);
+            if (minutes <= 0) {
+                plugin.lang().send(p, "market.bad-duration");
+                return;
+            }
+            String res = plugin.market().setRentPeriod(o, p, minutes);
+            if ("ok".equals(res)) {
+                plugin.lang().send(p, "market.period-set", "region", o.region,
+                        "time", new dev.qqregions.util.TimeFmt(plugin).format(o.periodMillis));
+            } else {
+                plugin.lang().send(p, "menu.offer-action-fail",
+                        "action", plugin.lang().get("menu.actions.period"), "reason", marketReason(res));
+            }
+        });
+    }
+
+    /** Разбор срока: число = минуты, либо комбинации вида 1y/1mo/1w/1d/1h/1m
+     *  (например "6mo 1d 15h 10m"). @return минуты или -1. */
+    private static long parseRentMinutes(String raw) {
+        String v = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (v.isEmpty()) {
+            return -1;
+        }
+        if (v.matches("\\d+")) {
+            try {
+                return Long.parseLong(v);
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        }
+        long total = 0;
+        int last = 0;
+        boolean any = false;
+        java.util.regex.Matcher m = Pattern.compile("(\\d+)\\s*(y|mo|w|d|h|m)").matcher(v);
+        while (m.find()) {
+            any = true;
+            long n;
+            try {
+                n = Long.parseLong(m.group(1));
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+            long mult;
+            switch (m.group(2)) {
+                case "y" -> mult = 365L * 1440L;
+                case "mo" -> mult = 30L * 1440L;
+                case "w" -> mult = 7L * 1440L;
+                case "d" -> mult = 1440L;
+                case "h" -> mult = 60L;
+                default -> mult = 1L;
+            }
+            total += n * mult;
+            last = m.end();
+        }
+        if (!any || last != v.length()) {
+            return -1;
+        }
+        return total;
+    }
+
     /** Закрыть живое состояние меню (инвентарь уже закрылся из-за чата). */
     private void closeOpen(Player p) {
         OpenMenu cur = open.remove(p.getUniqueId());
@@ -1242,6 +1541,12 @@ public class MenuManager implements Listener {
     private String marketReason(String code) {
         String s = plugin.lang().get("market." + code).trim();
         return s.isEmpty() ? code : s;
+    }
+
+    /** Флаг в контексте меню: "yes"/"true"/"1" считается включённым. */
+    private static boolean truthy(String s) {
+        return s != null
+                && (s.equalsIgnoreCase("yes") || s.equalsIgnoreCase("true") || "1".equals(s));
     }
 
     /** Дружелюбное отображение количества минут. */

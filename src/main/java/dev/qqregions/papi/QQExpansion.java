@@ -41,6 +41,48 @@ public class QQExpansion extends PlaceholderExpansion {
         return true;
     }
 
+    /** Список заполнителей для подсказок PlaceholderAPI
+     *  (/papi parse <игрок> %qqregions_ ...). Без него PAPI предлагает
+     *  только %qqregions_% и ничего после «_». */
+    @Override
+    public java.util.List<String> getPlaceholders() {
+        return java.util.List.of(
+                "%qqregions_selection_active%",
+                "%qqregions_selection_blocks%",
+                "%qqregions_selection_max_blocks%",
+                "%qqregions_selection_min_blocks%",
+                "%qqregions_selection_chunks%",
+                "%qqregions_selection_percent%",
+                "%qqregions_selection_over_limit%",
+                "%qqregions_selection_below_min%",
+                "%qqregions_selection_conflict%",
+                "%qqregions_selection_height_top%",
+                "%qqregions_selection_height_bottom%",
+                "%qqregions_selection_conflict_regions%",
+                "%qqregions_selection_conflict_count%",
+                "%qqregions_region_current%",
+                "%qqregions_eco_balance%",
+                "%qqregions_eco_balance_raw%",
+                "%qqregions_eco_has_<сумма>%",
+                "%qqregions_market_listings%",
+                "%qqregions_raid_active%",
+                "%qqregions_raid_state%",
+                "%qqregions_raid_region%",
+                "%qqregions_raid_world%",
+                "%qqregions_raid_clan%",
+                "%qqregions_raid_thief%",
+                "%qqregions_raid_players%",
+                "%qqregions_raid_remaining%",
+                "%qqregions_raid_time%",
+                "%qqregions_raid_cooldown%",
+                "%qqregions_region_price_<мир>:<регион>%",
+                "%qqregions_region_for_sale_<мир>:<регион>%",
+                "%qqregions_region_for_rent_<мир>:<регион>%",
+                "%qqregions_region_owner_<мир>:<регион>%",
+                "%qqregions_region_rent_time_<мир>:<регион>%"
+        );
+    }
+
     @Override
     public String onRequest(OfflinePlayer offline, String params) {
         if (params == null) {
@@ -151,6 +193,15 @@ public class QQExpansion extends PlaceholderExpansion {
         }
         if (params.startsWith("region_owner_")) {
             return ownerOf(params.substring("region_owner_".length()));
+        }
+        if (params.startsWith("region_rent_time_")) {
+            dev.qqregions.market.Offer o = activeOn(params.substring("region_rent_time_".length()), false);
+            if (o == null) {
+                return "";
+            }
+            String t = o.periodMillis <= 0 ? plugin.lang().get("menu.time-empty")
+                    : new dev.qqregions.util.TimeFmt(plugin).format(o.periodMillis);
+            return org.bukkit.ChatColor.stripColor(org.bukkit.ChatColor.translateAlternateColorCodes('&', t));
         }
         return null;
     }
