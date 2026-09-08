@@ -434,7 +434,7 @@ menu:
   dialog-dur-title: "&eСрок объявления аренды"
   dialog-dur-label: "&7Введите срок в минутах (например &f1440&7 = сутки)."
   dialog-dur-chat: "&eВведите срок в минутах в чат (например &f1440&e = сутки):"
-  flag-set: "actionbar:2!&fФлаг &9{flag-name}&f: &b{value}"
+  flag-set: "actionbar:2!&fФлаг &9{flag-name}&f: &b{label}"
   back-label.market: "&eна рынок"
   back-label.main: "&eв главное меню"
   back-label.regionsearch: "&eк поиску"

@@ -162,5 +162,7 @@ flag-values:
     replacement: '&aда'
   - placeholder: 'false'
     replacement: '&7нет'
+  - placeholder: 'default'
+    replacement: '&7по умолчанию'
   - placeholder: 'ELSE'
     replacement: '{value}'

@@ -640,6 +640,32 @@ public class Wg {
     }
 
     /**
+     * Снять значение флага региона — вернуть «не установлено» (работает
+     * дефолт WorldGuard, как /rg flag <флаг> -r). Вместе со значением
+     * снимается и группа флага (region group), чтобы не оставалось
+     * «осиротевшей» группы без значения.
+     */
+    public boolean unsetFlag(World world, ProtectedRegion region, Flag<?> flag) {
+        if (region == null || world == null || flag == null) {
+            return false;
+        }
+        try {
+            RegionGroupFlag groupFlag = flag.getRegionGroupFlag();
+            if (groupFlag != null) {
+                region.setFlag((Flag) groupFlag, null);
+            }
+            region.setFlag((Flag) flag, null);
+            RegionManager rm = manager(world);
+            if (rm != null) {
+                rm.save();
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
      * Установить строковый флаг региона (например, territory-type).
      * Сохраняет регион. Возвращает true при успехе.
      */

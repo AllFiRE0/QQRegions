@@ -17,7 +17,7 @@
 #                 asConsole!..., asPlayer!..., close
 # ============================================================
 config-version: 3
-update_interval: 20
+update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
   "owner":

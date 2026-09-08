@@ -5,7 +5,7 @@
 #  Переменные: {market-region} {market-type} {market-id}
 # ============================================================
 config-version: 2
-update_interval: 20
+update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
   "default":

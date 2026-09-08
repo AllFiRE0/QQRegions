@@ -19,7 +19,7 @@
 #  Псевдокоманды: @menu:<имя>, @region-info-or-pick, @region-search
 # ============================================================
 config-version: 3
-update_interval: 20
+update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
   "default":

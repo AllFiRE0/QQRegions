@@ -89,9 +89,10 @@ public class MenuManager implements Listener {
             dev.qqregions.util.Yml.upgrade(plugin, r, new File(dir, r.substring(r.indexOf('/') + 1)));
         }
         File[] files = dir.listFiles((d, n) -> n.toLowerCase(java.util.Locale.ROOT).endsWith(".yml"));
+        int defaultUpdate = plugin.config().menuUpdateTicks();
         if (files != null) {
             for (File f : files) {
-                List<Menu> parsed = Menu.parseFile(plugin, f, 20);
+                List<Menu> parsed = Menu.parseFile(plugin, f, defaultUpdate);
                 parsed.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
                 menus.put(f.getName().replaceFirst("\\.yml$", ""), parsed);
             }
@@ -458,7 +459,9 @@ public class MenuManager implements Listener {
             }
         }
         player.openInventory(inv);
-        open.put(player.getUniqueId(), new OpenMenu(player, inv, best, ctx, 0, maxPages, null, slotMap, Kind.MAIN));
+        OpenMenu om = new OpenMenu(player, inv, best, ctx, 0, maxPages, null, slotMap, Kind.MAIN);
+        om.lastRenderAt = System.currentTimeMillis();
+        open.put(player.getUniqueId(), om);
         return true;
     }
 
@@ -522,6 +525,20 @@ public class MenuManager implements Listener {
 
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
+        // Анти-автокликер (menu-update.debounce-after-click): перерисовка УЖЕ
+        // открытого меню (тот же шаблон + та же страница) после клика молча
+        // откладывается, пока не пройдёт update_interval тиков с последней
+        // реальной перерисовки. Навигация (другое меню/страница), открытие и
+        // меню с выключенным автообновлением перерисовываются сразу.
+        OpenMenu cur = open.get(player.getUniqueId());
+        if (cur != null && cur.menu == menu && cur.page == page && cur.role == role
+                && plugin.config().menuDebounce()) {
+            int interval = menu.updateInterval();
+            if (interval > 0 && cur.lastRenderAt > 0
+                    && System.currentTimeMillis() - cur.lastRenderAt < interval * 50L) {
+                return true;                    // отложено: перерисует tick()
+            }
+        }
         // Рынок: подставлять название кнопки-вкладки («Мои объявления»/«Все объявления»)
         // и заголовок меню {market-title} — чтобы по заголовку было видно,
         // в какой вкладке игрок находится.
@@ -562,7 +579,9 @@ public class MenuManager implements Listener {
         Map<Integer, MenuItem> slotMap = new HashMap<>();
         Inventory inv = menu.build(plugin, player, ctx, safePage, maxPages, dynItems, slotMap);
         player.openInventory(inv);
-        open.put(player.getUniqueId(), new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap, kind));
+        OpenMenu om = new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap, kind);
+        om.lastRenderAt = System.currentTimeMillis();
+        open.put(player.getUniqueId(), om);
         return true;
     }
 
@@ -592,12 +611,16 @@ public class MenuManager implements Listener {
             return;
         }
         for (OpenMenu om : List.copyOf(open.values())) {
+            if (!om.player.isOnline()) {
+                continue;
+            }
+            int interval = om.menu.updateInterval();
+            if (interval <= 0) {
+                continue;                    // автообновление выключено
+            }
             om.ticks += 5;
-            if (om.ticks >= om.menu.updateInterval()) {
+            if (om.ticks >= interval) {
                 om.ticks = 0;
-                if (!om.player.isOnline()) {
-                    continue;
-                }
                 render(om.player, om.menu, om.ctx, om.page, om.role, om.kind);
             }
         }
@@ -644,6 +667,9 @@ public class MenuManager implements Listener {
         if (item == null) {
             return;
         }
+        // Молча сбрасываем таймер автообновления: после клика по кнопке меню
+        // не перерисуется раньше чем через update_interval тиков (анти-автокликер).
+        om.ticks = 0;
         if (item.permission() != null && !item.permission().isEmpty()
                 && !p.hasPermission("qqregions.admin") && !p.hasPermission(item.permission())) {
             return;
@@ -868,20 +894,52 @@ public class MenuManager implements Listener {
         return v == null ? "" : v.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** Следующее значение в цикле states (или allow&lt;-&gt;deny для StateFlag). */
+    /** Следующее значение в цикле states (или allow&lt;-&gt;deny для StateFlag).
+     *  Флаг «не установлен» (current "") трактуется как последнее состояние
+     *  цикла: если в states есть default-токен — как он сам (следующий клик
+     *  ставит allow), иначе как последнее состояние (следующий — первое). */
     private String nextState(MenuItem item, String current) {
         List<String> states = item.states();
         if (states == null || states.isEmpty()) {
             return "";
         }
         int idx = -1;
-        for (int i = 0; i < states.size(); i++) {
-            if (states.get(i).equalsIgnoreCase(current)) {
-                idx = i;
-                break;
+        if (current == null || current.isEmpty()) {
+            for (int i = states.size() - 1; i >= 0; i--) {
+                if (isUnsetState(states.get(i))) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0) {
+                idx = states.size() - 1;
+            }
+        } else {
+            for (int i = 0; i < states.size(); i++) {
+                if (states.get(i).equalsIgnoreCase(current)) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx < 0) {
+                return states.get(0);
             }
         }
-        return idx < 0 ? states.get(0) : states.get((idx + 1) % states.size());
+        return states.get((idx + 1) % states.size());
+    }
+
+    /** Токены «не установлено» (по умолчанию) в циклах значений флага. */
+    private static boolean isUnsetState(String s) {
+        if (s == null) {
+            return false;
+        }
+        String t = s.trim();
+        return t.equalsIgnoreCase("default")
+                || t.equals("-")
+                || t.equalsIgnoreCase("unset")
+                || t.equalsIgnoreCase("none")
+                || t.equalsIgnoreCase("clear")
+                || t.equalsIgnoreCase("по-умолчанию");
     }
 
     @EventHandler
@@ -1036,8 +1094,9 @@ public class MenuManager implements Listener {
     }
 
     /** Установить флаг региона через API WG: @flag:<имя>:{значение}
-     *  (значение allow/deny/true/false). group — группа кнопки
-     *  (all/members/owners/nonmembers/nonowners), ставится вместе со значением. */
+     *  (значение allow/deny/true/false или default — снять, как /rg flag -r).
+     *  group — группа кнопки (all/members/owners/nonmembers/nonowners),
+     *  ставится вместе со значением. */
     private void setFlag(Player p, OpenMenu om, String spec, String group) {
         String worldName = om.ctx.get("world");
         org.bukkit.World world = worldName == null ? null : org.bukkit.Bukkit.getWorld(worldName);
@@ -1055,6 +1114,19 @@ public class MenuManager implements Listener {
         if (flag == null) {
             return;
         }
+        if (isUnsetState(value)) {
+            plugin.wg().unsetFlag(world, region, flag);
+            plugin.lang().send(p, "menu.flag-set",
+                    "flag", flagName,
+                    "flag-name", plugin.replace().flagName(flagName),
+                    "value", "",
+                    "label", plugin.lang().get("menu.value-not-set"));
+            OpenMenu live = open.get(p.getUniqueId());
+            if (live != null) {
+                render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+            }
+            return;
+        }
         boolean allow = "allow".equalsIgnoreCase(value);
         if (flag instanceof StateFlag) {
             value = allow ? "allow" : "deny";
@@ -1069,7 +1141,8 @@ public class MenuManager implements Listener {
         plugin.lang().send(p, "menu.flag-set",
                 "flag", flagName,
                 "flag-name", plugin.replace().flagName(flagName),
-                "value", value);
+                "value", value,
+                "label", plugin.replace().resolve("flag-values", value));
         OpenMenu live = open.get(p.getUniqueId());
         if (live != null) {
             // сохраняем текущую страницу (не сбрасываем на первую)
@@ -2652,7 +2725,10 @@ public class MenuManager implements Listener {
         final int page;
         final int maxPages;
         final Kind kind;
+        /** Тики до следующего автообновления (сбрасываются кликом по кнопке). */
         int ticks;
+        /** Время последней реальной перерисовки (ms) — для дебаунса кликов. */
+        long lastRenderAt;
 
         OpenMenu(Player player, Inventory inv, Menu menu, Map<String, String> ctx,
                  int page, int maxPages, String role, Map<Integer, MenuItem> slotMap, Kind kind) {

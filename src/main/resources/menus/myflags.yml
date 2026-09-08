@@ -7,7 +7,7 @@
 #  Динамические кнопки: {flag-name} {group-label} {groups-list}
 # ============================================================
 config-version: 2
-update_interval: 20
+update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
   "default":

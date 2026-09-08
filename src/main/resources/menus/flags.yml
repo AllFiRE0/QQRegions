@@ -23,19 +23,20 @@
 #              {flag-with-group} {flag-value} {flag-value-label} {next-state}
 #  Пагинация: слоты из dynamic-flags.slots; навигация блок navigation.
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @teleport,
-#                 @flag:<имя>:allow|deny, asConsole!..., close
+#                 @flag:<имя>:allow|deny|default, asConsole!..., close
 #
 #  Группы флагов (WorldGuard region groups): у флага может быть ТОЛЬКО
 #  одна группа (как в /rg flag -g <группа> <флаг> <значение>): all,
 #  members, owners, nonmembers, nonowners.
 #  Menu содержит ОДНУ кнопку на каждый флаг (без дублей): она показывает
-#  текущую группу флага и её значение. ЛКМ — переключить значение для
-#  текущей группы, ПКМ — сменить группу (цикл по dynamic-flags.groups).
+#  текущую группу флага и её значение. ЛКМ — цикл значений для текущей
+#  группы: вкл → выкл → по умолчанию (снять, /rg flag -r, работает дефолт
+#  WorldGuard); ПКМ — сменить группу (цикл по dynamic-flags.groups).
 #  {groups-list} — подсказка со списком групп, текущая выделена.
 #  Переводы групп и значений — в replace.yml (блоки flag-groups/flag-values).
 # ============================================================
-config-version: 2
-update_interval: 20
+config-version: 3
+update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
   "owner":
@@ -113,11 +114,12 @@ Menus:
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
-        - "&9ЛКМ — вкл/выкл для группы"
+        - "&9ЛКМ — вкл/выкл/по умолчанию"
         - "&eПКМ — сменить группу"
       states:
         - allow
         - deny
+        - default
       commands:
         - "@flag:{flag}:{next-state}"
       materials:
@@ -259,11 +261,12 @@ Menus:
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
-        - "&9ЛКМ — вкл/выкл для группы"
+        - "&9ЛКМ — вкл/выкл/по умолчанию"
         - "&eПКМ — сменить группу"
       states:
         - allow
         - deny
+        - default
       commands:
         - "@flag:{flag}:{next-state}"
       materials:
@@ -342,11 +345,12 @@ Menus:
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
-        - "&9ЛКМ — вкл/выкл для группы"
+        - "&9ЛКМ — вкл/выкл/по умолчанию"
         - "&eПКМ — сменить группу"
       states:
         - allow
         - deny
+        - default
       commands:
         - "@flag:{flag}:{next-state}"
       materials:
@@ -437,11 +441,12 @@ Menus:
       lore:
         - "&7Значение: &f{flag-value-label}"
         - "&7Группа: {groups-list}"
-        - "&9ЛКМ — вкл/выкл для группы"
+        - "&9ЛКМ — вкл/выкл/по умолчанию"
         - "&eПКМ — сменить группу"
       states:
         - allow
         - deny
+        - default
       commands:
         - "@flag:{flag}:{next-state}"
       materials:

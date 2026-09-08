@@ -214,13 +214,17 @@ public class HighlightManager implements Listener {
                 continue;
             }
             java.util.Set<String> cur = new java.util.HashSet<>();
+            // Только at-регионы (ПОД игроком): по этому набору считается ВЫХОД.
+            java.util.Set<String> underNow = new java.util.HashSet<>();
             List<ProtectedRegion> under = new ArrayList<>();
             // 1) Чужие/по флагу: регионы ПОД игроком, где territory-visible ALLOW.
             for (ProtectedRegion r : plugin.wg().at(p.getWorld(), p.getLocation())) {
                 if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
                     continue;
                 }
-                if (cur.add(key(p.getWorld(), r))) {
+                String k = key(p.getWorld(), r);
+                underNow.add(k);
+                if (cur.add(k)) {
                     under.add(r);
                 }
             }
@@ -229,13 +233,12 @@ public class HighlightManager implements Listener {
             //    там, где territory-visible ALLOW: соседний регион без флага
             //    не загорится ни при полёте рядом, ни при входе/выходе из региона
             //    с флагом (границы не имеют значения).
-            for (ProtectedRegion r : ownRegionsAround(p)) {
+            List<ProtectedRegion> near = ownRegionsAround(p);
+            for (ProtectedRegion r : near) {
                 if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
                     continue;
                 }
-                if (cur.add(key(p.getWorld(), r))) {
-                    under.add(r);
-                }
+                cur.add(key(p.getWorld(), r));
             }
             Set<String> was = flagShown.get(p.getUniqueId());
             Set<String> next = was == null ? new HashSet<>() : new HashSet<>(was);
@@ -254,11 +257,15 @@ public class HighlightManager implements Listener {
                 next.add(k);
                 show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
             }
-            // ВЫХОД: регион исчез из-под игрока. Если show-on-exit — подсветить
-            // один раз (exit-семантика как у WorldGuard), иначе скрыть по hide-on-exit.
+            // ВЫХОД: регион исчез ИЗ-ПОД игрока (набор underNow, а НЕ общий cur).
+            // Раньше здесь был cur, в который входил и радиус auto-show-radius:
+            // свой регион в радиусе 16 блоков «удерживался» как бы под игроком,
+            // из-за чего exit-подсветка владельца зажигалась только ЗА 16+ блоков
+            // от реальной границы. У чужих регионов радиус не учитывается вообще,
+            // поэтому белый забор всегда гас/зажигался мгновенно на самой границе.
             if (was != null) {
                 for (String k : was) {
-                    if (cur.contains(k)) {
+                    if (underNow.contains(k)) {
                         continue;
                     }
                     next.remove(k);
@@ -274,6 +281,28 @@ public class HighlightManager implements Listener {
                         }
                     }
                 }
+            }
+            // 2а) Свои рядом (радиус auto-show-radius), но НЕ под игроком: если
+            //     подсветка уже погасла (region-hide-seconds) — показать заново
+            //     (раз в cooldown-секунд), чтобы владелец видел границы со стороны.
+            //     Это не «вход» в регион и на exit-семантику выше не влияет.
+            for (ProtectedRegion r : near) {
+                String k = key(p.getWorld(), r);
+                if (underNow.contains(k)) {
+                    continue;
+                }
+                if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
+                    continue;
+                }
+                if (next.contains(k) && isActive(p, k)) {
+                    continue;
+                }
+                if (onCooldown(p, k, now)) {
+                    continue;
+                }
+                markCooldown(p, k, now);
+                next.add(k);
+                show(p, p.getWorld(), r, typeFor(p.getWorld(), r));
             }
             if (next.isEmpty()) {
                 flagShown.remove(p.getUniqueId());
