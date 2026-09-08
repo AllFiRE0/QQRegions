@@ -148,14 +148,23 @@ public class MenuItem {
 
     /** Собрать физический предмет с применением контекста и замен. */
     public ItemStack build(QQRegions plugin, Player player, Map<String, String> ctx) {
-        Material m = Material.matchMaterial(material);
+        // Материал тоже обрабатывает {заполнители}: например "PLAYER_HEAD:{pc-uuid}"
+        // в статичной кнопке подставит голову с игроком скином ("PLAYER_HEAD:<UUID>").
+        String raw = material == null ? "" : process(plugin, player, ctx, material);
+        String ownerUu = ownerUuid;
+        int headColon = raw.toLowerCase(java.util.Locale.ROOT).indexOf("player_head:");
+        if (headColon == 0) {
+            ownerUu = raw.substring("player_head:".length()).trim();
+            raw = "PLAYER_HEAD";
+        }
+        Material m = Material.matchMaterial(raw);
         ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             // голова игрока: подставить скин по UUID (PLAYER_HEAD)
-            if (ownerUuid != null && m == Material.PLAYER_HEAD && meta instanceof SkullMeta sm) {
+            if (ownerUu != null && m == Material.PLAYER_HEAD && meta instanceof SkullMeta sm) {
                 try {
-                    sm.setOwningPlayer(Bukkit.getOfflinePlayer(UUID.fromString(ownerUuid)));
+                    sm.setOwningPlayer(Bukkit.getOfflinePlayer(UUID.fromString(ownerUu)));
                     meta = sm;
                 } catch (Throwable ignored) {
                     // невалидный UUID — без скина

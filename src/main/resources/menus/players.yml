@@ -11,8 +11,9 @@
 #    игрока, например %vault_eco_balance% вернёт баланс каждого
 #    игрока из списка (работает так же для любого PAPI-заполнителя);
 #  - commands — команда клика: у владельца шаблон содержит
-#    @player-del:{player-id}:{role} (удаление по клику);
-#    у остальных ролей commands пустой — только просмотр.
+#    @player-del:{player-id}:{role} (открывает меню подтверждения
+#    с инфо об игроке перед удалением); у остальных ролей commands
+#    пустой — только просмотр.
 #
 #  Кнопки владельца:
 #    @add:owner / @add:member  — добавить (ввод ника в чат)
@@ -24,7 +25,7 @@
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @add:owner|member,
 #                 @player-del:<uuid|ник>:owner|member, @pf:all|owners|members, close
 # ============================================================
-config-version: 2
+config-version: 3
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
@@ -147,7 +148,7 @@ Menus:
       lore:
         - "%vault_eco_balance%$"
         - "&7Роль: &b{role-ru}"
-        - "&cЛКМ — удалить из региона"
+        - "&cЛКМ — удалить (подтверждение)"
       commands:
         - "@player-del:{player-id}:{role}"
     navigation:

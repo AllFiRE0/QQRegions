@@ -1,0 +1,66 @@
+# ============================================================
+#  QQRegions — меню подтверждения добавления/удаления игрока.
+#  Открывается из меню «Игроки» (@player-del, @add:) и меню
+#  «Поиск игроков» (ЛКМ/ПКМ по голове) ВМЕСТО мгновенного действия.
+#
+#  Подтверждение: @pc-confirm (выполняет операцию из контекста
+#  меню: _pc-op=add|remove, _pc-uuid, _pc-role и возвращает в
+#  предыдущее меню). Отмена: @back.
+#
+#  Переменные контекста:
+#    {pc-action}    — «Добавить»/«Удалить» (lang menu.pc-add/remove)
+#    {pc-player}    — ник игрока
+#    {pc-role}      — роль (Владелец/Участник)
+#    {pc-balance}   — баланс игрока (Vault) или «—»
+#    {pc-clan}      — клан игрока (JustTeams) или «—»
+#    {pc-regions}   — всего регионов (владелец + участник)
+#    {pc-reg-owner} — из них владелец
+#    {pc-reg-member}— из них участник
+#    {pc-max}       — максимум регионов игрока (∞ — без лимита)
+#  Материал "PLAYER_HEAD:{pc-uuid}" — кнопка с головой игрока.
+# ============================================================
+config-version: 2
+update_interval: 0   # перерисовка меню каждые N тиков; 0 = выключить автообновление
+
+Menus:
+  "default":
+    role-required: owner
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&f{pc-player}&7 — {pc-action}?"
+    size: 3
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+      tooltip: false
+    buttons:
+      "confirm":
+        slot: 11
+        material: EMERALD
+        name: "&aПодтвердить"
+        lore:
+          - "&7{pc-action} &f{pc-player}&7: {region}"
+          - "&8Действие будет выполнено сразу"
+        commands:
+          - "@pc-confirm"
+      "info":
+        slot: 13
+        material: "PLAYER_HEAD:{pc-uuid}"
+        name: "&f{pc-player}"
+        lore:
+          - "&7Роль: &b{pc-role}"
+          - "&7Баланс: &f{pc-balance}"
+          - "&7Клан: &f{pc-clan}"
+          - "&7Регионов: &f{pc-regions}&8/&f{pc-max} &8(&f{pc-reg-owner}&8 вл. + &f{pc-reg-member}&8 уч.)"
+          - "&8Подтверждение операции с игроком"
+        commands: []
+      "cancel":
+        slot: 15
+        material: BARRIER
+        name: "&cОтмена"
+        lore:
+          - "&7Вернуться назад без изменений"
+        commands:
+          - "@back"

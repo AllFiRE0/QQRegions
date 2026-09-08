@@ -643,7 +643,8 @@ public class RegionCommand {
                             ? plugin.market().nameOf(o.buyer)
                             : plugin.market().nameOf(o.tenant);
                     lang(p, "market.list-line",
-                            "type", o.kind == dev.qqregions.market.Offer.Kind.SALE ? "продажа" : "аренда",
+                            "type", plugin.lang().get(o.kind == dev.qqregions.market.Offer.Kind.SALE
+                                    ? "menu.market-type-sale" : "menu.market-type-rent"),
                             "region", o.region,
                             "world", o.world,
                             "status", o.status.name().toLowerCase(java.util.Locale.ROOT),
