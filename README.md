@@ -330,13 +330,23 @@ command:
 | Меню info | `{owners}` `{members}` `{type}` `{area}` `{volume}` `{priority}` `{status}` `{my-regions}` `{max-regions}` `{max-blocks}` |
 | Меню флагов | `{flag}` `{flag-name}` `{flag-value}` `{flag-value-label}` `{flag-raw}` `{group}` `{group-label}` `{groups-list}` `{flag-group}` `{flag-group-label}` `{flag-with-group}` `{next-state}` |
 | Меню игроков | `{player}` `{role}` `{role-ru}` `{player-id}` |
-| Меню рынка | `{market-type}` `{market-region}` `{market-world}` `{market-price}` `{market-who}` `{market-owner}` `{market-status}` |
-| Голограмма рынка (market-holo) | `{owner}` (ник продавца/владельца) `{price}` `{nick}` `{time}` `{region}` |
-| Магазин флагов | `{flag-name}` `{flag}` `{price}` |
-| Магазин расширений | `{pack-name}` `{pack-amount}` `{price}` |
+| Поиск игроков | `{ps-group}` `{ps-balance}` `{ps-balance-symbol}` `{ps-regions}` `{ps-max}` `{ps-clan}` `{ps-sort-list}` |
+| Подтверждение (playerconfirm) | `{pc-player}` `{pc-role}` `{pc-action}` `{pc-balance}` `{pc-balance-symbol}` `{pc-clan}` `{pc-regions}` `{pc-reg-owner}` `{pc-reg-member}` `{pc-max}` |
+| Выбор территории | `{rp-world}` `{rp-type}` `{rp-people}` `{rp-area}` `{rp-dist}` `{rp-sort-list}` |
+| Меню рынка | `{market-type}` `{market-region}` `{market-world}` `{market-price}` `{market-price-symbol}` `{market-who}` `{market-owner}` `{market-status}` |
+| Голограмма рынка (market-holo) | `{owner}` (ник продавца/владельца) `{price}` `{price-symbol}` `{nick}` `{time}` `{region}` |
+| Магазин флагов | `{flag-name}` `{flag}` `{price}` `{price-symbol}` |
+| Магазин расширений | `{pack-name}` `{pack-amount}` `{price}` `{price-symbol}` |
+| Меню info (рейд-кнопка) | `{raid-clan}` `{raid-balance}` `{raid-balance-symbol}` `{raid-online}` `{raid-total}` `{raid-in-region}` `{raid-needed}` |
 | Боссбар выделения | `{current}` `{max}` `{percent}` `{player}` `{value-color}` |
 | Доп. инфо-экшнбар | `{height-top}` `{height-bottom}` `{conflict}` `{conflict-regions}` `{conflict-count}` `{current}` `{max}` `{percent}` `{player}` |
 | Рейд (бары/уведомления) | `{region}` `{world}` `{clan}` `{count}` `{total}` `{thief}` `{time}` `{percent}` `{player}` |
+
+> Все денежные заполнители (`{price}`, `{market-price}`, `{raid-balance}`,
+> `{ps-balance}`, `{pc-balance}`) отдают **только число** (по формату
+> `market.economy`). Символ валюты подставляйте отдельно — у каждого есть
+> `-symbol` брат: `{price} {price-symbol}` и т.п. Если `-symbol` в шаблоне
+> нет, число выводится без символа.
 
 ### 5.3 Внешние PAPI-заполнители `%qqregions_*%`
 
@@ -366,11 +376,12 @@ PlaceholderAPI.
 | Заполнитель | Значение |
 |---|---|
 | `%qqregions_region_current%` | id региона, в котором стоит игрок |
-| `%qqregions_region_price_<мир:регион>%` | цена активной оферты (`0`, если нет) |
+| `%qqregions_region_price_<мир:регион>%` | цена активной оферты (`0`, если нет); только число, без символа валюты |
 | `%qqregions_region_for_sale_<мир:регион>%` | `yes`/`no` — продаётся |
 | `%qqregions_region_for_rent_<мир:регион>%` | `yes`/`no` — сдаётся |
 | `%qqregions_region_owner_<мир:регион>%` | владелец региона |
-| `%qqregions_eco_balance%` | отформатированный баланс |
+| `%qqregions_eco_balance%` | отформатированный баланс — **только число** (без символа валюты) |
+| `%qqregions_eco_balance_symbol%` | символ валюты из `market.economy.symbol` (пусто, если она отключена) |
 | `%qqregions_eco_balance_raw%` | «сырой» баланс |
 | `%qqregions_eco_has_<сумма>%` | `yes`/`no` — хватает ли средств |
 | `%qqregions_market_listings%` | число активных предложений |
@@ -679,6 +690,21 @@ prefix: "&8[&bQQRegions&8] "
 guard:
   blocked: "actionbar:3!&cСервер нагружен — подождите."
 ```
+
+Префикс работает для **любого** выводимого сообщения плагина (команды,
+промпты чата, результаты кликов в меню, рейд-уведомления): если в начале
+строки стоит `actionbar:N!`, текст идёт в экшнбар, иначе — в чат.
+Консоль получает обычный текст.
+
+В денежных шаблонах используйте пару заполнителей «число + символ»
+(`{price} {price-symbol}`, `{raid-balance} {raid-balance-symbol}` и т.д.).
+Подробные шаблоны синтаксиса команд лежат в секции `usage:` (например для
+`/region help`), ключи компактного времени — `menu.time-short-*`, значения
+«да/нет» в статусе выделения — `select-status.yes/no`. Версия файла —
+`config-version: 6`; при переезде со старой версии плагин дополняет только
+**пустые** значения — шаблоны, отсутствующие в старом `lang.yml`, нужно
+доутвердить вручную (например добавить `{price-symbol}` к денежным
+сообщениям, либо ранние версии продолжат показывать число без символа).
 
 ### 7.5 data.yml
 

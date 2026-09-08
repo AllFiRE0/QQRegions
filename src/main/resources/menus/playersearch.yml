@@ -95,7 +95,7 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 44
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"

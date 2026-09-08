@@ -1322,7 +1322,8 @@ public class MenuManager implements Listener {
                     : plugin.lang().get("menu.market-type-rent"));
             pc.put("market-region", o.region);
             pc.put("market-world", o.world);
-            pc.put("market-price", plugin.market().economy().format(o.price));
+            pc.put("market-price", plugin.market().economy().formatAmount(o.price));
+            pc.put("market-price-symbol", plugin.market().economy().symbol());
             pc.put("market-lister", lister);
             pc.put("market-period", sale ? ""
                     : tf.format(o.periodMillis));
@@ -1487,9 +1488,9 @@ public class MenuManager implements Listener {
     private void toggleMarketTab(Player p, OpenMenu om) {
         boolean on = truthy(om.ctx.get("_mine"));
         om.ctx.put("_mine", on ? "" : "yes");
-        p.sendMessage(plugin.lang().comp(on
+        plugin.lang().sendMsg(p, on
                 ? "menu.market-tab-switch-all"
-                : "menu.market-tab-switch-mine"));
+                : "menu.market-tab-switch-mine");
         render(p, om.menu, om.ctx, 0, om.role, om.kind);
     }
 
@@ -1679,7 +1680,7 @@ public class MenuManager implements Listener {
         // закрываем меню, чтобы игрок видел чат и ввёл срок; после ответа
         // меню снова откроется само (onDurResult)
         p.closeInventory();
-        p.sendMessage(plugin.lang().comp("menu.dialog-dur-chat"));
+        plugin.lang().sendMsg(p, "menu.dialog-dur-chat");
     }
 
     private void onDurResult(UUID id, dev.qqregions.market.Offer o, String raw) {
@@ -1701,7 +1702,7 @@ public class MenuManager implements Listener {
             }
             String res = plugin.market().setListDuration(o, p, minutes);
             if ("ok".equals(res)) {
-                plugin.lang().send(p, "market.listdur-set", "region", o.region, "minutes", fmt(minutes));
+                plugin.lang().send(p, "market.listdur-set", "region", o.region, "minutes", plugin.lang().shortTime(minutes));
                 // меню закрылось для ввода в чат — открываем снова с результатом
                 openMarketMine(p);
             } else {
@@ -1724,7 +1725,7 @@ public class MenuManager implements Listener {
         pendingPeriod.put(p.getUniqueId(), o);
         // закрываем меню для ввода в чат; после ответа открываем снова
         p.closeInventory();
-        p.sendMessage(plugin.lang().comp("menu.market-period-chat"));
+        plugin.lang().sendMsg(p, "menu.market-period-chat");
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -1830,21 +1831,6 @@ public class MenuManager implements Listener {
                 && (s.equalsIgnoreCase("yes") || s.equalsIgnoreCase("true") || "1".equals(s));
     }
 
-    /** Дружелюбное отображение количества минут. */
-    private static String fmt(long minutes) {
-        if (minutes >= 1440) {
-            long days = minutes / 1440;
-            long h = (minutes % 1440) / 60;
-            return h > 0 ? days + "д " + h + "ч" : days + "д";
-        }
-        if (minutes >= 60) {
-            long h = minutes / 60;
-            long m = minutes % 60;
-            return m > 0 ? h + "ч " + m + "м" : h + "ч";
-        }
-        return minutes + "м";
-    }
-
     /** Обработчик @raid:<action> из кнопок меню (запуск рейда). */
     private void raidAction(Player p, String spec, Map<String, String> ctx) {
         String action = spec.trim().toLowerCase(java.util.Locale.ROOT);
@@ -1865,7 +1851,7 @@ public class MenuManager implements Listener {
         }
         if (res != null) {
             // res — уже готовый перевод (RaidManager fmt из lang), только показать.
-            p.sendMessage(dev.qqregions.util.Msg.color(res));
+            plugin.lang().sendRaw(p, res);
         } else {
             plugin.lang().send(p, "raid.ok",
                     "region", r != null ? r.getId() : (ctx.get("region") == null ? "" : ctx.get("region")));
@@ -1970,6 +1956,7 @@ public class MenuManager implements Listener {
             pc.put("name", row.name());
             pc.put("ps-group", groupLabel);
             pc.put("ps-balance", row.balanceLabel());
+            pc.put("ps-balance-symbol", currencySymbol());
             pc.put("ps-regions", String.valueOf(row.regions()));
             pc.put("ps-max", row.maxLabel());
             pc.put("ps-clan", playerClan(row.uuid()));
@@ -2279,7 +2266,8 @@ public class MenuManager implements Listener {
         ctx.put("raid-clan", team.name());
         double bal = teams.balance(team);
         if (bal >= 0) {
-            ctx.put("raid-balance", plugin.market().economy().format(bal));
+            ctx.put("raid-balance", plugin.market().economy().formatAmount(bal));
+            ctx.put("raid-balance-symbol", plugin.market().economy().symbol());
         }
         List<UUID> online = teams.onlineMembers(team);
         ctx.put("raid-online", String.valueOf(online.size()));
@@ -2392,7 +2380,8 @@ public class MenuManager implements Listener {
             }
             Map<String, String> pc = new HashMap<>(ctx);
             pc.put("flag-name", plugin.replace().flagName(id));
-            pc.put("price", plugin.market().economy().format(price));
+            pc.put("price", plugin.market().economy().formatAmount(price));
+            pc.put("price-symbol", plugin.market().economy().symbol());
             String name = tpl.process(plugin, player, pc, "&f{flag-name}");
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-price")));
@@ -2417,7 +2406,8 @@ public class MenuManager implements Listener {
             Map<String, String> pc = new HashMap<>(ctx);
             pc.put("pack-name", p.name());
             pc.put("pack-amount", String.valueOf(p.amount()));
-            pc.put("price", plugin.market().economy().format(p.price()));
+            pc.put("price", plugin.market().economy().formatAmount(p.price()));
+            pc.put("price-symbol", plugin.market().economy().symbol());
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-area")));
@@ -2430,7 +2420,8 @@ public class MenuManager implements Listener {
             Map<String, String> pc = new HashMap<>(ctx);
             pc.put("pack-name", p.name());
             pc.put("pack-amount", String.valueOf(p.amount()));
-            pc.put("price", plugin.market().economy().format(p.price()));
+            pc.put("price", plugin.market().economy().formatAmount(p.price()));
+            pc.put("price-symbol", plugin.market().economy().symbol());
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-region")));
@@ -2464,11 +2455,13 @@ public class MenuManager implements Listener {
                 if ("flag".equals(kind)) {
                     plugin.lang().send(p, "shop.flag-bought",
                             "flag-name", plugin.replace().flagName(id),
-                            "price", plugin.market().economy().format(plugin.shop().priceOf(id)));
+                            "price", plugin.market().economy().formatAmount(plugin.shop().priceOf(id)),
+                            "price-symbol", plugin.market().economy().symbol());
                 } else {
                     plugin.lang().send(p, "shop.pack-bought",
                             "pack-name", packName(kind, id),
-                            "price", plugin.market().economy().format(packPrice(kind, id)));
+                            "price", plugin.market().economy().formatAmount(packPrice(kind, id)),
+                            "price-symbol", plugin.market().economy().symbol());
                 }
             }
             case "already" -> plugin.lang().send(p, "shop.already",
@@ -2556,6 +2549,7 @@ public class MenuManager implements Listener {
         ctx.put("pc-role", plugin.lang().get("menu." + (owner ? "role-owner" : "role-member")));
         ctx.put("pc-action", plugin.lang().get("menu.pc-" + ("add".equalsIgnoreCase(op) ? "add" : "remove")));
         ctx.put("pc-balance", playerBalance(uuid));
+        ctx.put("pc-balance-symbol", currencySymbol());
         ctx.put("pc-clan", playerClan(uuid));
         ctx.put("pc-regions", String.valueOf(c[0] + c[1]));
         ctx.put("pc-reg-owner", String.valueOf(c[0]));
@@ -2650,16 +2644,29 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Баланс игрока через Vault (или «—», если экономика недоступна). */
+    /** Баланс игрока через Vault (или «—», если экономика недоступна). Число БЕЗ символа валюты —
+     *  символ отдаётся отдельным заполнителем {…-symbol}. */
     private String playerBalance(UUID uuid) {
         try {
             if (!plugin.market().economy().enabled()) {
                 return plugin.lang().get("menu.time-empty");
             }
             double bal = plugin.market().economy().balance(uuid);
-            return plugin.market().economy().format(bal);
+            return plugin.market().economy().formatAmount(bal);
         } catch (Throwable t) {
             return plugin.lang().get("menu.time-empty");
+        }
+    }
+
+    /** Символ валюты для заполнителей {…-symbol} (пусто, если экономика выключена). */
+    private String currencySymbol() {
+        try {
+            if (!plugin.market().economy().enabled()) {
+                return "";
+            }
+            return plugin.market().economy().symbol();
+        } catch (Throwable t) {
+            return "";
         }
     }
 
@@ -2701,8 +2708,8 @@ public class MenuManager implements Listener {
         // закрываем меню: игрок вводит запрос в чат, результат открывает
         // меню заново (applySearch). Без закрытия чат «прилипает» к инвентарю.
         p.closeInventory();
-        p.sendMessage(plugin.lang().comp("market.search-prompt"));
-        p.sendMessage(plugin.lang().comp("market.search-cancel"));
+        plugin.lang().sendMsg(p, "market.search-prompt");
+        plugin.lang().sendMsg(p, "market.search-cancel");
     }
 
     /** Цикл сортировки предложений рынка: Название → Цена → По умолчанию. */
@@ -2726,12 +2733,12 @@ public class MenuManager implements Listener {
         final String text = e.getMessage().trim();
         pendingSearch.remove(id);
         if (text.isEmpty()) {
-            e.getPlayer().sendMessage(plugin.lang().comp("market.search-off"));
+            plugin.lang().sendMsg(e.getPlayer(), "market.search-off");
             return;
         }
         if (text.equalsIgnoreCase("cancel") || text.equalsIgnoreCase("отмена")
                 || text.equalsIgnoreCase("сброс") || text.equalsIgnoreCase("off")) {
-            e.getPlayer().sendMessage(plugin.lang().comp("market.search-off"));
+            plugin.lang().sendMsg(e.getPlayer(), "market.search-off");
             return;
         }
         final String q = text;
@@ -2750,7 +2757,7 @@ public class MenuManager implements Listener {
         }
         boolean market = "market".equalsIgnoreCase(pr.kind);
         String key = market ? "_marketsearch" : "_flagsearch";
-        p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
+        plugin.lang().sendMsg(p, "market.search-set", "query", query);
         OpenMenu live = open.get(id);
         if (live != null) {
             // меню ещё открыто — кладём фильтр в ЖИВОЙ контекст и перерисовываем
@@ -2796,8 +2803,8 @@ public class MenuManager implements Listener {
             }
             return;
         }
-        p.sendMessage(plugin.lang().comp("menu.region-search-many", "query", query,
-                "regions", String.valueOf(matches.size())));
+        plugin.lang().sendMsg(p, "menu.region-search-many", "query", query,
+                "regions", String.valueOf(matches.size()));
         Map<String, String> ctx = new HashMap<>();
         ctx.put("world", p.getWorld().getName());
         ctx.put("region", "");
@@ -2906,7 +2913,7 @@ public class MenuManager implements Listener {
         // закрываем меню: игрок вводит ник в чат, после ответа меню
         // открывается снова (addPlayerFromChat)
         p.closeInventory();
-        p.sendMessage(plugin.lang().comp(ownerRole ? "menu.add-chat-prompt-owner" : "menu.add-chat-prompt-member"));
+        plugin.lang().sendMsg(p, ownerRole ? "menu.add-chat-prompt-owner" : "menu.add-chat-prompt-member");
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

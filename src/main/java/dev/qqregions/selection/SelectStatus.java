@@ -123,10 +123,12 @@ public final class SelectStatus {
         long cur = sel.volume();
         String percent = mx <= 0 ? "100" : String.valueOf(Math.min(100L, cur * 100 / mx));
         String text = template == null ? "" : template;
+        String yes = plugin.lang().get("select-status.yes");
+        String no = plugin.lang().get("select-status.no");
         text = text.replace("{height-top}", fmt(heightTop(sel, p)))
                 .replace("{height-bottom}", fmt(heightBottom(sel, p)))
-                .replace("{conflict}", foreign.isEmpty() ? "нет" : "да")
-                .replace("{conflict-regions}", foreign.isEmpty() ? "нет" : foreignNames(plugin, sel, p))
+                .replace("{conflict}", foreign.isEmpty() ? no : yes)
+                .replace("{conflict-regions}", foreign.isEmpty() ? no : foreignNames(plugin, sel, p))
                 .replace("{conflict-count}", fmt(foreign.size()))
                 .replace("{current}", fmt(cur))
                 .replace("{max}", fmt(mx))

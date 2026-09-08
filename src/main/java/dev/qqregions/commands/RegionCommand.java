@@ -108,13 +108,13 @@ public class RegionCommand {
                 return;
             }
         }
-        sender.sendMessage(l.comp("help.header", "version", plugin.getDescription().getVersion()));
+        l.sendMsg(sender, "help.header", "version", plugin.getDescription().getVersion());
         for (Object o : l.getList("help.commands")) {
             if (o instanceof Map) {
                 Map<?, ?> m = (Map<?, ?>) o;
-                sender.sendMessage(l.comp("help.line",
+                l.sendMsg(sender, "help.line",
                         "cmd", "/" + label + " " + m.get("usage"),
-                        "desc", String.valueOf(m.get("desc"))));
+                        "desc", String.valueOf(m.get("desc")));
             }
         }
     }
@@ -158,7 +158,7 @@ public class RegionCommand {
             return;
         }
         if (args.length < 2) {
-            lang(p, "general.usage", "usage", label + " create <название>");
+            lang(p, "general.usage", "usage", label + " " + plugin.lang().get("usage.create"));
             return;
         }
         String name = args[1];
@@ -290,7 +290,7 @@ public class RegionCommand {
                 regionName = args[2];
             }
         } else {
-            lang(p, "general.usage", "usage", plugin.config().commandName() + " " + (add ? "add" : "remove") + " [member|owner] <ник> [регион]");
+            lang(p, "general.usage", "usage", plugin.config().commandName() + " " + plugin.lang().get("usage." + (add ? "add" : "remove")));
             return;
         }
 
@@ -648,7 +648,8 @@ public class RegionCommand {
                             "region", o.region,
                             "world", o.world,
                             "status", o.status.name().toLowerCase(java.util.Locale.ROOT),
-                            "price", plugin.market().economy().format(o.price),
+                            "price", plugin.market().economy().formatAmount(o.price),
+                            "price-symbol", plugin.market().economy().symbol(),
                             "who", who,
                             "id", o.id.toString().substring(0, 8));
                 }
@@ -683,9 +684,7 @@ public class RegionCommand {
         if (sub.equals("sell") || sub.equals("rent")) {
             boolean rent = sub.equals("rent");
             if (args.length < 2) {
-                lang(p, "general.usage", "usage", label + " " + sub + " " + (rent
-                        ? "[ник] <сумма> <время> [регион]"
-                        : "[ник] <сумма> [регион]"));
+                lang(p, "general.usage", "usage", label + " " + plugin.lang().get("usage." + sub));
                 return;
             }
             String nick = null;
@@ -698,7 +697,7 @@ public class RegionCommand {
                 regionIdx = 2;
                 if (rent) {
                     if (args.length < 3) {
-                        lang(p, "general.usage", "usage", label + " rent <сумма> <время> [регион]");
+                        lang(p, "general.usage", "usage", label + " " + plugin.lang().get("usage.rent-public"));
                         return;
                     }
                     timeArg = args[2];
@@ -707,9 +706,9 @@ public class RegionCommand {
             } else {
                 nick = args[1];
                 if (args.length < (rent ? 4 : 3)) {
-                    lang(p, "general.usage", "usage", label + " " + sub + " " + (rent
-                            ? "<ник> <сумма> <время> [регион]"
-                            : "<ник> <сумма> [регион]"));
+                    lang(p, "general.usage", "usage", label + " " + plugin.lang().get("usage." + (rent
+                            ? "rent-target"
+                            : "sell-target")));
                     return;
                 }
                 priceArg = args[2];
@@ -754,7 +753,8 @@ public class RegionCommand {
                     lang(p, nick == null ? "market.rent-listed" : "market.rent-offer-made",
                             "target", nick == null ? "" : nick,
                             "region", region.getId(),
-                            "price", plugin.market().economy().format(price));
+                            "price", plugin.market().economy().formatAmount(price),
+                            "price-symbol", plugin.market().economy().symbol());
                 } else {
                     lang(p, marketErr(res), "region", region.getId());
                 }
@@ -764,7 +764,8 @@ public class RegionCommand {
                     lang(p, nick == null ? "market.sale-listed" : "market.sale-offer-made",
                             "target", nick == null ? "" : nick,
                             "region", region.getId(),
-                            "price", plugin.market().economy().format(price));
+                            "price", plugin.market().economy().formatAmount(price),
+                            "price-symbol", plugin.market().economy().symbol());
                 } else {
                     lang(p, marketErr(res), "region", region.getId());
                 }

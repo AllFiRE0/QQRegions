@@ -142,26 +142,27 @@ public final class MarketHolos {
     }
 
     private String textOf(Offer o) {
-        String price = plugin.market().economy().format(o.price);
+        String price = plugin.market().economy().formatAmount(o.price);
+        String priceSymbol = plugin.market().economy().symbol();
         String owner = plugin.market().nameOf(o.owner != null ? o.owner : o.seller);
         if (o.kind == Offer.Kind.RENT) {
-            String time = fmtMinutes(o.periodMillis / 60_000L);
+            String time = plugin.lang().shortTime(o.periodMillis / 60_000L);
             if (o.status == Offer.Status.PENDING && o.tenant != null) {
                 return plugin.lang().fmt("market-holo.rent-pending",
                         "owner", owner,
                         "nick", plugin.market().nameOf(o.tenant),
-                        "price", price, "time", time);
+                        "price", price, "price-symbol", priceSymbol, "time", time);
             }
             return plugin.lang().fmt("market-holo.rent",
-                    "owner", owner, "price", price, "time", time);
+                    "owner", owner, "price", price, "price-symbol", priceSymbol, "time", time);
         }
         // SALE
         if (o.status == Offer.Status.PENDING && o.buyer != null) {
             return plugin.lang().fmt("market-holo.sale-pending",
                     "owner", owner,
-                    "nick", plugin.market().nameOf(o.buyer), "price", price);
+                    "nick", plugin.market().nameOf(o.buyer), "price", price, "price-symbol", priceSymbol);
         }
-        return plugin.lang().fmt("market-holo.sale", "owner", owner, "price", price);
+        return plugin.lang().fmt("market-holo.sale", "owner", owner, "price", price, "price-symbol", priceSymbol);
     }
 
     /** Ближайший игрок (по X/Z), чей Y внутри высот региона и кто в радиусе. */
@@ -252,21 +253,6 @@ public final class MarketHolos {
         if (d.isValid()) {
             d.remove();
         }
-    }
-
-    /** Дружелюбное отображение количества минут. */
-    static String fmtMinutes(long minutes) {
-        if (minutes >= 1440) {
-            long days = minutes / 1440;
-            long h = (minutes % 1440) / 60;
-            return h > 0 ? days + "д " + h + "ч" : days + "д";
-        }
-        if (minutes >= 60) {
-            long h = minutes / 60;
-            long m = minutes % 60;
-            return m > 0 ? h + "ч " + m + "м" : h + "ч";
-        }
-        return minutes + "м";
     }
 
     /** Живая вывеска: мир, регион, текущий текст, сущность и её позиция. */

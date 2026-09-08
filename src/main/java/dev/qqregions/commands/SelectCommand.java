@@ -222,7 +222,7 @@ public class SelectCommand {
             amountStr = args[1];
             direction = facing(p.getLocation().getYaw());
         } else {
-            send(p, "general.usage", "usage", "select expand [сторона] <количество>");
+            send(p, "general.usage", "usage", plugin.lang().get("usage.select-expand"));
             return;
         }
         int amount;
@@ -239,7 +239,7 @@ public class SelectCommand {
 
     private void outset(Player p, String[] args) {
         if (args.length < 2) {
-            send(p, "general.usage", "usage", "select outset <количество> [h|v|horizontal|vertical]");
+            send(p, "general.usage", "usage", plugin.lang().get("usage.select-outset"));
             return;
         }
         int amount;
@@ -282,7 +282,7 @@ public class SelectCommand {
             return;
         }
         if (args.length < 2) {
-            send(p, "general.usage", "usage", "select view <ник>|off");
+            send(p, "general.usage", "usage", plugin.lang().get("usage.select-view"));
             return;
         }
         String target = args[1];

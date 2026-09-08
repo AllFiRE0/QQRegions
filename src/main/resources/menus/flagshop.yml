@@ -7,7 +7,7 @@
 #  После покупки флаг появляется в меню флагов региона и в
 #  «Моих флагах» (кнопка в меню рынка).
 #
-#  Динамические кнопки: {flag-name} {flag} {price}
+#  Динамические кнопки: {flag-name} {flag} {price} {price-symbol}
 # ============================================================
 config-version: 2
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
@@ -42,16 +42,16 @@ Menus:
           - "&7Нажмите и введите запрос в чат"
         commands:
           - "@flag-search"
-      "market":
-        slot: 45
-        material: GOLD_INGOT
-        name: "&eРынок"
-        lore:
-          - "&7Вернуться к рынку"
-        commands:
-          - "@menu:market"
+#      "market":
+#        slot: 45
+#        material: GOLD_INGOT
+#        name: "&eРынок"
+#        lore:
+#          - "&7Вернуться к рынку"
+#        commands:
+#          - "@menu:market"
       "myflags":
-        slot: 46
+        slot: 49
         material: WRITABLE_BOOK
         name: "&bМои флаги"
         lore:
@@ -99,8 +99,8 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 51
+        slot: 53

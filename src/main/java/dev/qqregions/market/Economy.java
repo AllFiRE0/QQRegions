@@ -166,8 +166,14 @@ public final class Economy {
         }
     }
 
-    /** Отформатировать сумму по правилам market.economy.* (знак + символ валюты). */
-    public String format(double amount) {
+    /** Символ валюты из настроек config.yml (может быть пустой строкой). */
+    public String symbol() {
+        Config.MarketOptions m = plugin.config().market();
+        return m.symbol == null ? "" : m.symbol;
+    }
+
+    /** Отформатировать ТОЛЬКО число (разряды/десятичные), без символа валюты. */
+    public String formatAmount(double amount) {
         Config.MarketOptions m = plugin.config().market();
         String gs = m.groupSeparator == null || m.groupSeparator.isEmpty() ? " " : m.groupSeparator;
         String ds = m.decimalSeparator == null || m.decimalSeparator.isEmpty() ? "." : m.decimalSeparator;
@@ -189,10 +195,16 @@ public final class Economy {
         if (m.decimalPlaces > 0) {
             pat.append('.').append("0".repeat(m.decimalPlaces));
         }
-        DecimalFormat df = new DecimalFormat(pat.toString(), sym);
-        String num = df.format(amount);
-        String symStr = m.symbol == null ? "" : m.symbol;
-        return m.symbolPosition == Config.MarketOptions.SymbolPosition.BEFORE
-                ? symStr + num : num + symStr;
+        return new DecimalFormat(pat.toString(), sym).format(amount);
+    }
+
+    /** Отформатировать сумму: число + символ валюты (число и символ
+     *  доступны отдельно через {@link #formatAmount(double)} и {@link #symbol()},
+     *  чтобы в переводах можно было составить, например, «1.000 ₽» с пробелом). */
+    public String format(double amount) {
+        String amountStr = formatAmount(amount);
+        String symStr = symbol();
+        return plugin.config().market().symbolPosition == Config.MarketOptions.SymbolPosition.BEFORE
+                ? symStr + amountStr : amountStr + symStr;
     }
 }

@@ -161,7 +161,8 @@ public final class MarketManager {
             player(o.buyer).ifPresent(t -> plugin.lang().send(t, "market.sale-offer-sent",
                     "region", o.region,
                     "world", o.world,
-                    "price", economy().format(o.price),
+                    "price", economy().formatAmount(o.price),
+                    "price-symbol", economy().symbol(),
                     "initiator", nameOf(initiator.getUniqueId())));
         }
         return "ok";
@@ -212,8 +213,9 @@ public final class MarketManager {
             player(o.tenant).ifPresent(t -> plugin.lang().send(t, "market.rent-offer-sent",
                     "region", o.region,
                     "world", o.world,
-                    "price", economy().format(o.price),
-                    "time", MarketHolos.fmtMinutes(o.periodMillis / 60_000L),
+                    "price", economy().formatAmount(o.price),
+                    "price-symbol", economy().symbol(),
+                    "time", plugin.lang().shortTime(o.periodMillis / 60_000L),
                     "initiator", nameOf(initiator.getUniqueId())));
         }
         return "ok";
@@ -525,7 +527,8 @@ public final class MarketManager {
                 UUID counterpart = o.kind == Offer.Kind.SALE ? o.buyer : o.tenant;
                 UUID initiator = initiatorOf(o);
                 Config.MarketOptions m = plugin.config().market();
-                String price = economy().format(o.price);
+                String price = economy().formatAmount(o.price);
+                String priceSymbol = economy().symbol();
                 if (m.offerTimeoutAction == Config.MarketOptions.OfferTimeoutAction.RELIST) {
                     if (o.kind == Offer.Kind.SALE) {
                         o.buyer = null;
@@ -539,14 +542,14 @@ public final class MarketManager {
                     o.status = Offer.Status.ACTIVE;
                     save();
                     player(counterpart).ifPresent(t -> plugin.lang().send(t, "market.offer-expired",
-                            "region", o.region, "world", o.world, "price", price));
+                            "region", o.region, "world", o.world, "price", price, "price-symbol", priceSymbol));
                     player(initiator).ifPresent(t -> plugin.lang().send(t, "market.offer-relisted",
-                            "region", o.region, "world", o.world, "price", price));
+                            "region", o.region, "world", o.world, "price", price, "price-symbol", priceSymbol));
                 } else {
                     o.status = Offer.Status.CANCELLED;
                     save();
                     player(initiator).ifPresent(t -> plugin.lang().send(t, "market.offer-timeout-cancelled",
-                            "region", o.region, "world", o.world, "price", price));
+                            "region", o.region, "world", o.world, "price", price, "price-symbol", priceSymbol));
                 }
                 changed = true;
             }
@@ -584,7 +587,8 @@ public final class MarketManager {
             plugin.marketHolos().refresh();
             player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-relisted",
                     "region", o.region, "world", o.world,
-                    "price", economy().format(o.price)));
+                    "price", economy().formatAmount(o.price),
+                    "price-symbol", economy().symbol()));
             return;
         }
         o.status = cancelled ? Offer.Status.CANCELLED : Offer.Status.DONE;
@@ -594,7 +598,8 @@ public final class MarketManager {
         plugin.marketHolos().refresh();
         player(o.owner).ifPresent(p -> plugin.lang().send(p, "market.rent-ended",
                 "region", o.region, "world", o.world,
-                "price", economy().format(o.price)));
+                "price", economy().formatAmount(o.price),
+                "price-symbol", economy().symbol()));
     }
 
     // ---------- уведомления ----------
@@ -603,11 +608,13 @@ public final class MarketManager {
         player(first).ifPresent(p -> plugin.lang().send(p, keyTenantOrBuyer,
                 "region", o.region,
                 "world", o.world,
-                "price", economy().format(o.price)));
+                "price", economy().formatAmount(o.price),
+                "price-symbol", economy().symbol()));
         player(second).ifPresent(p -> plugin.lang().send(p, keyOther,
                 "region", o.region,
                 "world", o.world,
-                "price", economy().format(o.price)));
+                "price", economy().formatAmount(o.price),
+                "price-symbol", economy().symbol()));
     }
 
     private static java.util.Optional<Player> player(UUID u) {

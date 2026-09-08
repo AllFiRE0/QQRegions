@@ -10,7 +10,7 @@
 #      Шифт+ЛКМ — срок объявления, Шифт+ПКМ — срок аренды.
 #
 #  Динамические кнопки строятся из предложений рынка (market.yml):
-#    {market-type} {market-region} {market-world} {market-price}
+#    {market-type} {market-region} {market-world} {market-price} {market-price-symbol}
 #    {market-lister} {market-volume} {market-loc} {market-age} {market-period}
 # ============================================================
 config-version: 2
@@ -38,7 +38,7 @@ Menus:
         commands:
           - "@back"
       "search":
-        slot: 4
+        slot: 5
         material: PAPER
         name: "&eПоиск по названию"
         lore:
@@ -47,7 +47,7 @@ Menus:
         commands:
           - "@market-search"
       "tab":
-        slot: 5
+        slot: 4
         material: BOOK
         name: "{market-tab-name}"
         lore:
@@ -56,37 +56,37 @@ Menus:
         commands:
           - "@market-tab"
       "sort":
-        slot: 6
+        slot: 3
         material: HOPPER
         name: "&eСортировка: &fНазвание"
         lore:
           - "&7Цикл: Название → Цена → По умолчанию"
         commands:
           - "@sort"
-      "blocks":
-        slot: 45
-        material: GOLD_BLOCK
-        name: "&6Расширение"
-        lore:
-          - "&7Пакеты площади и «+регион»"
-        commands:
-          - "@menu:blocks"
-      "flagshop":
-        slot: 46
-        material: REDSTONE_TORCH
-        name: "&eМагазин флагов"
-        lore:
-          - "&7Купить флаг, доступный по праву"
-        commands:
-          - "@menu:flagshop"
-      "myflags":
-        slot: 53
-        material: WRITABLE_BOOK
-        name: "&bМои флаги"
-        lore:
-          - "&7Купленные в магазине флаги"
-        commands:
-          - "@menu:myflags"
+#      "blocks":
+#        slot: 45
+#        material: GOLD_BLOCK
+#        name: "&6Расширение"
+#        lore:
+#          - "&7Пакеты площади и «+регион»"
+#        commands:
+#          - "@menu:blocks"
+#      "flagshop":
+#        slot: 46
+#        material: REDSTONE_TORCH
+#        name: "&eМагазин флагов"
+#        lore:
+#          - "&7Купить флаг, доступный по праву"
+#        commands:
+#          - "@menu:flagshop"
+#      "myflags":
+#        slot: 53
+#        material: WRITABLE_BOOK
+#        name: "&bМои флаги"
+#        lore:
+#          - "&7Купленные в магазине флаги"
+#        commands:
+#          - "@menu:myflags"
       "help":
         slot: 8
         material: BOOK
@@ -121,8 +121,8 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 51
+        slot: 53

@@ -62,6 +62,7 @@ public class QQExpansion extends PlaceholderExpansion {
                 "%qqregions_selection_conflict_count%",
                 "%qqregions_region_current%",
                 "%qqregions_eco_balance%",
+                "%qqregions_eco_balance_symbol%",
                 "%qqregions_eco_balance_raw%",
                 "%qqregions_eco_has_<сумма>%",
                 "%qqregions_market_listings%",
@@ -136,7 +137,9 @@ public class QQExpansion extends PlaceholderExpansion {
                 var region = plugin.wg().current(p);
                 return region == null ? "" : region.getId();
             case "eco_balance":
-                return economy() ? plugin.market().economy().format(plugin.market().economy().balance(offline.getUniqueId())) : "";
+                return economy() ? plugin.market().economy().formatAmount(plugin.market().economy().balance(offline.getUniqueId())) : "";
+            case "eco_balance_symbol":
+                return economy() ? plugin.market().economy().symbol() : "";
             case "eco_balance_raw":
                 return economy() ? String.valueOf(plugin.market().economy().balance(offline.getUniqueId())) : "";
             case "market_listings":
@@ -243,7 +246,7 @@ public class QQExpansion extends PlaceholderExpansion {
         if (o == null) {
             return "0";
         }
-        return plugin.market().economy().format(o.price);
+        return plugin.market().economy().formatAmount(o.price);
     }
 
     private String ownerOf(String key) {

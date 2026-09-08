@@ -5,7 +5,7 @@
 #  Допустимы: '&'-цвета, '&#RRGGBB' и заполнители {переменная}.
 # ============================================================
 
-config-version: 5
+config-version: 6
 
 prefix: "&8[&bQQRegions&8] "
 
@@ -19,6 +19,20 @@ general:
   player-not-found: "&cИгрок &7{player} &cне найден."
   unknown-subcommand: "&cНеизвестная подкоманда. Введите &7/{alias} help"
   usage: "&7Использование: &f/{usage}"
+
+# Шаблоны синтаксиса команд (подставляются в general.usage после имени команды).
+usage:
+  create: "create <название>"
+  add: "add [member|owner] <ник> [регион]"
+  remove: "remove [member|owner] <ник> [регион]"
+  sell: "sell [ник] <сумма> [регион]"
+  sell-target: "sell <ник> <сумма> [регион]"
+  rent: "rent [ник] <сумма> <время> [регион]"
+  rent-target: "rent <ник> <сумма> <время> [регион]"
+  rent-public: "rent <сумма> <время> [регион]"
+  select-expand: "select expand [сторона] <количество>"
+  select-outset: "select outset <количество> [h|v|horizontal|vertical]"
+  select-view: "select view <ник>|off"
 
 select:
   point-1: "точка 1"
@@ -271,15 +285,15 @@ market:
   bad-args: "&cНекорректная сумма или время аренды."
   already-offer: "&eНа регион &7{region} &eуже есть активное предложение."
   not-found: "&cПредложение не найдено."
-  sale-offer-made: "&aПредложение о продаже &7{region} &aотправлено &7{target}&a — он увидит его в меню рынка. Цена: &7{price}"
-  rent-offer-made: "&aПредложение об аренде &7{region} &aотправлено &7{target}&a. Цена: &7{price}"
-  sale-offer-sent: "&eВам предложено купить регион &7{region}&e за &7{price}&e. Инициатор: &7{initiator}"
-  rent-offer-sent: "&eВам предложено арендовать регион &7{region}&e за &7{price}&e на &7{time}&e. Инициатор: &7{initiator}"
+  sale-offer-made: "&aПредложение о продаже &7{region} &aотправлено &7{target}&a — он увидит его в меню рынка. Цена: &7{price} {price-symbol}"
+  rent-offer-made: "&aПредложение об аренде &7{region} &aотправлено &7{target}&a. Цена: &7{price} {price-symbol}"
+  sale-offer-sent: "&eВам предложено купить регион &7{region}&e за &7{price} {price-symbol}&e. Инициатор: &7{initiator}"
+  rent-offer-sent: "&eВам предложено арендовать регион &7{region}&e за &7{price} {price-symbol}&e на &7{time}&e. Инициатор: &7{initiator}"
   offer-expired: "&7Срок предложения по региону &7{region} &7истёк — теперь объявление публичное."
   offer-relisted: "&aСрок приватного предложения по региону &7{region} &aистек — объявление перевыставлено публично по той же цене."
   offer-timeout-cancelled: "&eСрок приватного предложения по региону &7{region} &eистек — объявление снято с рынка."
-  sale-listed: "&aОбъявление о продаже &7{region} &aвыставлено на рынок. Цена: &7{price}&a. Любой игрок может купить."
-  rent-listed: "&aОбъявление об аренде &7{region} &aвыставлено на рынок. Цена: &7{price}&a. Любой игрок может арендовать."
+  sale-listed: "&aОбъявление о продаже &7{region} &aвыставлено на рынок. Цена: &7{price} {price-symbol}&a. Любой игрок может купить."
+  rent-listed: "&aОбъявление об аренде &7{region} &aвыставлено на рынок. Цена: &7{price} {price-symbol}&a. Любой игрок может арендовать."
   buy-ok: "&aПокупка &7{region} &aзавершена: вы теперь владелец."
   tenant-ok: "&aВы арендуете &7{region}&a. Голограмма-вывеска рынка видна всем рядом с регионом."
   no-offer: "&cНа этом регионе нет публичного объявления."
@@ -292,7 +306,7 @@ market:
   too-long: "&cСрок аренды больше максимального (1 год, настраивается в config.yml)."
   rent-relisted: "&aАренда &7{region} &aзавершилась, автовозврат включён — объявление снова на рынке."
   no-market: "&cРынок в настоящее время не работает."
-  list-line: "&7[{type}] &f{region} &8· &7{status} &8· &7{price} &8· &7{who} &8· &f{id}"
+  list-line: "&7[{type}] &f{region} &8· &7{status} &8· &7{price} {price-symbol} &8· &7{who} &8· &f{id}"
   search-prompt: "&eВведите текст для поиска в чат (пробелы не важны):"
   search-cancel: "&8Напишите &7off&8/&7отмена&8 — убрать поиск."
   search-set: "&aПоиск: &f{query}"
@@ -310,25 +324,26 @@ market:
   no-money: "&cНедостаточно средств на счету."
   error-no-region: "&cРегион больше не существует — предложение отменено."
   error-no-target: "&cИгрок не найден — предложение не создано."
-  sale-done-buyer: "&aВы купили регион &7{region}&a за &7{price}&a."
-  sale-done-seller: "&aРегион &7{region} &aпродан за &7{price}&a."
-  rent-started-tenant: "&aВы арендуете регион &7{region}&a. Стоимость: &7{price}"
-  rent-started-owner: "&aРегион &7{region} &aсдан в аренду. Плата: &7{price}"
-  rent-renew-tenant: "&aСписан платёж за аренду &7{region}&a: &7{price}"
-  rent-renew-owner: "&aПоступил платёж за аренду &7{region}&a: &7{price}"
+  sale-done-buyer: "&aВы купили регион &7{region}&a за &7{price} {price-symbol}&a."
+  sale-done-seller: "&aРегион &7{region} &aпродан за &7{price} {price-symbol}&a."
+  rent-started-tenant: "&aВы арендуете регион &7{region}&a. Стоимость: &7{price} {price-symbol}"
+  rent-started-owner: "&aРегион &7{region} &aсдан в аренду. Плата: &7{price} {price-symbol}"
+  rent-renew-tenant: "&aСписан платёж за аренду &7{region}&a: &7{price} {price-symbol}"
+  rent-renew-owner: "&aПоступил платёж за аренду &7{region}&a: &7{price} {price-symbol}"
   rent-unpaid-tenant: "&cНедостаточно средств — аренда &7{region} &cпрекращена."
   rent-unpaid-owner: "&cАрендатор не оплатил аренду &7{region} &c— аренда прекращена."
   rent-ended: "&7Срок аренды региона &7{region} &7завершён."
 
 # Голограмма-вывеска рынка (market.market-holo): ОДНА плавающая голограмма возле
 # периметра региона, облетает границы следом за игроком и всегда смотрит на него.
-# Заполнители: {owner} — ник продавца/владельца, {price} — цена, {nick} — покупатель/
-# арендатор приватного предложения, {time} — срок аренды, {region}.
+# Заполнители: {owner} — ник продавца/владельца, {price} — число, {price-symbol} —
+# символ валюты, {nick} — покупатель/арендатор приватного предложения,
+# {time} — срок аренды, {region}.
 market-holo:
-  sale: "&a[ Рынок ] Продаёт &f{owner}&a за &f{price}"
-  rent: "&b[ Рынок ] Сдаёт &f{owner}&b за &f{price} &8· &f{time}"
-  sale-pending: "&a[ Рынок ] &f{owner}&a ждёт покупку от &f{nick}&a за &f{price}"
-  rent-pending: "&b[ Рынок ] &f{owner}&b сдаёт игроку &f{nick}&b за &f{price} &8· &f{time}"
+  sale: "&a[ Рынок ] Продаёт &f{owner}&a за &f{price} {price-symbol}"
+  rent: "&b[ Рынок ] Сдаёт &f{owner}&b за &f{price} {price-symbol} &8· &f{time}"
+  sale-pending: "&a[ Рынок ] &f{owner}&a ждёт покупку от &f{nick}&a за &f{price} {price-symbol}"
+  rent-pending: "&b[ Рынок ] &f{owner}&b сдаёт игроку &f{nick}&b за &f{price} {price-symbol} &8· &f{time}"
   buy-hint: "&8Нажмите &f/region buy&8 / &f/region tenant&8, чтобы купить/арендовать"
 
 menu:
@@ -382,13 +397,13 @@ menu:
   add-chat-prompt-member: "&eВведите в чат ник игрока, которого добавить &eучастником&e. Напишите &cотмена&e, чтобы отменить."
   dialog-ok: "OK"
   dialog-cancel: "Отмена"
-  lore-price: "&7Цена: &f{price}"
+  lore-price: "&7Цена: &f{price} {price-symbol}"
   # --- Рынок: одна кнопка объявления с полным описанием ---
   market-type-sale: "&bПродажа"
   market-type-rent: "&6Аренда"
   lore-market-type-region: "&f{market-type} &8· &7{market-region}"
   lore-market-lister: "&7Выставил: &f{market-lister}"
-  lore-market-price: "&7Цена: &f{market-price}"
+  lore-market-price: "&7Цена: &f{market-price} {market-price-symbol}"
   lore-market-volume: "&7Объём: &f{market-volume} &8блоков"
   lore-market-location: "&7Месторасположение: &f{market-loc}"
   lore-market-age: "&7Снятие с рынка через: &f{market-age}"
@@ -430,6 +445,11 @@ menu:
   time-day: "{n} д"
   time-month: "{n} мес"
   time-year: "{n} лет"
+  # Короткие единицы для компактного отображения срока («7д 3ч») — menu.action
+  # промпты и голограммы рынка.
+  time-short-day: "д"
+  time-short-hour: "ч"
+  time-short-min: "м"
   autorent-on: "&aАвтовозврат для &7{region} &aвключён (после аренды объявление снова появится на рынке)."
   autorent-off: "&7Автовозврат для &7{region} &7выключен (после аренды объявление пропадёт)."
   dialog-dur-title: "&eСрок объявления аренды"
@@ -451,7 +471,7 @@ menu:
   lore-buy: "&eЛКМ — купить"
   lore-pack-area: "&7Увеличивает выделение на &f{pack-amount}&7 блоков"
   lore-pack-region: "&7Добавляет &f{pack-amount}&7 к лимиту регионов"
-  lore-pack-repeatable: "&7Цена: &f{price} &8(повторяемый)"
+  lore-pack-repeatable: "&7Цена: &f{price} {price-symbol} &8(повторяемый)"
   # --- Кнопка «Моя территория» в главном меню ---
   main-myregion-here: "&7Управление регионом — вы сейчас внутри территории"
   main-myregion-pick: "&7Нажмите — откроется меню выбора региона"
@@ -463,7 +483,7 @@ menu:
   ps-click-remove: "&cПКМ — удалить из региона (с подтверждением)"
   ps-group-changed: "actionbar:3!&eГруппа добавления: {group}"
   ps-line-group: "&7Группа добавления: &f{ps-group}"
-  ps-line-balance: "&7Баланс: &f{ps-balance}"
+  ps-line-balance: "&7Баланс: &f{ps-balance} {ps-balance-symbol}"
   ps-line-regions: "&7Регионов (вл.+уч.): &f{ps-regions}&8/&f{ps-max}"
   ps-line-clan: "&7Клан: &f{ps-clan}"
   ps-sort-changed: "actionbar:3!&eСортировка: &f{sort}"
@@ -502,8 +522,8 @@ menu:
 
 shop:
   none-owned: "&7У вас нет купленных флагов. Магазин: &f/region market flags"
-  flag-bought: "&aФлаг &f{flag-name} &aкуплен за &f{price}&a."
-  pack-bought: "&aПакет &f{pack-name} &aкуплен за &f{price}&a."
+  flag-bought: "&aФлаг &f{flag-name} &aкуплен за &f{price} {price-symbol}&a."
+  pack-bought: "&aПакет &f{pack-name} &aкуплен за &f{price} {price-symbol}&a."
   already: "&cУ вас уже есть &f{flag-name}&c."
   no-money: "&cНедостаточно средств на счету."
   not-found: "&cПокупка не найдена или не продаётся."
@@ -537,3 +557,6 @@ guard:
 select-status:
   # Цвет {value-color} боссбара/статуса, когда выделение упёрлось в лимит.
   value-full: "&c"
+  # Слова «да»/«нет» для заполнителей {conflict} и {conflict-regions} в доп. инфе.
+  yes: "да"
+  no: "нет"

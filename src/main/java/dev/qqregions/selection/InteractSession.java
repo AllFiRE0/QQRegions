@@ -100,7 +100,7 @@ public class InteractSession {
         renderButtons();
         inv.setHeldItemSlot(plugin.config().buttonSlot("select"));
         plugin.lang().send(player, "select.interactive-on");
-        player.sendMessage(plugin.lang().comp("select.interactive-help"));
+        plugin.lang().sendMsg(player, "select.interactive-help");
         plugin.dbg("session start: " + player.getName() + " @" + world.getName()
                 + " (syncWorldEdit=" + plugin.config().syncWorldEdit() + ")");
         saveWorldEditSelector();

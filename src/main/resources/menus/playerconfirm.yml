@@ -11,7 +11,8 @@
 #    {pc-action}    — «Добавить»/«Удалить» (lang menu.pc-add/remove)
 #    {pc-player}    — ник игрока
 #    {pc-role}      — роль (Владелец/Участник)
-#    {pc-balance}   — баланс игрока (Vault) или «—»
+#    {pc-balance}   — баланс игрока (Vault, только число) или «—»
+#    {pc-balance-symbol} — символ валюты (market.economy.symbol) или пусто
 #    {pc-clan}      — клан игрока (JustTeams) или «—»
 #    {pc-regions}   — всего регионов (владелец + участник)
 #    {pc-reg-owner} — из них владелец
@@ -51,7 +52,7 @@ Menus:
         name: "&f{pc-player}"
         lore:
           - "&7Роль: &b{pc-role}"
-          - "&7Баланс: &f{pc-balance}"
+          - "&7Баланс: &f{pc-balance} {pc-balance-symbol}"
           - "&7Клан: &f{pc-clan}"
           - "&7Регионов: &f{pc-regions}&8/&f{pc-max} &8(&f{pc-reg-owner}&8 вл. + &f{pc-reg-member}&8 уч.)"
           - "&8Подтверждение операции с игроком"

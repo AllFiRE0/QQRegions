@@ -42,14 +42,14 @@ Menus:
       name: " "
       tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
+#      "info":
+#        slot: 45
+#        material: PAPER
+#        name: "&eИнформация"
+#        lore:
+#          - "&7Назад к информации о регионе"
+#        commands:
+#          - "@menu:info"
       "help":
         slot: 8
         material: BOOK
@@ -58,14 +58,14 @@ Menus:
           - "&7Команды и справка плагина"
         commands:
           - "@menu:help"
-      "flags":
-        slot: 46
-        material: REDSTONE_TORCH
-        name: "&eФлаги"
-        lore:
-          - "&7Открыть редактор флагов"
-        commands:
-          - "@menu:flags"
+#      "flags":
+#        slot: 46
+#        material: REDSTONE_TORCH
+#        name: "&eФлаги"
+#        lore:
+#          - "&7Открыть редактор флагов"
+#        commands:
+#          - "@menu:flags"
       "add-owner":
         slot: 47
         material: EMERALD
@@ -157,7 +157,7 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 44
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
@@ -176,14 +176,14 @@ Menus:
       name: " "
       tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
+#      "info":
+#        slot: 45
+#        material: PAPER
+#        name: "&eИнформация"
+#        lore:
+#          - "&7Назад к информации о регионе"
+#        commands:
+#          - "@menu:info"
       "help":
         slot: 8
         material: BOOK
@@ -237,7 +237,7 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 44
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"

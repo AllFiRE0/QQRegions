@@ -4,7 +4,7 @@
 #  «+регион» (region-packs, лимит regions.max-regions).
 #  Цены и состав — shop.yml. Покупки на игрока навсегда.
 #
-#  Динамические кнопки: {pack-name} {pack-amount} {price}
+#  Динамические кнопки: {pack-name} {pack-amount} {price} {price-symbol}
 # ============================================================
 config-version: 2
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
@@ -31,7 +31,7 @@ Menus:
         commands:
           - "@back"
       "flagshop":
-        slot: 46
+        slot: 3
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
@@ -39,7 +39,7 @@ Menus:
         commands:
           - "@menu:flagshop"
       "myflags":
-        slot: 53
+        slot: 5
         material: WRITABLE_BOOK
         name: "&bМои флаги"
         lore:
@@ -87,8 +87,8 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 51
+        slot: 53

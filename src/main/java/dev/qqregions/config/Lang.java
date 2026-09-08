@@ -4,6 +4,7 @@ import dev.qqregions.QQRegions;
 import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -191,6 +192,66 @@ public class Lang {
             return;
         }
         p.sendMessage(compPrefixed(key, kv));
+    }
+
+    /**
+     * Отправить сообщение БЕЗ префикса плагина (как «сырой» comp), но с
+     * поддержкой спец-префикса "actionbar:N!": если перевод начинается с
+     * него — текст уходит в экшнбар на N секунд. Используется там, где
+     * раньше был прямой sendMessage(lang().comp(...)) — теперь любой такой
+     * ключ можно перевести в экшнбар прямо из lang.yml.
+     */
+    public void sendMsg(Player p, String key, String... kv) {
+        dispatch(p, fmt(key, kv));
+    }
+
+    /** Для консоли/CommandSender: без actionbar (он только у Player), как comp. */
+    public void sendMsg(CommandSender sender, String key, String... kv) {
+        if (sender instanceof Player p) {
+            dispatch(p, fmt(key, kv));
+            return;
+        }
+        sender.sendMessage(Msg.color(fmt(key, kv)));
+    }
+
+    /**
+     * Отправить уже-отформатированный текст, как если бы это было значение
+     * lang.yml: без префикса плагина, но с поддержкой "actionbar:N!".
+     * Для текстов, которые собираются в другом месте (например, RaidManager).
+     */
+    public void sendRaw(Player p, String text) {
+        if (text == null) {
+            return;
+        }
+        dispatch(p, text);
+    }
+
+    private void dispatch(Player p, String text) {
+        Matcher m = ACTIONBAR_PREFIX.matcher(text);
+        if (m.matches()) {
+            sendActionbar(p, m.group(2), parseIntSafe(m.group(1)));
+            return;
+        }
+        p.sendMessage(Msg.color(text));
+    }
+
+    /** Короткое отображение минут как «7д 3ч» / «5ч 20м» / «45м». Единицы «д/ч/м»
+     *  берутся из lang.yml (menu.time-short-*), чтобы админ мог подстроить формат. */
+    public String shortTime(long minutes) {
+        String d = get("menu.time-short-day");
+        String h = get("menu.time-short-hour");
+        String m = get("menu.time-short-min");
+        if (minutes >= 1440) {
+            long days = minutes / 1440;
+            long hr = (minutes % 1440) / 60;
+            return hr > 0 ? days + d + " " + hr + h : days + d;
+        }
+        if (minutes >= 60) {
+            long hr = minutes / 60;
+            long mi = minutes % 60;
+            return mi > 0 ? hr + h + " " + mi + m : hr + h;
+        }
+        return minutes + m;
     }
 
     private static int parseIntSafe(String s) {
