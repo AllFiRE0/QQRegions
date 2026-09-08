@@ -35,6 +35,9 @@ public class MenuItem {
     /** Требуемая для ПОКАЗА кнопки роль (owner/member/other); "" = любая.
      *  Админ (qqregions.admin) и операторы видят кнопку при любой роли. */
     private final String roleRequired;
+    /** tooltip: false — убрать всплывающее окно у КОНКРЕТНОЙ кнопки
+     *  (например у фона из стекла). По умолчанию тултип показывается. */
+    private boolean tooltip = true;
 
     /** имя флага для динамических кнопок, null для статичных */
     private final String flag;
@@ -121,6 +124,16 @@ public class MenuItem {
         return stateFlag;
     }
 
+    /** tooltip: false — скрыть тултип у этой кнопки (setHideTooltip). */
+    public MenuItem tooltip(boolean tooltip) {
+        this.tooltip = tooltip;
+        return this;
+    }
+
+    public boolean tooltip() {
+        return tooltip;
+    }
+
     /** Собрать физический предмет с применением контекста и замен. */
     public ItemStack build(QQRegions plugin, Player player, Map<String, String> ctx) {
         Material m = Material.matchMaterial(material);
@@ -131,6 +144,13 @@ public class MenuItem {
             // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,
                     ItemFlag.HIDE_ARMOR_TRIM, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+            if (!tooltip) {
+                try {
+                    meta.setHideTooltip(true);
+                } catch (Throwable ignored) {
+                    // старые версии API без setHideTooltip — просто показываем тултип
+                }
+            }
             meta.displayName(Msg.color(process(plugin, player, ctx, name == null ? "" : name)));
             List<Component> lines = new ArrayList<>();
             if (lore != null) {

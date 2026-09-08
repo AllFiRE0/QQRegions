@@ -578,9 +578,12 @@ public class Config {
             enabled = s.getBoolean("enabled", true);
             flagEnabled = s.getBoolean("flag-enabled", true);
             type = s.getString("type", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
-            // Общий таймаут ВСЕХ подсветок (регионы + выделения): 60 секунд.
-            // Если задан старый ключ show-seconds — берётся из него (совместимость).
-            showSeconds = Math.max(1, s.getInt("auto-hide-seconds", s.getInt("show-seconds", 60)));
+            // Таймаут подсветки РЕГИОНА (territory-visible / /region visible):
+            // отдельный ключ region-hide-seconds, старые auto-hide-seconds
+            // и show-seconds читаются как fallback. На выделения не влияет
+            // (у них свои ключи: interactive.view-hide-after и др.).
+            showSeconds = Math.max(1, s.getInt("region-hide-seconds",
+                    s.getInt("auto-hide-seconds", s.getInt("show-seconds", 60))));
             showMillis = showSeconds * 1000L;
             scanTicks = Math.max(1, s.getInt("scan-ticks", 20));
             cooldownMillis = Math.max(0, s.getInt("cooldown-seconds", 10)) * 1000L;

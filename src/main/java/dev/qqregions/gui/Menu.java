@@ -58,7 +58,8 @@ public class Menu {
 
     public Menu(String file, String title, int rows, int updateInterval, int priority,
                 String permissionGroup, String placeholderGroup, String roleRequired,
-                MenuItem fill, DynamicFlags dyn, DynamicFlags purchased, DynamicPlayers dynPlayers) {
+                MenuItem fill, DynamicFlags dyn, DynamicFlags purchased,
+                DynamicPlayers dynPlayers) {
         this.file = file;
         this.title = title;
         this.rows = rows;
@@ -490,6 +491,7 @@ public class Menu {
                     f.getString("name", " "),
                     fillLore.isEmpty() ? null : fillLore,
                     null, null);
+            fill.tooltip(f.getBoolean("tooltip", true));
         }
 
         DynamicFlags dyn = DynamicFlags.parse(g.getConfigurationSection("dynamic-flags"));
@@ -523,6 +525,7 @@ public class Menu {
                         b.getString("permission", ""),
                         null, null, null, false,
                         b.getString("role-required", ""));
+                item.tooltip(b.getBoolean("tooltip", true));
                 menu.addButton(slot, item);
             }
         }

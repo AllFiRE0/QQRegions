@@ -225,9 +225,14 @@ public class HighlightManager implements Listener {
                 }
             }
             // 2) «Свои» (владелец/участник): АВТО в радиусе auto-show-radius.
-            //    Чужим нужен флаг (белый стек по ALLOW), свои подсвечиваются
-            //    сразу своим цветом (зелёный/жёлтый).
+            //    Флаг требуется ВСЕМ одинаково — свои подсвечиваются только
+            //    там, где territory-visible ALLOW: соседний регион без флага
+            //    не загорится ни при полёте рядом, ни при входе/выходе из региона
+            //    с флагом (границы не имеют значения).
             for (ProtectedRegion r : ownRegionsAround(p)) {
+                if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
+                    continue;
+                }
                 if (cur.add(key(p.getWorld(), r))) {
                     under.add(r);
                 }
