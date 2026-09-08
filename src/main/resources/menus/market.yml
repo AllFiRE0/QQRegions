@@ -21,7 +21,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Рынок регионов"
+    title: "&#000000{market-title}"
     size: 6
     fill:
       enabled: true

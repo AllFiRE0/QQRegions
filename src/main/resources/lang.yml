@@ -390,7 +390,8 @@ menu:
   lore-market-price: "&7Цена: &f{market-price}"
   lore-market-volume: "&7Объём: &f{market-volume} &8блоков"
   lore-market-location: "&7Месторасположение: &f{market-loc}"
-  lore-market-age: "&7Время объявления: &f{market-age}"
+  lore-market-age: "&7Снятие с рынка через: &f{market-age}"
+  lore-market-rent-left: "&7До конца аренды: &f{market-age}"
   lore-market-period: "&7Срок аренды: &f{market-period}"
   lore-market-autorent: "&8Автовозврат: {market-autorent}"
   lore-market-autorent-on: "&aвкл"
@@ -407,6 +408,9 @@ menu:
   # Кнопка-вкладка рынка: как названо то меню, в которое ПЕРЕКЛЮЧАЕМ.
   market-tab-mine: "&6Мои объявления"
   market-tab-all: "&6Все объявления"
+  # Заголовки вкладок рынка: «Все объявления» и «Мои объявления».
+  market-title-all: "&rРынок регионов"
+  market-title-mine: "&6Мои объявления"
   market-tab-switch-mine: "&eОткрыта вкладка «Мои объявления»."
   market-tab-switch-all: "&eОткрыта вкладка «Все объявления»."
   own-only: "&7Это действие доступно в ваших вкладках «Мои объявления»."
@@ -431,6 +435,8 @@ menu:
   dialog-dur-chat: "&eВведите срок в минутах в чат (например &f1440&e = сутки):"
   flag-set: "actionbar:2!&fФлаг &9{flag-name}&f: &b{value}"
   back-label.market: "&eна рынок"
+  back-label.main: "&eв главное меню"
+  back-label.regionsearch: "&eк поиску"
   back-label.flags: "&eк флагам"
   back-label.myflags: "&eк моим флагам"
   back-label.flagshop: "&eв магазин"

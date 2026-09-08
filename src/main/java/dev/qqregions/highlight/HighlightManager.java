@@ -843,15 +843,15 @@ public class HighlightManager implements Listener {
             Vector3f scale = alongX
                     ? new Vector3f((float) f.width, (float) f.height, (float) f.thickness)
                     : new Vector3f((float) f.thickness, (float) f.height, (float) f.width);
-            // Только ВЕРХИ пластов: блок — рельеф, а над ним уже не рельеф.
+            // Только ВЕРХИ пластов: блок — опора забора, а над ним уже не опора.
             // Заглублённые слои пропускаем — они всё равно невидимы, а бюджет
             // тратят (раньше первые колонки от угла съедали весь лимит края).
             for (int y = maxY; y >= minY && made < budget; y--) {
-                if (!isTerrain(world.getBlockAt(x, y, z).getType(), ignore)) {
+                if (!isFenceTerrain(world.getBlockAt(x, y, z).getType(), ignore)) {
                     continue;
                 }
                 Material above = world.getBlockAt(x, y + 1, z).getType();
-                if (isTerrain(above, ignore)) {
+                if (isFenceTerrain(above, ignore)) {
                     continue;
                 }
                 colsTerrain++;
@@ -875,6 +875,25 @@ public class HighlightManager implements Listener {
             return false;
         }
         return ignore.isEmpty() || !ignore.contains(type);
+    }
+
+    /**
+     * Опора ЗАБОРА (только для TERRITORY+BLOCKS): блок считается опорой только
+     * если он ПОЛНЫЙ и НЕПРОЗРАЧНЫЙ (Material.isOccluding), не воздух и не в
+     * списке ignore. Листья, стёкла, плиты, ступени, заборы, рельсы, люки и всё
+     * прочее прозрачное/неполное опорой не являются — забор встаёт ПОД листвой
+     * (на ствол/землю), а не сверху кроны, и не стоит на стёклах/плитах.
+     * Для particles/particle-рельефа (addColumnLevels) продолжает работать
+     * обычный isTerrain — там ignore-blocks просто отсекают декор.
+     */
+    private static boolean isFenceTerrain(Material type, Set<Material> ignore) {
+        if (type == Material.AIR || type == Material.CAVE_AIR || type == Material.VOID_AIR) {
+            return false;
+        }
+        if (!ignore.isEmpty() && ignore.contains(type)) {
+            return false;
+        }
+        return type.isOccluding();
     }
 
     private void despawnBlocks(Player p, String key) {

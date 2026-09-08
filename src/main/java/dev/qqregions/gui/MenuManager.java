@@ -338,7 +338,9 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Кнопка @back: вернуться к предыдущему меню (без записи в историю). */
+    /** Кнопка @back: вернуться к предыдущему меню (без записи в историю).
+     *  Если истории нет (меню открыто командой /region market и т.п.) —
+     *  открываем главное меню территорий, а не «молчим». */
     private void goBack(Player p) {
         Deque<NavState> stack = history.get(p.getUniqueId());
         NavState prev = stack == null ? null : stack.pollFirst();
@@ -346,7 +348,7 @@ public class MenuManager implements Listener {
             if (stack != null && stack.isEmpty()) {
                 history.remove(p.getUniqueId());
             }
-            plugin.lang().send(p, "menu.no-prev");
+            open(p, "main", new HashMap<>(), 0, null, false);
             return;
         }
         if (stack.isEmpty()) {
@@ -509,11 +511,17 @@ public class MenuManager implements Listener {
 
     /** Перерендерить инвентарь меню (kind: чем заполняются динамические слоты). */
     private boolean render(Player player, Menu menu, Map<String, String> ctx, int page, String role, Kind kind) {
-        // Рынок: подставлять название кнопки-вкладки («Мои объявления»/«Все объявления»).
+        // Рынок: подставлять название кнопки-вкладки («Мои объявления»/«Все объявления»)
+        // и заголовок меню {market-title} — чтобы по заголовку было видно,
+        // в какой вкладке игрок находится.
         if (kind == Kind.MARKET) {
-            ctx.put("market-tab-name", truthy(ctx.get("_mine"))
+            boolean mineView = truthy(ctx.get("_mine"));
+            ctx.put("market-tab-name", mineView
                     ? plugin.lang().get("menu.market-tab-all")
                     : plugin.lang().get("menu.market-tab-mine"));
+            ctx.put("market-title", mineView
+                    ? plugin.lang().get("menu.market-title-mine")
+                    : plugin.lang().get("menu.market-title-all"));
         }
         List<MenuItem> dynItems;
         Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
@@ -748,6 +756,10 @@ public class MenuManager implements Listener {
                 toggleMarketTab(p, om);
                 continue;
             }
+            if (c.equalsIgnoreCase("@market-mine")) {
+                openMarketMine(p);
+                continue;
+            }
             if (c.startsWith("@mkt-cancel:")) {
                 confirmCancel(p, c.substring("@mkt-cancel:".length()).trim());
                 continue;
@@ -850,7 +862,7 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Телепорт в центр региона (только админ и владелец). */
+    /** Телепорт в регион на безопасную точку (только админ и владелец). */
     private void teleportToRegion(Player p, Map<String, String> ctx, String role) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(role)) {
             plugin.lang().send(p, "menu.teleport-owner-only");
@@ -866,15 +878,110 @@ public class MenuManager implements Listener {
             return;
         }
         try {
-            com.sk89q.worldedit.math.BlockVector3 min = region.getMinimumPoint();
-            com.sk89q.worldedit.math.BlockVector3 max = region.getMaximumPoint();
-            int cx = (min.x() + max.x()) / 2;
-            int cz = (min.z() + max.z()) / 2;
-            int y = Math.max(min.y(), world.getMinHeight()) + 1;
-            p.teleport(new org.bukkit.Location(world, cx + 0.5, y, cz + 0.5));
+            p.teleport(safeLanding(world, region));
         } catch (Throwable t) {
             plugin.lang().send(p, "menu.teleport-fail");
         }
+    }
+
+    /** Безопасная точка приземления игрока в регионе: на твёрдом блоке,
+     *  НЕ в воздухе над пустотой, НЕ внутри блока и НЕ в лаве/воде.
+     *  Порядок поиска:
+     *   1. сухие колонны внутри региона, ближе к центру;
+     *   2. если вся территория — лава/вода/пустота, ближайшая безопасная
+     *      колонна МИРА вокруг центра (игрок встанет РЯДОМ, на берегу);
+     *   3. иначе — над верхней точкой региона (не в блоке). */
+    private org.bukkit.Location safeLanding(org.bukkit.World w, ProtectedRegion r) {
+        com.sk89q.worldedit.math.BlockVector3 min = r.getMinimumPoint();
+        com.sk89q.worldedit.math.BlockVector3 max = r.getMaximumPoint();
+        int cx = (min.getX() + max.getX()) / 2;
+        int cz = (min.getZ() + max.getZ()) / 2;
+        int bottom = Math.max(min.getY(), w.getMinHeight());
+        int top = Math.min(max.getY(), w.getMaxHeight() - 3);
+        int reach = Math.min(12, Math.max(Math.abs(max.getX() - min.getX()), Math.abs(max.getZ() - min.getZ())));
+        org.bukkit.Location best = null;
+        int bestDist = Integer.MAX_VALUE;
+        for (int x = cx - reach; x <= cx + reach; x++) {
+            if (x < min.getX() || x > max.getX()) {
+                continue;
+            }
+            for (int z = cz - reach; z <= cz + reach; z++) {
+                if (z < min.getZ() || z > max.getZ()) {
+                    continue;
+                }
+                int d = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+                if (d > bestDist) {
+                    continue;
+                }
+                int y = safeColumnY(w, x, z, bottom, top);
+                if (y < 0) {
+                    continue;
+                }
+                bestDist = d;
+                best = new org.bukkit.Location(w, x + 0.5, y + 1, z + 0.5);
+                if (d == 0) {
+                    return best;
+                }
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        // лава/вода/пустота на всей территории: ищем берег/остров вокруг.
+        for (int rad = 1; rad <= 64; rad++) {
+            for (int x = cx - rad; x <= cx + rad; x++) {
+                for (int z = cz - rad; z <= cz + rad; z++) {
+                    if (Math.max(Math.abs(x - cx), Math.abs(z - cz)) != rad) {
+                        continue;
+                    }
+                    int y = safeWorldColumnY(w, x, z);
+                    if (y >= 0) {
+                        return new org.bukkit.Location(w, x + 0.5, y + 1, z + 0.5);
+                    }
+                }
+            }
+        }
+        return new org.bukkit.Location(w, cx + 0.5, Math.min(w.getMaxHeight() - 1, top + 2), cz + 0.5);
+    }
+
+    /** Верх безопасного ПОДЛОЖНОГО блока колонны (y пола) в диапазоне
+     *  [bottom..top] или -1: пол твёрдый, над ним два блока воздуха
+     *  (нет лавы/воды и нет затопления головы). */
+    private int safeColumnY(org.bukkit.World w, int x, int z, int bottom, int top) {
+        for (int y = top; y >= bottom; y--) {
+            org.bukkit.Material floor = w.getBlockAt(x, y, z).getType();
+            if (!floor.isSolid() || floor.isLiquid()) {
+                continue;
+            }
+            org.bukkit.Material above1 = w.getBlockAt(x, y + 1, z).getType();
+            if (above1.isSolid() || above1.isLiquid()) {
+                continue;
+            }
+            org.bukkit.Material above2 = w.getBlockAt(x, y + 2, z).getType();
+            if (above2.isSolid() || above2.isLiquid()) {
+                continue;
+            }
+            return y;
+        }
+        return -1;
+    }
+
+    /** Верх безопасной поверхности в колонне МИРА (для поиска «берега» рядом
+     *  с лавой/водой/пустотой) или -1. */
+    private int safeWorldColumnY(org.bukkit.World w, int x, int z) {
+        org.bukkit.block.Block hb = w.getHighestBlockAt(x, z);
+        if (hb.getY() < w.getMinHeight()) {
+            return -1;
+        }
+        org.bukkit.Material t = hb.getType();
+        if (!t.isSolid() || t.isLiquid()) {
+            return -1;
+        }
+        org.bukkit.Material above = w.getBlockAt(x, hb.getY() + 1, z).getType();
+        if (above.isSolid() || above.isLiquid()) {
+            return -1;
+        }
+        return hb.getY();
     }
 
     /** Установить флаг региона через API WG: @flag:<имя>:{значение}
@@ -1075,7 +1182,25 @@ public class MenuManager implements Listener {
             pc.put("market-lister", lister);
             pc.put("market-period", sale ? ""
                     : tf.format(o.periodMillis));
-            pc.put("market-age", tf.format(System.currentTimeMillis() - o.created));
+            // Обратный отсчёт: сколько осталось до снятия объявления с рынка.
+            // Публичное объявление снимается в listUntil (срок объявления,
+            // market.rent.list-duration-minutes), приватное — в pendingUntil
+            // (market.offer-timeout-minutes). У идущей аренды показываем
+            // остаток СРОКА аренды (until). Раньше было «время объявления»
+            // ВВЕРХ от создания — оно росло и сбивало с толку, теперь
+            // остаток убывает к нулю.
+            long deadline;
+            if (o.isActiveRental()) {
+                deadline = o.until;
+            } else if (o.status == dev.qqregions.market.Offer.Status.PENDING && o.pendingUntil > 0) {
+                deadline = o.pendingUntil;
+            } else {
+                deadline = o.listUntil > 0 ? o.listUntil : 0;
+            }
+            String age = deadline > 0
+                    ? tf.format(Math.max(0, deadline - System.currentTimeMillis()))
+                    : plugin.lang().get("menu.time-empty");
+            pc.put("market-age", age);
             pc.put("market-autorent", o.autoRent
                     ? plugin.lang().get("menu.lore-market-autorent-on")
                     : plugin.lang().get("menu.lore-market-autorent-off"));
@@ -1093,7 +1218,8 @@ public class MenuManager implements Listener {
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-price")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-volume")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-location")));
-            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-age")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get(
+                    o.isActiveRental() ? "menu.lore-market-rent-left" : "menu.lore-market-age")));
             if (!sale && o.periodMillis > 0) {
                 lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.lore-market-period")));
             }
@@ -1206,6 +1332,13 @@ public class MenuManager implements Listener {
         }
     }
 
+    /** Открыть рынок сразу во вкладке «Мои объявления» (кнопка в главном меню). */
+    private void openMarketMine(Player p) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("_mine", "yes");
+        open(p, "market", ctx, 0, null, true);
+    }
+
     /** Переключить вкладку рынка «Мои объявления / Все объявления». */
     private void toggleMarketTab(Player p, OpenMenu om) {
         boolean on = truthy(om.ctx.get("_mine"));
@@ -1263,12 +1396,7 @@ public class MenuManager implements Listener {
             return;
         }
         try {
-            com.sk89q.worldedit.math.BlockVector3 min = r.getMinimumPoint();
-            com.sk89q.worldedit.math.BlockVector3 max = r.getMaximumPoint();
-            double x = (min.getX() + max.getX()) / 2.0 + 0.5;
-            double z = (min.getZ() + max.getZ()) / 2.0 + 0.5;
-            double y = max.getY() + 2;
-            p.teleport(new org.bukkit.Location(w, x, y, z));
+            p.teleport(safeLanding(w, r));
             plugin.lang().send(p, "menu.market-teleported", "region", o.region);
         } catch (Throwable t) {
             plugin.lang().send(p, "menu.teleport-fail");
