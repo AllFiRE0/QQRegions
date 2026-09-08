@@ -950,15 +950,15 @@ public class MenuManager implements Listener {
     private int safeColumnY(org.bukkit.World w, int x, int z, int bottom, int top) {
         for (int y = top; y >= bottom; y--) {
             org.bukkit.Material floor = w.getBlockAt(x, y, z).getType();
-            if (!floor.isSolid() || floor.isLiquid()) {
+            if (!floor.isSolid() || isLiquid(floor)) {
                 continue;
             }
             org.bukkit.Material above1 = w.getBlockAt(x, y + 1, z).getType();
-            if (above1.isSolid() || above1.isLiquid()) {
+            if (above1.isSolid() || isLiquid(above1)) {
                 continue;
             }
             org.bukkit.Material above2 = w.getBlockAt(x, y + 2, z).getType();
-            if (above2.isSolid() || above2.isLiquid()) {
+            if (above2.isSolid() || isLiquid(above2)) {
                 continue;
             }
             return y;
@@ -974,14 +974,19 @@ public class MenuManager implements Listener {
             return -1;
         }
         org.bukkit.Material t = hb.getType();
-        if (!t.isSolid() || t.isLiquid()) {
+        if (!t.isSolid() || isLiquid(t)) {
             return -1;
         }
         org.bukkit.Material above = w.getBlockAt(x, hb.getY() + 1, z).getType();
-        if (above.isSolid() || above.isLiquid()) {
+        if (above.isSolid() || isLiquid(above)) {
             return -1;
         }
         return hb.getY();
+    }
+
+    /** true, если материал — жидкость (вода или лава). */
+    private static boolean isLiquid(org.bukkit.Material m) {
+        return m == org.bukkit.Material.WATER || m == org.bukkit.Material.LAVA;
     }
 
     /** Установить флаг региона через API WG: @flag:<имя>:{значение}
