@@ -171,20 +171,20 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 52
+        slot: 53
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"
         lore:
           - "&7Поиск по имени или переводу"
           - "&7Нажмите и введите запрос в чат"
-        slot: 48
+        slot: 4
         commands:
           - "@flag-search"
   "member":
@@ -280,11 +280,11 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 52
+        slot: 53
   "other":
     role-required: other
     priority: 10
@@ -366,20 +366,20 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 52
+        slot: 53
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"
         lore:
           - "&7Поиск по имени или переводу"
           - "&7Нажмите и введите запрос в чат"
-        slot: 48
+        slot: 4
         commands:
           - "@flag-search"
   "default":
@@ -462,19 +462,19 @@ Menus:
         name: "&eНазад"
         lore:
           - "&7Предыдущая страница"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
         lore:
           - "&7Следующая страница"
-        slot: 52
+        slot: 53
       search:
         material: WRITABLE_BOOK
         name: "&eПоиск флагов"
         lore:
           - "&7Поиск по имени или переводу"
           - "&7Нажмите и введите запрос в чат"
-        slot: 48
+        slot: 4
         commands:
           - "@flag-search"

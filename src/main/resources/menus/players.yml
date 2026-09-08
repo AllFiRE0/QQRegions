@@ -101,12 +101,12 @@ Menus:
         commands:
           - "@pf:owners"
       "addplayers":
-        slot: 52
+        slot: 4
         material: PLAYER_HEAD
         name: "&eДобавить игроков"
         lore:
           - "&7Открыть меню со всеми игроками сервера"
-          - "&7ЛКМ — добавить, ПКМ — убрать, Шифт+ЛКМ — сменить группу"
+          #- "&7ЛКМ — добавить, ПКМ — убрать, Шифт+ЛКМ — сменить группу"
         commands:
           - "@menu:playersearch"
       "back":
