@@ -667,14 +667,23 @@ public class Menu {
                     materials.put(k, ms.getString(k, "STONE"));
                 }
             }
+            // states — цикл значений для StateFlag (ЛКМ вкл/выкл/по умолчанию);
+            // custom-states — цикл для НЕ-State флагов (Boolean/Set и т.п.).
+            // До сессии 20 yml-ключ states попадал в customStates, а StateFlag
+            // получал ЖЁСТКИЙ [allow, deny] — из-за чего default был недостижим.
+            List<String> states = d.getStringList("states");
+            if (states.isEmpty()) {
+                states = List.of("allow", "deny");
+            }
+            List<String> customStates = d.getStringList("custom-states");
             return new DynamicFlags(true, slots,
                     d.getString("material", "MAP"),
                     d.getString("name", "&f{flag-name}"),
                     d.getStringList("lore"),
                     d.getStringList("commands"),
                     groups,
-                    List.of("allow", "deny"),
-                    d.getStringList("states"),
+                    states,
+                    customStates,
                     ignore, materials,
                     d.getString("flag-permission-prefix", ""));
         }

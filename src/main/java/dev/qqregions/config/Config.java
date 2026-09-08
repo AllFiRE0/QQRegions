@@ -81,8 +81,9 @@ public class Config {
     /** menu-update.ticks: глобальный дефолт автообновления меню (тики; 0 = выкл). */
     private int menuUpdateTicks = 20;
     /** menu-update.debounce-after-click: молча не перерисовывать меню раньше
-     *  чем через menu-update.ticks после клика игрока (анти-автокликер). */
-    private boolean menuDebounce = true;
+     *  чем через menu-update.ticks после клика игрока (анти-автокликер).
+     *  По умолчанию ВЫКЛ (false): клики перерисовывают меню сразу. */
+    private boolean menuDebounce = false;
 
     /** flags-menu.whitelist: флаги, доступные всем бесплатно (пусто = прежнее поведение). */
     private Set<String> flagsMenuWhitelist = new HashSet<>();
@@ -185,7 +186,7 @@ public class Config {
         selectStatus = new SelectStatusOptions(cfg.getConfigurationSection("select-status"));
         guard = new GuardOptions(cfg.getConfigurationSection("guard"));
         menuUpdateTicks = Math.max(0, cfg.getInt("menu-update.ticks", 20));
-        menuDebounce = cfg.getBoolean("menu-update.debounce-after-click", true);
+        menuDebounce = cfg.getBoolean("menu-update.debounce-after-click", false);
 
         flagsMenuWhitelist = new HashSet<>(lower(cfg.getStringList("flags-menu.whitelist")));
         flagsShopIgnore = new HashSet<>(lower(cfg.getStringList("flags-menu.shop-ignore")));
