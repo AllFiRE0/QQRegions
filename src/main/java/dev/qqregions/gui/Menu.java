@@ -53,6 +53,8 @@ public class Menu {
     private final List<Integer> extraSlots = new ArrayList<>();
     private MenuItem navPrev;
     private MenuItem navNext;
+    /** Свои команды, по которым открывается это меню (как в DeluxeMenus). */
+    private List<String> openCommands = new ArrayList<>();
 
     public Menu(String file, String title, int rows, int updateInterval, int priority,
                 String permissionGroup, String placeholderGroup, String roleRequired,
@@ -171,6 +173,10 @@ public class Menu {
     public void setNav(MenuItem prev, MenuItem next) {
         this.navPrev = prev;
         this.navNext = next;
+    }
+
+    public List<String> openCommands() {
+        return openCommands;
     }
 
     // ---------- динамические кнопки флагов ----------
@@ -536,6 +542,18 @@ public class Menu {
             MenuItem next = parseNav(nav, "next", "@page:next", null);
             menu.setNav(prev, next);
         }
+
+        // Команды-открыватели меню (как в DeluxeMenus):
+        //   open-commands: [ territoryshop, "ts" ]
+        // По /territoryshop меню откроется так же, как и через @menu:<файл>.
+        List<String> ocmds = new ArrayList<>();
+        for (String s : g.getStringList("open-commands")) {
+            String c = s.trim().replaceFirst("^/", "");
+            if (!c.isEmpty()) {
+                ocmds.add(c.toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        menu.openCommands = ocmds;
 
         return menu;
     }

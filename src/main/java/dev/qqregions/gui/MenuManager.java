@@ -40,6 +40,10 @@ public class MenuManager implements Listener {
 
     /** файл (без .yml) -> упорядоченные по приоритету шаблоны */
     private final Map<String, List<Menu>> menus = new HashMap<>();
+    /** open-commands: команда -> файл меню (свои команды-открыватели). */
+    private final Map<String, String> openCommandMenus = new HashMap<>();
+    private final java.util.List<org.bukkit.command.Command> registeredOpen = new ArrayList<>();
+    private final java.util.List<String> registeredOpenNames = new ArrayList<>();
     private final Map<UUID, OpenMenu> open = new HashMap<>();
     /** ожидание ввода ника для добавления: UUID -> контекст промпта.
      *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
@@ -70,7 +74,8 @@ public class MenuManager implements Listener {
         String[] menuResources = {
                 "menus/flags.yml", "menus/info.yml", "menus/players.yml",
                 "menus/market.yml", "menus/flagshop.yml", "menus/blocks.yml",
-                "menus/myflags.yml", "menus/help.yml", "menus/main.yml"
+                "menus/myflags.yml", "menus/help.yml", "menus/main.yml",
+                "menus/regionsearch.yml"
         };
         for (String r : menuResources) {
             dev.qqregions.util.Yml.upgrade(plugin, r, new File(dir, r.substring(r.indexOf('/') + 1)));
@@ -81,6 +86,92 @@ public class MenuManager implements Listener {
                 List<Menu> parsed = Menu.parseFile(plugin, f, 20);
                 parsed.sort((a, b) -> Integer.compare(b.priority(), a.priority()));
                 menus.put(f.getName().replaceFirst("\\.yml$", ""), parsed);
+            }
+        }
+        registerOpenCommands();
+    }
+
+    /** Зарегистрировать open-commands из всех меню (команда = открыть меню). */
+    private void registerOpenCommands() {
+        unregisterOpenCommands();
+        openCommandMenus.clear();
+        for (Map.Entry<String, List<Menu>> e : menus.entrySet()) {
+            for (Menu m : e.getValue()) {
+                for (String cmd : m.openCommands()) {
+                    openCommandMenus.putIfAbsent(cmd, e.getKey());
+                }
+            }
+        }
+        if (openCommandMenus.isEmpty()) {
+            return;
+        }
+        Map<String, org.bukkit.command.Command> known = commandMap().getKnownCommands();
+        for (Map.Entry<String, String> e : openCommandMenus.entrySet()) {
+            String name = e.getKey();
+            org.bukkit.command.Command c = new org.bukkit.command.Command(name,
+                    "QQRegions menu shortcut", "/" + name, java.util.List.of()) {
+                @Override
+                public boolean execute(org.bukkit.command.CommandSender sender, String commandLabel, String[] args) {
+                    if (!(sender instanceof Player p)) {
+                        return false;
+                    }
+                    String menuName = openCommandMenus.get(name);
+                    if (menuName == null) {
+                        return false;
+                    }
+                    return open(p, menuName, defaultCtx(p), 0, null, true);
+                }
+            };
+            commandMap().register(name, "qqregions", c);
+            known.putIfAbsent(name, c);
+            registeredOpen.add(c);
+            registeredOpenNames.add(name);
+        }
+    }
+
+    private void unregisterOpenCommands() {
+        if (registeredOpen.isEmpty()) {
+            return;
+        }
+        Map<String, org.bukkit.command.Command> known = commandMap().getKnownCommands();
+        for (String name : registeredOpenNames) {
+            org.bukkit.command.Command cmd = known.get(name);
+            if (cmd != null && registeredOpen.contains(cmd)) {
+                known.remove(name);
+            }
+        }
+        for (org.bukkit.command.Command c : registeredOpen) {
+            c.unregister(commandMap());
+        }
+        registeredOpen.clear();
+        registeredOpenNames.clear();
+    }
+
+    /** Стандартный контекст для открытия своего меню командой. */
+    private Map<String, String> defaultCtx(Player p) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ProtectedRegion r = plugin.wg().current(p);
+        ctx.put("region", r == null ? "" : r.getId());
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        if (r != null) {
+            ctx.put("region-name", r.getId());
+            ctx.put("owners", multilineNicks(r, true));
+            ctx.put("members", multilineNicks(r, false));
+        }
+        return ctx;
+    }
+
+    private org.bukkit.command.CommandMap commandMap() {
+        try {
+            return Bukkit.getCommandMap();
+        } catch (Throwable t) {
+            try {
+                java.lang.reflect.Method m = Bukkit.getServer().getClass().getMethod("getCommandMap");
+                return (org.bukkit.command.CommandMap) m.invoke(Bukkit.getServer());
+            } catch (Throwable t2) {
+                throw new IllegalStateException("Командная карта недоступна", t2);
             }
         }
     }
@@ -159,7 +250,7 @@ public class MenuManager implements Listener {
 
     /** Чем заполняются динамические слоты меню. */
     private enum Kind {
-        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS, MAIN
+        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS, MAIN, REGION_SEARCH
     }
 
     private static long regionArea(ProtectedRegion region) {
@@ -227,6 +318,7 @@ public class MenuManager implements Listener {
             case "blocks" -> Kind.BLOCK_SHOP;
             case "myflags" -> Kind.MY_FLAGS;
             case "main" -> Kind.MAIN;
+            case "regionsearch" -> Kind.REGION_SEARCH;
             default -> Kind.FLAGS;
         };
     }
@@ -315,6 +407,19 @@ public class MenuManager implements Listener {
         ctx.put("region", "");
         ctx.put("player", player.getName());
         ctx.put("role", "other");
+        // «Мой регион»: если стоим в регионе — подкладываем имя и списки
+        // владельцев/участников для лора кнопки; иначе — пустые строки.
+        ProtectedRegion here = plugin.wg().current(player);
+        if (here != null) {
+            ctx.put("region", here.getId());
+            ctx.put("region-name", here.getId());
+            ctx.put("owners", multilineNicks(here, true));
+            ctx.put("members", multilineNicks(here, false));
+        } else {
+            ctx.put("region-name", "");
+            ctx.put("owners", "");
+            ctx.put("members", "");
+        }
         Menu best = pick(player, "main", null);
         if (best == null) {
             return false;
@@ -342,7 +447,30 @@ public class MenuManager implements Listener {
         return true;
     }
 
-    /** «Инфо по региону» из главного меню: регион, в котором стоит игрок. */
+    /** Ники владельцев/участников каждый на своей строке (для лора кнопки). */
+    private String multilineNicks(ProtectedRegion region, boolean owner) {
+        List<String> nick = new ArrayList<>();
+        for (dev.qqregions.wg.Wg.Participant pa : plugin.wg().participants(region)) {
+            if (pa.owner() == owner) {
+                nick.add(pa.name());
+            }
+        }
+        if (nick.isEmpty()) {
+            return "&7—";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String n : nick) {
+            if (sb.length() > 0) {
+                sb.append('\n');
+            }
+            sb.append("&f  ").append(n);
+        }
+        return sb.toString();
+    }
+
+    /** «Инфо по региону» из главного меню: регион, в котором стоит игрок.
+     *  Открывает info через openInfo(), чтобы подбирался шаблон по РОЛИ игрока
+     *  (владелец/участник/все остальные) и контекст заполнялся полностью. */
     private void openInfoCurrent(Player p, OpenMenu om) {
         ProtectedRegion r = plugin.wg().current(p);
         if (r == null) {
@@ -353,17 +481,13 @@ public class MenuManager implements Listener {
             }
             return;
         }
-        Map<String, String> ctx = new HashMap<>();
-        ctx.put("world", p.getWorld().getName());
-        ctx.put("region", r.getId());
-        ctx.put("player", p.getName());
-        String role = switch (plugin.wg().role(r, p)) {
-            case OWNER -> "owner";
-            case MEMBER -> "member";
-            default -> "other";
-        };
-        ctx.put("role", role);
-        open(p, "info", ctx, 0, null, true);
+        if (!openInfo(p, p.getWorld(), r)) {
+            plugin.lang().send(p, "info.menu-disabled");
+            OpenMenu live = open.get(p.getUniqueId());
+            if (live != null) {
+                render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+            }
+        }
     }
 
     /** Разрешено ли действие при включённом guard: TPS >= min-tps и пинг <= max-ping. */
@@ -392,6 +516,7 @@ public class MenuManager implements Listener {
             case BLOCK_SHOP -> dynItems = blockShopItems(menu, player, ctx);
             case MY_FLAGS -> dynItems = menu.purchasedItems(plugin, player, ctx, owned);
             case MAIN -> dynItems = marketItems(menu, player, ctx);
+            case REGION_SEARCH -> dynItems = regionSearchItems(menu, player, ctx);
             default -> dynItems = menu.flagItems(plugin, player, ctx, menu.dynamicFlags(), false, owned);
         }
         int maxPages = menu.maxPages(dynItems.size());
@@ -636,6 +761,10 @@ public class MenuManager implements Listener {
                 startSearchPrompt(p, om, "region");
                 continue;
             }
+            if (c.startsWith("@rinfo:")) {
+                openFoundRegion(p, c.substring("@rinfo:".length()).trim());
+                continue;
+            }
             if (c.equalsIgnoreCase("@region-info")) {
                 openInfoCurrent(p, om);
                 continue;
@@ -688,15 +817,15 @@ public class MenuManager implements Listener {
         open.remove(id);
         // Закрытие инвентаря случается и при открытии чата («введите ник») —
         // тогда промпт должен ПЕРЕЖИТЬ закрытие. Но если игрок просто закрыл
-        // меню, ждём 5 сек и убираем промпт, чтобы не глотать следующий чат.
+        // меню, ждём 30 сек и убираем промпт, чтобы не глотать следующий чат.
         if (pendingAdd.containsKey(id)) {
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingAdd.remove(id), 100L);
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingAdd.remove(id), 600L);
         }
-        // поисковый промпт живёт 5 сек после закрытия меню, потом перестаёт
+        // поисковый промпт живёт 30 сек после закрытия меню, потом перестаёт
         // глотать чат (если игрок не ввёл запрос — просто отменяется),
-        // но при вводе до истечения срока меню переоткроется с результатом.
+        // но при вводе до истечения срока меню откроется с результатом.
         if (pendingSearch.containsKey(id)) {
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingSearch.remove(id), 100L);
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> pendingSearch.remove(id), 600L);
         }
     }
 
@@ -1452,61 +1581,125 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Поиск региона по имени (из главного меню «Поиск региона»): ищем по всем
-     *  мирам, исключаем banned-regions из конфига, и открываем info нужного региона. */
+    /** Поиск региона по имени (из главного меню «Поиск региона»).
+     *  Точно одно совпадение → сразу info-меню региона (как /region info).
+     *  Несколько → открывается меню-результат menus/regionsearch.yml со списком
+     *  совпавших регионов (страницы, клик = info). 0 → сообщение и возврат. */
     private void applyRegionSearch(Player p, SearchPrompt pr, String query) {
+        List<String> matches = findRegions(query);
+        if (matches.isEmpty()) {
+            plugin.lang().send(p, "menu.region-search-notfound", "query", query);
+            reopenPrev(p, pr, query);
+            return;
+        }
+        if (matches.size() == 1) {
+            org.bukkit.World fw = null;
+            ProtectedRegion fr = null;
+            for (org.bukkit.World w : Bukkit.getWorlds()) {
+                ProtectedRegion r = plugin.wg().byName(w, matches.get(0));
+                if (r != null) {
+                    fw = w;
+                    fr = r;
+                    break;
+                }
+            }
+            if (fr == null) {
+                plugin.lang().send(p, "menu.region-search-notfound", "query", query);
+                reopenPrev(p, pr, query);
+                return;
+            }
+            plugin.lang().send(p, "menu.region-search-found", "region", matches.get(0));
+            if (!openInfo(p, fw, fr)) {
+                plugin.lang().send(p, "info.menu-disabled");
+            }
+            return;
+        }
+        p.sendMessage(plugin.lang().comp("menu.region-search-many", "query", query,
+                "regions", String.valueOf(matches.size())));
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        ctx.put("_regionsearch", query);
+        ctx.put("query", query);
+        open(p, "regionsearch", ctx, 0, null, true);
+    }
+
+    /** Все регионы (по всем мирам), имя которых содержит запрос; без banned/__global__. */
+    private List<String> findRegions(String query) {
+        List<String> out = new ArrayList<>();
         String q = query.toLowerCase(java.util.Locale.ROOT);
-        String exact = null;
-        List<String> hits = new ArrayList<>();
         for (org.bukkit.World w : Bukkit.getWorlds()) {
             for (ProtectedRegion r : plugin.wg().all(w)) {
                 String name = r.getId().toLowerCase(java.util.Locale.ROOT);
-                if (!excludeFromSearch(name) && name.equals(q)) {
-                    exact = r.getId();
-                    break;
+                if (excludeFromSearch(name)) {
+                    continue;
                 }
-                if (!excludeFromSearch(name) && name.contains(q) && !hits.contains(r.getId())) {
-                    hits.add(r.getId());
+                if (name.contains(q) && !out.contains(r.getId())) {
+                    out.add(r.getId());
                 }
             }
-            if (exact != null) {
+        }
+        return out;
+    }
+
+    /** Вернуться к меню, из которого запускался поиск (если оно ещё живо). */
+    private void reopenPrev(Player p, SearchPrompt pr, String query) {
+        OpenMenu live = open.get(p.getUniqueId());
+        if (live != null) {
+            render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+        } else if (pr.om != null) {
+            open(p, pr.om.menu.file(), pr.om.ctx, 0, pr.om.role, false);
+        }
+    }
+
+    /** Кнопки совпавших регионов для меню regionsearch. */
+    private List<MenuItem> regionSearchItems(Menu menu, Player viewer, Map<String, String> ctx) {
+        List<MenuItem> out = new ArrayList<>();
+        String q = ctx.get("_regionsearch");
+        if (q == null || q.isEmpty()) {
+            return out;
+        }
+        for (String name : findRegions(q)) {
+            for (org.bukkit.World w : Bukkit.getWorlds()) {
+                ProtectedRegion r = plugin.wg().byName(w, name);
+                if (r == null) {
+                    continue;
+                }
+                Map<String, String> pc = new HashMap<>(ctx);
+                pc.put("region", r.getId());
+                pc.put("world", w.getName());
+                out.add(new MenuItem("COMPASS", 1, null,
+                        "&e" + name, List.of(
+                                "&7Мир: &f" + w.getName(),
+                                "&7Тип: &f" + r.getType().getName(),
+                                "&7Клик — информация о регионе"),
+                        List.of("@rinfo:" + w.getName() + ":" + r.getId()), ""));
                 break;
             }
         }
-        String target = exact != null ? exact : (hits.size() == 1 ? hits.get(0) : null);
-        if (target == null) {
-            if (hits.isEmpty()) {
-                plugin.lang().send(p, "menu.region-search-notfound", "query", query);
-            } else {
-                plugin.lang().send(p, "menu.region-search-multiple", "query", query,
-                        "regions", String.join(", ", hits.subList(0, Math.min(5, hits.size()))));
-            }
-            OpenMenu live = open.get(p.getUniqueId());
-            if (live != null) {
-                live.ctx.put("region", "");
-                render(p, live.menu, live.ctx, live.page, live.role, live.kind);
-            }
+        return out;
+    }
+
+    /** Клик по найденному региону из меню regionsearch: открывает info с ролью игрока. */
+    private void openFoundRegion(Player p, String spec) {
+        int i = spec.indexOf(':');
+        int j = i < 0 ? -1 : spec.indexOf(':', i + 1);
+        if (i < 0 || j < 0) {
             return;
         }
-        org.bukkit.World w = null;
-        for (org.bukkit.World cw : Bukkit.getWorlds()) {
-            ProtectedRegion r = plugin.wg().byName(cw, target);
-            if (r != null) {
-                w = cw;
-                break;
-            }
-        }
-        if (w == null) {
-            plugin.lang().send(p, "menu.region-search-notfound", "query", query);
+        String worldName = spec.substring(i + 1, j);
+        String name = spec.substring(j + 1);
+        org.bukkit.World w = Bukkit.getWorld(worldName);
+        ProtectedRegion r = w == null ? null : plugin.wg().byName(w, name);
+        if (w == null || r == null) {
+            plugin.lang().send(p, "menu.region-search-notfound", "query", name);
             return;
         }
-        plugin.lang().send(p, "menu.region-search-found", "region", target);
-        Map<String, String> ctx = new HashMap<>();
-        ctx.put("world", w.getName());
-        ctx.put("region", target);
-        ctx.put("player", p.getName());
-        ctx.put("role", "other");
-        open(p, "info", ctx, 0, null, true);
+        if (!openInfo(p, w, r)) {
+            plugin.lang().send(p, "info.menu-disabled");
+        }
     }
 
     private boolean excludeFromSearch(String name) {
