@@ -43,6 +43,9 @@ public class Config {
     private int wheelShiftSpeed;
     private boolean invertWheel;
     private final Map<String, Material> buttonMaterials = new HashMap<>();
+    /** Слот хотбара (0-8) для каждой кнопки сессии выделения. */
+    private final Map<String, Integer> buttonSlots = new HashMap<>();
+    private int selectCenterSlot = 4;
     private List<String> blockedCommands = new ArrayList<>();
     private boolean syncWorldEdit = true;
     private boolean debug;
@@ -145,6 +148,7 @@ public class Config {
         cmdViewHideAfter = Math.max(0, cfg.getInt("interactive.command-selection-hide-after", 0));
 
         buttonMaterials.clear();
+        buttonSlots.clear();
         ConfigurationSection btns = cfg.getConfigurationSection("interactive.buttons");
         if (btns != null) {
             for (String key : btns.getKeys(false)) {
@@ -152,8 +156,13 @@ public class Config {
                 if (mat != null) {
                     buttonMaterials.put(key, Material.matchMaterial(mat));
                 }
+                int slot = btns.getInt(key + ".slot", -1);
+                if (slot >= 0 && slot <= 8) {
+                    buttonSlots.put(key, slot);
+                }
             }
         }
+        selectCenterSlot = Math.max(0, Math.min(8, cfg.getInt("interactive.select-center-slot", 4)));
 
         particles = new ParticleOptions(cfg.getConfigurationSection("particles"));
         bossbar = new BossBarOptions(cfg.getConfigurationSection("bossbar"));
@@ -322,6 +331,35 @@ public class Config {
     public Material buttonMaterial(String id) {
         Material m = buttonMaterials.get(id);
         return m == null ? Material.BARRIER : m;
+    }
+
+    /** Слот хотбара (0-8) кнопки сессии; дефолтная раскладка, если не задан. */
+    public int buttonSlot(String id) {
+        Integer s = buttonSlots.get(id);
+        if (s != null) {
+            return s;
+        }
+        switch (id) {
+            case "create":
+                return 0;
+            case "point1":
+                return 1;
+            case "point2":
+                return 2;
+            case "select":
+                return 3;
+            case "reset":
+                return 5;
+            case "cancel":
+                return 8;
+            default:
+                return 0;
+        }
+    }
+
+    /** Слот (0-8), который удерживается по центру в select-режиме (SCM). */
+    public int selectCenterSlot() {
+        return selectCenterSlot;
     }
 
     public ParticleOptions particles() {

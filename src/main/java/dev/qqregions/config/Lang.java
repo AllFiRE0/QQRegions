@@ -88,6 +88,15 @@ public class Lang {
                 cfg.set(key, dv);
             }
         }
+        // Списки (lore кнопок и пр.): отсутствующие у игрока — из дефолтов.
+        for (String key : defs.getKeys(true)) {
+            if (!defs.isList(key)) {
+                continue;
+            }
+            if (!cfg.isList(key)) {
+                cfg.set(key, defs.getList(key));
+            }
+        }
         // Авто-обновление: проставляем актуальную версию lang.yml (новые
         // переводы уже подтянулись через defaults выше; пользовательские
         // непустые значения сохраняются).

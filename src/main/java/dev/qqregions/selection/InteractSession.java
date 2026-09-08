@@ -15,6 +15,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
@@ -23,6 +24,7 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,11 +38,13 @@ import java.util.List;
 public class InteractSession {
 
     public static final int SLOT_CREATE = 0;
+    public static final int SLOT_POINT_1 = 1;
+    public static final int SLOT_POINT_2 = 2;
     public static final int SLOT_SELECT = 3;
     public static final int SLOT_RESET = 5;
     public static final int SLOT_CANCEL = 8;
 
-    /** Ключ NBT-тега кнопки сессии (значение = "create"|"select"|"reset"|"cancel"). */
+    /** Ключ NBT-тега кнопки сессии (значение = "create"|"point1"|"point2"|"select"|"reset"|"cancel"). */
     public static final String BTN_TAG_KEY = "session-button";
 
     private final QQRegions plugin;
@@ -94,7 +98,7 @@ public class InteractSession {
         inv.clear();
         inv.setItemInOffHand(null);
         renderButtons();
-        inv.setHeldItemSlot(SLOT_SELECT);
+        inv.setHeldItemSlot(plugin.config().buttonSlot("select"));
         plugin.lang().send(player, "select.interactive-on");
         player.sendMessage(plugin.lang().comp("select.interactive-help"));
         plugin.dbg("session start: " + player.getName() + " @" + world.getName()
@@ -125,25 +129,50 @@ public class InteractSession {
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Msg.color(plugin.lang().get(nameKey)));
+            List<Component> lore = lore(nameKey + "-lore");
+            if (!lore.isEmpty()) {
+                meta.lore(lore);
+            }
             meta.getPersistentDataContainer().set(buttonKey(), PersistentDataType.STRING, id);
             item.setItemMeta(meta);
         }
         return item;
     }
 
-    /** Раскладка «четыре кнопки» вне режима выделения. */
+    /** Собирает описание из lang-списка: каждая строка красится отдельно,
+     *  пустые строки становятся пустыми компонентами (разделителями в лоре). */
+    private List<Component> lore(String key) {
+        List<Component> lines = new ArrayList<>();
+        for (String l : plugin.lang().stringList(key)) {
+            if (l == null || l.isEmpty()) {
+                lines.add(Component.empty());
+                continue;
+            }
+            for (String seg : l.split("\n", -1)) {
+                lines.add(seg.isEmpty() ? Component.empty() : Msg.color(seg));
+            }
+        }
+        return lines;
+    }
+
+    /** Раскладка кнопок вне режима выделения (слоты из config). */
     private void renderButtons() {
         PlayerInventory inv = player.getInventory();
         for (int slot = 0; slot < 9; slot++) {
             inv.setItem(slot, null);
         }
-        inv.setItem(SLOT_CREATE, button("create", "select.button-create"));
-        inv.setItem(SLOT_SELECT, button("select", "select.button-select"));
-        inv.setItem(SLOT_RESET, button("reset", "select.button-reset"));
-        inv.setItem(SLOT_CANCEL, button("cancel", "select.button-cancel"));
+        Config cfg = plugin.config();
+        inv.setItem(cfg.buttonSlot("create"), button("create", "select.button-create"));
+        inv.setItem(cfg.buttonSlot("point1"), button("point1", "select.button-point-1"));
+        inv.setItem(cfg.buttonSlot("point2"), button("point2", "select.button-point-2"));
+        inv.setItem(cfg.buttonSlot("select"), button("select", "select.button-select"));
+        inv.setItem(cfg.buttonSlot("reset"), button("reset", "select.button-reset"));
+        inv.setItem(cfg.buttonSlot("cancel"), button("cancel", "select.button-cancel"));
     }
 
-    /** Раскладка «стеклянные панели» в режиме выделения: все 9 слотов. */
+    /** Раскладка «стеклянные панели» в режиме выделения: все 9 слотов.
+     *  Выбранный слот всегда возвращается на центр (SCM): тогда клавиши 4/6
+     *  меняют слот с 4-го, и InteractListener трактует их как шаги колеса. */
     private void renderSelectHotbar() {
         PlayerInventory inv = player.getInventory();
         Config.PointStyle style = plugin.config().pointStyle(activePoint);
@@ -152,11 +181,16 @@ public class InteractSession {
         if (meta != null) {
             meta.displayName(Msg.color(plugin.lang().get(
                     activePoint == 1 ? "select.point-pane-1" : "select.point-pane-2")));
+            List<Component> lore = lore(activePoint == 1 ? "select.point-pane-1-lore" : "select.point-pane-2-lore");
+            if (!lore.isEmpty()) {
+                meta.lore(lore);
+            }
             pane.setItemMeta(meta);
         }
         for (int slot = 0; slot < 9; slot++) {
             inv.setItem(slot, pane.clone());
         }
+        inv.setHeldItemSlot(plugin.config().selectCenterSlot());
     }
 
     private NamespacedKey buttonKey() {
@@ -171,6 +205,12 @@ public class InteractSession {
             case "create":
                 create();
                 break;
+            case "point1":
+                setPoint(1);
+                break;
+            case "point2":
+                setPoint(2);
+                break;
             case "select":
                 toggleSelect();
                 break;
@@ -183,6 +223,27 @@ public class InteractSession {
             default:
                 break;
         }
+    }
+
+    /** Кнопки «точка 1/2»: как /region select point — берём блок по прицелу
+     *  (до 300 блоков), иначе позицию игрока. Работает и в воздухе, и по блоку. */
+    private void setPoint(int which) {
+        Block target = player.getTargetBlockExact(300);
+        BlockVector3 pos = target != null
+                ? BlockVector3.at(target.getX(), target.getY(), target.getZ())
+                : BlockVector3.at(player.getLocation().getBlockX(),
+                        player.getLocation().getBlockY(), player.getLocation().getBlockZ());
+        SelectionManager mgr = plugin.selections();
+        Selection sel = mgr.getOrCreate(player, player.getWorld());
+        sel.setPos(which, pos);
+        mgr.set(player, sel);
+        syncWorldEdit();
+        plugin.lang().send(player, "select.pos-set",
+                "point", plugin.lang().fmt("select.point-" + which),
+                "x", String.valueOf(pos.getBlockX()),
+                "y", String.valueOf(pos.getBlockY()),
+                "z", String.valueOf(pos.getBlockZ()));
+        plugin.dbg("button point" + which + " -> " + pos);
     }
 
     private void create() {
@@ -306,7 +367,7 @@ public class InteractSession {
     }
 
     private void invHoldSelectSlot() {
-        player.getInventory().setHeldItemSlot(SLOT_SELECT);
+        player.getInventory().setHeldItemSlot(plugin.config().buttonSlot("select"));
     }
 
     public void onWheel(boolean scrollUp) {
