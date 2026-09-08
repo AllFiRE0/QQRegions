@@ -36,7 +36,17 @@ public class RegionCommand {
     }
 
     public boolean execute(CommandSender sender, String label, String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("?")) {
+        if (args.length == 0) {
+            // /region без аргументов — главное меню территорий (меню, а не справка).
+            if (sender instanceof Player p) {
+                if (plugin.menus().openMain(p)) {
+                    return true;
+                }
+            }
+            help(sender, label);
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("?")) {
             help(sender, label);
             return true;
         }

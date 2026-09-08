@@ -367,6 +367,12 @@ menu:
   dialog-add-label: "&7Введите ник игрока, которого {action}"
   dialog-add-action-owner: "сделать владельцем региона."
   dialog-add-action-member: "добавить участником региона."
+  # Главное меню (/region без аргументов), кнопка «Назад» в слоте 0.
+  main-back-name: "&eНазад|Главное меню"
+  main-back-lore: "&7Выполняется команда из config.yml."
+  region-search-notfound: "&cРегион по запросу &f{query} &cне найден."
+  region-search-multiple: "&eНайдено несколько: &f{regions}"
+  region-search-found: "&aРегион &f{region} &aнайден."
   add-chat-prompt-owner: "&eВведите в чат ник игрока, которого добавить &bвладельцем&e. Напишите &cотмена&e, чтобы отменить."
   add-chat-prompt-member: "&eВведите в чат ник игрока, которого добавить &eучастником&e. Напишите &cотмена&e, чтобы отменить."
   dialog-ok: "OK"

@@ -49,6 +49,10 @@ public class Config {
     private List<String> blockedCommands = new ArrayList<>();
     private boolean syncWorldEdit = true;
     private boolean debug;
+    /** Главное меню /region: кнопка «Назад» в слоте 0 (выкл. по умолчанию). */
+    private boolean mainMenuBackEnabled = false;
+    /** Команда кнопки «Назад» в главном меню (выполняется от имени игрока). */
+    private String mainMenuBackCommand = "@back";
     private PointStyle point1;
     private PointStyle point2;
     private String viewMode = "PARTICLES";
@@ -163,6 +167,8 @@ public class Config {
             }
         }
         selectCenterSlot = Math.max(0, Math.min(8, cfg.getInt("interactive.select-center-slot", 4)));
+        mainMenuBackEnabled = cfg.getBoolean("interactive.main-menu.back-enabled", false);
+        mainMenuBackCommand = cfg.getString("interactive.main-menu.back-command", "@back");
 
         particles = new ParticleOptions(cfg.getConfigurationSection("particles"));
         bossbar = new BossBarOptions(cfg.getConfigurationSection("bossbar"));
@@ -264,6 +270,14 @@ public class Config {
 
     public boolean syncWorldEdit() {
         return syncWorldEdit;
+    }
+
+    public boolean mainMenuBackEnabled() {
+        return mainMenuBackEnabled;
+    }
+
+    public String mainMenuBackCommand() {
+        return mainMenuBackCommand;
     }
 
     public boolean debug() {

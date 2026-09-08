@@ -6,15 +6,6 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
-import io.papermc.paper.dialog.Dialog;
-import io.papermc.paper.registry.data.dialog.ActionButton;
-import io.papermc.paper.registry.data.dialog.DialogBase;
-import io.papermc.paper.registry.data.dialog.action.DialogAction;
-import io.papermc.paper.registry.data.dialog.body.DialogBody;
-import io.papermc.paper.registry.data.dialog.input.DialogInput;
-import io.papermc.paper.registry.data.dialog.type.DialogType;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickCallback;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -36,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -55,7 +45,7 @@ public class MenuManager implements Listener {
      *  Храним копию OpenMenu: открытие чата закрывает инвентарь (onClose
      *  чистит open), но промпт должен пережить это и обработать сообщение. */
     private final Map<UUID, AddPrompt> pendingAdd = new ConcurrentHashMap<>();
-    /** Ожидание поискового запроса в чат: значение = SearchPrompt(kind: flag|market). */
+    /** Ожидание поискового запроса в чат: значение = SearchPrompt(kind: flag|market|region). */
     private final Map<UUID, SearchPrompt> pendingSearch = new ConcurrentHashMap<>();
     /** Ожидание ввода срока объявления аренды в чат: UUID -> предложение. */
     private final Map<UUID, dev.qqregions.market.Offer> pendingDur = new ConcurrentHashMap<>();
@@ -80,7 +70,7 @@ public class MenuManager implements Listener {
         String[] menuResources = {
                 "menus/flags.yml", "menus/info.yml", "menus/players.yml",
                 "menus/market.yml", "menus/flagshop.yml", "menus/blocks.yml",
-                "menus/myflags.yml", "menus/help.yml"
+                "menus/myflags.yml", "menus/help.yml", "menus/main.yml"
         };
         for (String r : menuResources) {
             dev.qqregions.util.Yml.upgrade(plugin, r, new File(dir, r.substring(r.indexOf('/') + 1)));
@@ -169,7 +159,7 @@ public class MenuManager implements Listener {
 
     /** Чем заполняются динамические слоты меню. */
     private enum Kind {
-        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS
+        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS, MAIN
     }
 
     private static long regionArea(ProtectedRegion region) {
@@ -236,6 +226,7 @@ public class MenuManager implements Listener {
             case "flagshop" -> Kind.FLAG_SHOP;
             case "blocks" -> Kind.BLOCK_SHOP;
             case "myflags" -> Kind.MY_FLAGS;
+            case "main" -> Kind.MAIN;
             default -> Kind.FLAGS;
         };
     }
@@ -315,6 +306,66 @@ public class MenuManager implements Listener {
         return null;
     }
 
+    /** Главное меню территорий: открывается по /region (и алиасам) без аргументов.
+     *  Слот 0 «Назад» добавляется только если включено в config.yml
+     *  (interactive.main-menu.back-enabled) — по умолчанию выключен. */
+    public boolean openMain(Player player) {
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", player.getWorld().getName());
+        ctx.put("region", "");
+        ctx.put("player", player.getName());
+        ctx.put("role", "other");
+        Menu best = pick(player, "main", null);
+        if (best == null) {
+            return false;
+        }
+        List<MenuItem> dynItems = marketItems(best, player, ctx);
+        int maxPages = best.maxPages(dynItems.size());
+        applyBackTarget(player, ctx);
+        Map<Integer, MenuItem> slotMap = new HashMap<>();
+        Inventory inv = best.build(plugin, player, ctx, 0, maxPages, dynItems, slotMap);
+        if (plugin.config().mainMenuBackEnabled()) {
+            String cmd = plugin.config().mainMenuBackCommand();
+            if (cmd != null && !cmd.trim().isEmpty()) {
+                MenuItem back = new MenuItem("ARROW", 1, 0,
+                        plugin.lang().get("menu.main-back-name"),
+                        List.of(plugin.lang().get("menu.main-back-lore")),
+                        List.of(cmd.trim()), "");
+                if (inv.getItem(0) == null) {
+                    inv.setItem(0, back.build(plugin, player, ctx));
+                    slotMap.put(0, back);
+                }
+            }
+        }
+        player.openInventory(inv);
+        open.put(player.getUniqueId(), new OpenMenu(player, inv, best, ctx, 0, maxPages, null, slotMap, Kind.MAIN));
+        return true;
+    }
+
+    /** «Инфо по региону» из главного меню: регион, в котором стоит игрок. */
+    private void openInfoCurrent(Player p, OpenMenu om) {
+        ProtectedRegion r = plugin.wg().current(p);
+        if (r == null) {
+            plugin.lang().send(p, "info.none");
+            OpenMenu live = open.get(p.getUniqueId());
+            if (live != null) {
+                render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+            }
+            return;
+        }
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", p.getWorld().getName());
+        ctx.put("region", r.getId());
+        ctx.put("player", p.getName());
+        String role = switch (plugin.wg().role(r, p)) {
+            case OWNER -> "owner";
+            case MEMBER -> "member";
+            default -> "other";
+        };
+        ctx.put("role", role);
+        open(p, "info", ctx, 0, null, true);
+    }
+
     /** Разрешено ли действие при включённом guard: TPS >= min-tps и пинг <= max-ping. */
     private static boolean guardOk(Player p, Config.GuardOptions g) {
         if (Config.GuardOptions.tps() < g.minTps) {
@@ -340,6 +391,7 @@ public class MenuManager implements Listener {
             case FLAG_SHOP -> dynItems = flagShopItems(menu, player, ctx);
             case BLOCK_SHOP -> dynItems = blockShopItems(menu, player, ctx);
             case MY_FLAGS -> dynItems = menu.purchasedItems(plugin, player, ctx, owned);
+            case MAIN -> dynItems = marketItems(menu, player, ctx);
             default -> dynItems = menu.flagItems(plugin, player, ctx, menu.dynamicFlags(), false, owned);
         }
         int maxPages = menu.maxPages(dynItems.size());
@@ -451,6 +503,24 @@ public class MenuManager implements Listener {
         if (cmds == null) {
             return;
         }
+        // Клик по кнопке, НЕ связанной с вводом, отменяет незавершённый
+        // ввод (поиск/ник/срок), чтобы случайный чат не глотался промптом.
+        boolean inputCmd = false;
+        for (String c : cmds) {
+            String cl = c.toLowerCase(java.util.Locale.ROOT);
+            if (cl.startsWith("@add:") || cl.startsWith("@market-search")
+                    || cl.startsWith("@region-search") || cl.startsWith("@flag-search")
+                    || cl.startsWith("@market:dur:")) {
+                inputCmd = true;
+                break;
+            }
+        }
+        if (!inputCmd) {
+            UUID cid = p.getUniqueId();
+            pendingAdd.remove(cid);
+            pendingSearch.remove(cid);
+            pendingDur.remove(cid);
+        }
 
         // Кнопка флага: ПКМ = сменить группу флага (без переключения значения),
         // ЛКМ = сменить значение для текущей группы.
@@ -560,6 +630,14 @@ public class MenuManager implements Listener {
             }
             if (c.equalsIgnoreCase("@sort")) {
                 cycleSort(p, om);
+                continue;
+            }
+            if (c.equalsIgnoreCase("@region-search")) {
+                startSearchPrompt(p, om, "region");
+                continue;
+            }
+            if (c.equalsIgnoreCase("@region-info")) {
+                openInfoCurrent(p, om);
                 continue;
             }
             MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
@@ -982,18 +1060,11 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Диалог «срок объявления аренды» (минуты). */
+    /** Ввод срока объявления аренды (минуты) через чат. */
     private void startDurPrompt(Player p, dev.qqregions.market.Offer o) {
         if (!plugin.market().ownsOffer(o, p.getUniqueId())) {
             plugin.lang().send(p, "menu.offer-action-fail",
                     "action", plugin.lang().get("menu.actions.dur"), "reason", marketReason("not-you"));
-            return;
-        }
-        if (tryInputDialog(p,
-                plugin.lang().comp("menu.dialog-dur-title"),
-                plugin.lang().comp("menu.dialog-dur-label"),
-                value -> onDurResult(p.getUniqueId(), o, value))) {
-            closeOpen(p);
             return;
         }
         pendingDur.put(p.getUniqueId(), o);
@@ -1027,7 +1098,7 @@ public class MenuManager implements Listener {
         });
     }
 
-    /** Закрыть живое состояние меню (инвентарь уже закрылся из-за диалога/чата). */
+    /** Закрыть живое состояние меню (инвентарь уже закрылся из-за чата). */
     private void closeOpen(Player p) {
         OpenMenu cur = open.remove(p.getUniqueId());
         if (cur != null) {
@@ -1314,20 +1385,10 @@ public class MenuManager implements Listener {
         render(p, om.menu, om.ctx, om.page, om.role, om.kind);
     }
 
-    /** Начать поиск флагов по названию (по id И переводу {flag-name}).
-     *  При поддержке сервером нового диалогового API значение вводится через
-     *  диалоговое окно, иначе — через обычный чат. */
+    /** Начать ввод запроса в чат: фильтр по флагам/рынку или поиск региона по имени
+     *  (kind: flag|market|region). Меню при этом НЕ закрывается — игрок пишет в чат
+     *  поверх инвентаря, результат применяется к живому контексту. */
     private void startSearchPrompt(Player p, OpenMenu om, String kind) {
-        boolean market = "market".equalsIgnoreCase(kind);
-        if (tryInputDialog(p,
-                plugin.lang().comp(market ? "menu.dialog-search-market-title" : "menu.dialog-search-flag-title"),
-                plugin.lang().comp(market ? "menu.dialog-search-market-label" : "menu.dialog-search-flag-label"),
-                query -> onSearchResult(p.getUniqueId(), new SearchPrompt(om, kind), query))) {
-            // инвентарь клиент закрыл при открытии диалога — снимаем живое состояние,
-            // результат диалога сам перерисует/переоткроет меню
-            closeOpen(p);
-            return;
-        }
         pendingSearch.put(p.getUniqueId(), new SearchPrompt(om, kind));
         p.sendMessage(plugin.lang().comp("market.search-prompt"));
         p.sendMessage(plugin.lang().comp("market.search-cancel"));
@@ -1372,6 +1433,10 @@ public class MenuManager implements Listener {
         if (p == null || !p.isOnline()) {
             return;
         }
+        if ("region".equalsIgnoreCase(pr.kind)) {
+            applyRegionSearch(p, pr, query);
+            return;
+        }
         boolean market = "market".equalsIgnoreCase(pr.kind);
         String key = market ? "_marketsearch" : "_flagsearch";
         p.sendMessage(plugin.lang().comp("market.search-set", "query", query));
@@ -1381,33 +1446,74 @@ public class MenuManager implements Listener {
             live.ctx.put(key, query);
             render(p, live.menu, live.ctx, live.page, live.role, live.kind);
         } else {
-            // меню закрылось во время ввода (клиент закрывает инвентарь при
-            // открытии чата/диалога) — кладём фильтр в сохранённый контекст и
-            // переоткрываем, чтобы результат был виден
+            // инвентарь закрыли во время ввода — переоткрываем с фильтром
             pr.om.ctx.put(key, query);
             open(p, market ? "market" : "flags", pr.om.ctx, 0, pr.om.role, false);
         }
     }
 
-    /** Результат поиска из диалогового окна (запускается на главном потоке). */
-    private void onSearchResult(UUID id, SearchPrompt pr, String raw) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            Player p = plugin.getServer().getPlayer(id);
-            if (p == null || !p.isOnline()) {
-                return;
+    /** Поиск региона по имени (из главного меню «Поиск региона»): ищем по всем
+     *  мирам, исключаем banned-regions из конфига, и открываем info нужного региона. */
+    private void applyRegionSearch(Player p, SearchPrompt pr, String query) {
+        String q = query.toLowerCase(java.util.Locale.ROOT);
+        String exact = null;
+        List<String> hits = new ArrayList<>();
+        for (org.bukkit.World w : Bukkit.getWorlds()) {
+            for (ProtectedRegion r : plugin.wg().all(w)) {
+                String name = r.getId().toLowerCase(java.util.Locale.ROOT);
+                if (!excludeFromSearch(name) && name.equals(q)) {
+                    exact = r.getId();
+                    break;
+                }
+                if (!excludeFromSearch(name) && name.contains(q) && !hits.contains(r.getId())) {
+                    hits.add(r.getId());
+                }
             }
-            String q = raw == null ? "" : raw.trim();
-            if (q.isEmpty() || q.equalsIgnoreCase("cancel") || q.equalsIgnoreCase("отмена")
-                    || q.equalsIgnoreCase("сброс") || q.equalsIgnoreCase("off")) {
-                p.sendMessage(plugin.lang().comp("market.search-off"));
-                return;
+            if (exact != null) {
+                break;
             }
-            applySearch(id, pr, q);
-        });
+        }
+        String target = exact != null ? exact : (hits.size() == 1 ? hits.get(0) : null);
+        if (target == null) {
+            if (hits.isEmpty()) {
+                plugin.lang().send(p, "menu.region-search-notfound", "query", query);
+            } else {
+                plugin.lang().send(p, "menu.region-search-multiple", "query", query,
+                        "regions", String.join(", ", hits.subList(0, Math.min(5, hits.size()))));
+            }
+            OpenMenu live = open.get(p.getUniqueId());
+            if (live != null) {
+                live.ctx.put("region", "");
+                render(p, live.menu, live.ctx, live.page, live.role, live.kind);
+            }
+            return;
+        }
+        org.bukkit.World w = null;
+        for (org.bukkit.World cw : Bukkit.getWorlds()) {
+            ProtectedRegion r = plugin.wg().byName(cw, target);
+            if (r != null) {
+                w = cw;
+                break;
+            }
+        }
+        if (w == null) {
+            plugin.lang().send(p, "menu.region-search-notfound", "query", query);
+            return;
+        }
+        plugin.lang().send(p, "menu.region-search-found", "region", target);
+        Map<String, String> ctx = new HashMap<>();
+        ctx.put("world", w.getName());
+        ctx.put("region", target);
+        ctx.put("player", p.getName());
+        ctx.put("role", "other");
+        open(p, "info", ctx, 0, null, true);
     }
 
-    /** Начать ввод ника в чат для добавления владельца/участника.
-     *  При поддержке сервером диалогового API ник вводится через окно, иначе — чатом. */
+    private boolean excludeFromSearch(String name) {
+        return plugin.config().isBannedRegion(name) || name.startsWith("__global__");
+    }
+
+    /** Ввод ника игрока в чат для добавления владельца/участника. */
     private void startPrompt(Player p, OpenMenu om, String kind) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
             plugin.lang().send(p, "menu.participants-owner-only");
@@ -1418,48 +1524,8 @@ public class MenuManager implements Listener {
         }
         String k = kind.toLowerCase(java.util.Locale.ROOT);
         boolean ownerRole = "owner".equalsIgnoreCase(k);
-        if (tryInputDialog(p,
-                plugin.lang().comp(ownerRole ? "menu.dialog-add-owner-title" : "menu.dialog-add-member-title"),
-                plugin.lang().comp("menu.dialog-add-label", "action",
-                        plugin.lang().get(ownerRole ? "menu.dialog-add-action-owner" : "menu.dialog-add-action-member")),
-                name -> onAddResult(p.getUniqueId(), new AddPrompt(om, k), name))) {
-            closeOpen(p);
-            return;
-        }
         pendingAdd.put(p.getUniqueId(), new AddPrompt(om, k));
         p.sendMessage(plugin.lang().comp(ownerRole ? "menu.add-chat-prompt-owner" : "menu.add-chat-prompt-member"));
-    }
-
-    /** Результат диалога «добавить игрока» (запускается на главном потоке). */
-    private void onAddResult(UUID id, AddPrompt pr, String name) {
-        plugin.getServer().getScheduler().runTask(plugin, () -> addPlayerFromChat(id, pr, name));
-    }
-
-    /** Показать диалоговое окно с текстовым полем (Paper Dialog API).
-     *  Возвращает false, если API недоступно — вызывающий переключается на чат. */
-    private boolean tryInputDialog(Player p, Component title, Component label, Consumer<String> onResult) {
-        try {
-            Dialog dialog = Dialog.create(builder -> builder.empty()
-                    .base(DialogBase.builder(title)
-                            .body(List.of(DialogBody.plainMessage(label)))
-                            .inputs(List.of(DialogInput.text("value", 300, label, true, "", 64, null)))
-                            .canCloseWithEscape(true)
-                            .build())
-                    .type(DialogType.confirmation(
-                            ActionButton.create(Component.text(plugin.lang().get("menu.dialog-ok")), null, 100,
-                                    DialogAction.customClick((response, audience) -> {
-                                        if (audience instanceof Player pl) {
-                                            String value = response.getText("value");
-                                            onResult.accept(value == null ? "" : value);
-                                        }
-                                    }, ClickCallback.Options.builder().uses(1)
-                                            .lifetime(ClickCallback.DEFAULT_LIFETIME).build())),
-                            ActionButton.create(Component.text(plugin.lang().get("menu.dialog-cancel")), null, 100, null))));
-            p.showDialog(dialog);
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
