@@ -215,12 +215,22 @@ public class HighlightManager implements Listener {
             }
             java.util.Set<String> cur = new java.util.HashSet<>();
             List<ProtectedRegion> under = new ArrayList<>();
+            // 1) Чужие/по флагу: регионы ПОД игроком, где territory-visible ALLOW.
             for (ProtectedRegion r : plugin.wg().at(p.getWorld(), p.getLocation())) {
                 if (!plugin.wg().territoryVisibleAllows(p.getWorld(), r, p)) {
                     continue;
                 }
-                cur.add(key(p.getWorld(), r));
-                under.add(r);
+                if (cur.add(key(p.getWorld(), r))) {
+                    under.add(r);
+                }
+            }
+            // 2) «Свои» (владелец/участник): АВТО в радиусе auto-show-radius.
+            //    Чужим нужен флаг (белый стек по ALLOW), свои подсвечиваются
+            //    сразу своим цветом (зелёный/жёлтый).
+            for (ProtectedRegion r : ownRegionsAround(p)) {
+                if (cur.add(key(p.getWorld(), r))) {
+                    under.add(r);
+                }
             }
             Set<String> was = flagShown.get(p.getUniqueId());
             Set<String> next = was == null ? new HashSet<>() : new HashSet<>(was);
@@ -266,6 +276,28 @@ public class HighlightManager implements Listener {
                 flagShown.put(p.getUniqueId(), next);
             }
         }
+    }
+
+    /** Свои регионы (владелец/участник) в радиусе auto-show-radius вокруг игрока. */
+    private List<ProtectedRegion> ownRegionsAround(Player p) {
+        int r = plugin.config().highlight().autoShowRadius;
+        if (r <= 0) {
+            return List.of();
+        }
+        World w = p.getWorld();
+        org.bukkit.Location l = p.getLocation();
+        int bx = l.getBlockX();
+        int bz = l.getBlockZ();
+        BlockVector3 mn = BlockVector3.at(bx - r, w.getMinHeight(), bz - r);
+        BlockVector3 mx = BlockVector3.at(bx + r, w.getMaxHeight() - 1, bz + r);
+        List<ProtectedRegion> out = new ArrayList<>();
+        UUID id = p.getUniqueId();
+        for (ProtectedRegion reg : plugin.wg().regionsInCube(w, mn, mx)) {
+            if (plugin.wg().isOwner(reg, id) || plugin.wg().isMember(reg, id)) {
+                out.add(reg);
+            }
+        }
+        return out;
     }
 
     private void cooldownRemove(Player p, String key) {
@@ -577,7 +609,7 @@ public class HighlightManager implements Listener {
             }
         }
         List<Entity> list = "TERRITORY".equals(type)
-                ? spawnPickets(world, fencePickets(world, r, h))
+                ? spawnPickets(world, fencePickets(world, r, h, p))
                 : boxBlocks(world, r, h);
         perPlayer.put(key, list);
     }
@@ -590,7 +622,7 @@ public class HighlightManager implements Listener {
      */
     private void resyncTerrainFence(Player p, World w, ProtectedRegion r, String key) {
         Config.HighlightOptions h = plugin.config().highlight();
-        List<Picket> fresh = fencePickets(w, r, h);
+        List<Picket> fresh = fencePickets(w, r, h, p);
         Map<String, List<Entity>> perPlayer = blockViews.get(p.getUniqueId());
         List<Entity> old = perPlayer == null ? null : perPlayer.get(key);
         if (picketsEqual(old, fresh)) {
@@ -691,8 +723,16 @@ public class HighlightManager implements Listener {
      * чтобы при периодическом резкане сравнивать с уже стоящими дисплеями и
      * НЕ пересоздавать неизменившийся забор (иначе он видимо мигает).
      */
-    private List<Picket> fencePickets(World world, ProtectedRegion r, Config.HighlightOptions h) {
+    private List<Picket> fencePickets(World world, ProtectedRegion r, Config.HighlightOptions h, Player p) {
         Config.TerrainFenceOptions f = h.fence;
+        // Цвет забора по роли ИГРОКА: владелец/участник/чужой — свой материал
+        // (highlight.territory.fence.owner/member/foreign). У каждого игрока
+        // свои дисплеи, поэтому роль читается именно на его перспективу.
+        Config.TerrainFenceOptions.FenceRoleStyle role = f.forRelation(
+                p != null && plugin.wg().isOwner(r, p.getUniqueId()),
+                p != null && plugin.wg().isMember(r, p.getUniqueId()));
+        Material roleMat = role.material;
+        Color roleGlow = role.glow ? plugin.config().highlight().particles.dustColor : null;
         BlockVector3 mn = r.getMinimumPoint();
         BlockVector3 mx = r.getMaximumPoint();
         int minX = mn.getBlockX(), maxX = mx.getBlockX();
@@ -705,11 +745,11 @@ public class HighlightManager implements Listener {
         int budget = Math.max(1000, h.particles.maxPoints);
         Set<Material> ignore = h.territoryIgnore;
         // Стороны, параллельные X (z фиксирован): наружу региона = -Z/+Z.
-        picketEdge(world, list, f, minX, maxX, minY, maxY, minZ, true, -1, budget, ignore);
-        picketEdge(world, list, f, minX, maxX, minY, maxY, maxZ, true, +1, budget, ignore);
+        picketEdge(world, list, f, roleMat, roleGlow, minX, maxX, minY, maxY, minZ, true, -1, budget, ignore);
+        picketEdge(world, list, f, roleMat, roleGlow, minX, maxX, minY, maxY, maxZ, true, +1, budget, ignore);
         // Стороны, параллельные Z (x фиксирован): наружу региона = -X/+X.
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, minX, false, -1, budget, ignore);
-        picketEdge(world, list, f, minZ, maxZ, minY, maxY, maxX, false, +1, budget, ignore);
+        picketEdge(world, list, f, roleMat, roleGlow, minZ, maxZ, minY, maxY, minX, false, -1, budget, ignore);
+        picketEdge(world, list, f, roleMat, roleGlow, minZ, maxZ, minY, maxY, maxX, false, +1, budget, ignore);
         // Углы: каждая сторона ставит свой дисплей в один и тот же угловой блок
         // (X-грань и Z-грань сходятся в центр угла) — оставляем ОДИН штакет на
         // угол, иначе в 4 углах стоят сдвоенные «кресты», ломающие сетку по
@@ -723,7 +763,8 @@ public class HighlightManager implements Listener {
         }
         if (plugin.config().debug()) {
             StringBuilder sb = new StringBuilder();
-            sb.append("[territory-fence] ПАРАМЕТРЫ: material=").append(f.material)
+            sb.append("[territory-fence] ПАРАМЕТРЫ: material=").append(roleMat.name())
+                    .append(" glow=").append(roleGlow != null)
                     .append(" h=").append(f.height).append(" w=").append(f.width)
                     .append(" t=").append(f.thickness).append(" spacing=").append(f.spacing)
                     .append(" offset=").append(f.offset)
@@ -771,6 +812,7 @@ public class HighlightManager implements Listener {
      * -1 — наружу = падение координаты (minX/minZ). Нужен для across-offset.
      */
     private void picketEdge(World world, List<Picket> out, Config.TerrainFenceOptions f,
+                            Material picketMat, Color glow,
                             int lo, int hi, int minY, int maxY, int fixed, boolean alongX,
                             int outwardSign, int budget, Set<Material> ignore) {
         double step = f.spacing;
@@ -815,8 +857,7 @@ public class HighlightManager implements Listener {
                 colsTerrain++;
                 out.add(new Picket(cx,
                         y + 1 + f.height / 2.0 + f.offset, cz,
-                        f.material.createBlockData(), scale,
-                        f.glow ? plugin.config().highlight().particles.dustColor : null));
+                        picketMat.createBlockData(), scale, glow));
                 made++;
             }
         }

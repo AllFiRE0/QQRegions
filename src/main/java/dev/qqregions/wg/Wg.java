@@ -2,6 +2,7 @@ package dev.qqregions.wg;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.math.BoundingBox;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.domains.DefaultDomain;
 import com.sk89q.worldguard.internal.platform.WorldGuardPlatform;
@@ -144,6 +145,28 @@ public class Wg {
             }
         }
         return out;
+    }
+
+    /** Регионы, пересекающие куб [min..max] (для авто-показа «своих» вокруг игрока). */
+    public List<ProtectedRegion> regionsInCube(World world, BlockVector3 min, BlockVector3 max) {
+        RegionManager rm = manager(world);
+        if (rm == null) {
+            return List.of();
+        }
+        try {
+            BoundingBox box = BoundingBox.fromMinMax(min, max);
+            ApplicableRegionSet set = rm.getApplicableRegions(box);
+            List<ProtectedRegion> out = new ArrayList<>();
+            for (ProtectedRegion r : set.getRegions()) {
+                if (r.intersects(box)) {
+                    out.add(r);
+                }
+            }
+            return out;
+        } catch (Throwable t) {
+            plugin.dbg("regionsInCube error: " + t.getMessage());
+            return List.of();
+        }
     }
 
     /**

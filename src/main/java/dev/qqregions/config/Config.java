@@ -143,9 +143,9 @@ public class Config {
         viewMaxBlocks = cfg.getInt("interactive.view-max-blocks", 500);
         viewBlockScale = (float) cfg.getDouble("interactive.view-block-scale", 0.35);
         commandSelectionView = cfg.getBoolean("interactive.command-selection-view", true);
-        viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 5));
+        viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 60));
         viewHideDistance = Math.max(0, cfg.getInt("interactive.view-hide-distance", 0));
-        cmdViewHideAfter = Math.max(0, cfg.getInt("interactive.command-selection-hide-after", 0));
+        cmdViewHideAfter = Math.max(0, cfg.getInt("interactive.command-selection-hide-after", 60));
 
         buttonMaterials.clear();
         buttonSlots.clear();
@@ -524,6 +524,8 @@ public class Config {
         public final long cooldownMillis;
         public final float blockScale;
         public final Material block;
+        /** Радиус АВТО-показа «своих» регионов вокруг игрока (0 = только под ногами). */
+        public final int autoShowRadius;
         /** Скрывать подсветку при выходе игрока из региона (вход/выход по флагу). */
         public final boolean hideOnExit;
         /** Показывать подсветку при выходе игрока из региона (как exit-флаг WG). */
@@ -549,6 +551,7 @@ public class Config {
                 cooldownMillis = 10_000L;
                 blockScale = 0.35f;
                 block = Material.GLASS;
+                autoShowRadius = 16;
                 hideOnExit = true;
                 showOnExit = true;
                 terrainCacheSeconds = 3;
@@ -561,10 +564,15 @@ public class Config {
             enabled = s.getBoolean("enabled", true);
             flagEnabled = s.getBoolean("flag-enabled", true);
             type = s.getString("type", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
-            showSeconds = Math.max(1, s.getInt("show-seconds", 10));
+            // Общий таймаут ВСЕХ подсветок (регионы + выделения): 60 секунд.
+            // Если задан старый ключ show-seconds — берётся из него (совместимость).
+            showSeconds = Math.max(1, s.getInt("auto-hide-seconds", s.getInt("show-seconds", 60)));
             showMillis = showSeconds * 1000L;
             scanTicks = Math.max(1, s.getInt("scan-ticks", 20));
             cooldownMillis = Math.max(0, s.getInt("cooldown-seconds", 10)) * 1000L;
+            // Радиус АВТО-показа «своих» регионов (владелец/участник) вокруг игрока;
+            // 0 = только регионы, в которых игрок стоит. Чужие — только по флагу ALLOW.
+            autoShowRadius = Math.max(0, s.getInt("auto-show-radius", 16));
             blockScale = (float) s.getDouble("block-scale", 0.35);
             String mat = s.getString("block", "GLASS");
             Material m = Material.matchMaterial(mat);
@@ -615,6 +623,30 @@ public class Config {
         public final double acrossOffset;
         /** Светиться ли (glow) в цвет highlight.particles.dust-color. */
         public final boolean glow;
+        /** Стиль забора для ЧУЖИХ регионов. */
+        public final FenceRoleStyle foreign;
+        /** Стиль забора для регионов, где игрок УЧАСТНИК. */
+        public final FenceRoleStyle member;
+        /** Стиль забора для регионов, где игрок ВЛАДЕЛЕЦ. */
+        public final FenceRoleStyle owner;
+
+        /** Материал + свечение забора конкретной роли (fallback на базовые). */
+        public static final class FenceRoleStyle {
+            public final Material material;
+            public final boolean glow;
+
+            FenceRoleStyle(Material material, boolean glow) {
+                this.material = material;
+                this.glow = glow;
+            }
+        }
+
+        public FenceRoleStyle forRelation(boolean isOwner, boolean isMember) {
+            if (isOwner) {
+                return owner;
+            }
+            return isMember ? member : foreign;
+        }
 
         TerrainFenceOptions(ConfigurationSection s) {
             String def = "OAK_PLANKS";
@@ -633,6 +665,27 @@ public class Config {
             // на полблока ВНУТРЬ от контура (визуально «съезжает»).
             acrossOffset = s == null ? 0.5 : s.getDouble("across-offset", 0.5);
             glow = s == null || s.getBoolean("glow", true);
+            // Роли: вложенные секции owner/member/foreign с собственными
+            // material/glow; при отсутствии своих значений берется базовая пара.
+            foreign = style(s, "foreign", material, glow);
+            member = style(s, "member", material, glow);
+            owner = style(s, "owner", material, glow);
+        }
+
+        private static FenceRoleStyle style(ConfigurationSection s, String role,
+                                            Material baseMat, boolean baseGlow) {
+            ConfigurationSection r = s == null ? null : s.getConfigurationSection(role);
+            if (r == null) {
+                return new FenceRoleStyle(baseMat, baseGlow);
+            }
+            Material mat = baseMat;
+            if (r.getString("material") != null) {
+                Material mm = Material.matchMaterial(r.getString("material"));
+                if (mm != null) {
+                    mat = mm;
+                }
+            }
+            return new FenceRoleStyle(mat, r.getBoolean("glow", baseGlow));
         }
     }
 

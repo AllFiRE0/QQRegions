@@ -245,7 +245,7 @@ public class Menu {
                     : "";
             String groupLabel = plugin.replace().resolve("flag-groups", group);
             String valueLabel = value.isEmpty()
-                    ? "&7не задано"
+                    ? plugin.lang().get("menu.value-not-set")
                     : plugin.replace().resolve("flag-values", value);
             String groupsList = groupsList(plugin, tpl, group);
             String flagName = plugin.replace().flagName(id);
@@ -308,9 +308,9 @@ public class Menu {
         for (String g : tpl.groups) {
             String label = plugin.replace().resolve("flag-groups", g);
             if (g.equalsIgnoreCase(currentGroup)) {
-                sb.append("&a✓ ").append(label);
+                sb.append(plugin.lang().get("menu.group-check")).append(label);
             } else {
-                sb.append("&8• &7").append(label);
+                sb.append(plugin.lang().get("menu.group-bullet")).append(label);
             }
             sb.append('\n');
         }

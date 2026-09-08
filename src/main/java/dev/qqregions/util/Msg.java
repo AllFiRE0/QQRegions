@@ -160,6 +160,19 @@ public final class Msg {
                 i = end + 1;
                 continue;
             }
+            // &#RRGGBB — ЕДИНЫЙ токен (уже legacy/мини-обёртка): не даём
+            // конвертируемому '#' оторваться от '&'. Иначе остаётся голый
+            // '&' перед текстом, а цвет не применяется — в заголовках окон
+            // (menus/*.yml "&#000000Помощь") вместо «Чёрный Помощь»
+            // отображался "&Помощь".
+            if (c == '&' && i + 8 <= n && s.charAt(i + 1) == '#') {
+                String hex = s.substring(i + 2, i + 8);
+                if (isHex(hex)) {
+                    sb.append(mini ? "<#" + hex + ">" : "&#" + hex);
+                    i += 8;
+                    continue;
+                }
+            }
             if (c == '#' && i + 7 <= n) {
                 String hex = s.substring(i + 1, i + 7);
                 if (isHex(hex)) {

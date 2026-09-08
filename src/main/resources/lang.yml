@@ -344,6 +344,20 @@ menu:
   offer-declined: "&eОтклонено: &f{region}"
   offer-cancelled: "&eОтменено: &f{region}"
   offer-action-fail: "&cНе удалось {action}: &f{reason}"
+  # Имена действий {action} в offer-action-fail.
+  actions:
+    buy: "&aкупить"
+    rent: "&aарендовать"
+    autorent: "&eавтовозврат"
+    accept: "&aпринять"
+    decline: "&eотклонить"
+    cancel: "&eотменить"
+    dur: "&eсрок"
+  # «Не задано» для пустого значения флага (меню флагов).
+  value-not-set: "&7не задано"
+  # Маркеры групп флагов в lore «ПКМ — сменить группу».
+  group-check: "&a✓ "
+  group-bullet: "&8• &7"
   dialog-search-market-title: "&eПоиск по рынку"
   dialog-search-flag-title: "&eПоиск флагов"
   dialog-search-market-label: "&7Введите название региона для поиска."
@@ -423,3 +437,7 @@ raid:
 
 guard:
   blocked: "&cСервер испытывает сильную нагрузку — действие отменено. Попробуйте позже."
+
+select-status:
+  # Цвет {value-color} боссбара/статуса, когда выделение упёрлось в лимит.
+  value-full: "&c"

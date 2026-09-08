@@ -69,7 +69,9 @@ public final class SelectStatus {
         }
         String percent = mx <= 0 ? "100" : String.valueOf(Math.min(100L, cur * 100 / mx));
         // {value-color} — цвет перед {current}: &f в норме, красный при лимите.
-        String valueColor = full(plugin, p, sel) ? "&c" : bo.valueColor;
+        String valueColor = full(plugin, p, sel)
+                ? plugin.lang().get("select-status.value-full")
+                : bo.valueColor;
         text = text.replace("{value-color}", valueColor)
                 .replace("{current}", fmt(cur))
                 .replace("{max}", fmt(mx))

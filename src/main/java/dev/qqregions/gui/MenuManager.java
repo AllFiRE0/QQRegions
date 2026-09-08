@@ -912,7 +912,7 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&aкупить", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.buy"), "reason", marketReason(res));
                 }
                 break;
             }
@@ -928,7 +928,7 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&aарендовать", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.rent"), "reason", marketReason(res));
                 }
                 break;
             }
@@ -939,7 +939,7 @@ public class MenuManager implements Listener {
                             "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&eавтовозврат", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.autorent"), "reason", marketReason(res));
                 }
                 break;
             }
@@ -952,7 +952,7 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-accepted", "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&aпринять", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.accept"), "reason", marketReason(res));
                 }
                 break;
             case "decline":
@@ -961,7 +961,7 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-declined", "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&eотклонить", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.decline"), "reason", marketReason(res));
                 }
                 break;
             case "cancel":
@@ -970,7 +970,7 @@ public class MenuManager implements Listener {
                     plugin.lang().send(p, "menu.offer-cancelled", "region", o.region);
                 } else {
                     plugin.lang().send(p, "menu.offer-action-fail",
-                            "action", "&eотменить", "reason", marketReason(res));
+                            "action", plugin.lang().get("menu.actions.cancel"), "reason", marketReason(res));
                 }
                 break;
             default:
@@ -986,7 +986,7 @@ public class MenuManager implements Listener {
     private void startDurPrompt(Player p, dev.qqregions.market.Offer o) {
         if (!plugin.market().ownsOffer(o, p.getUniqueId())) {
             plugin.lang().send(p, "menu.offer-action-fail",
-                    "action", "&eсрок", "reason", marketReason("not-you"));
+                    "action", plugin.lang().get("menu.actions.dur"), "reason", marketReason("not-you"));
             return;
         }
         if (tryInputDialog(p,
@@ -1022,7 +1022,7 @@ public class MenuManager implements Listener {
                 plugin.lang().send(p, "market.listdur-set", "region", o.region, "minutes", fmt(minutes));
             } else {
                 plugin.lang().send(p, "menu.offer-action-fail",
-                        "action", "&eсрок", "reason", marketReason(res));
+                        "action", plugin.lang().get("menu.actions.dur"), "reason", marketReason(res));
             }
         });
     }

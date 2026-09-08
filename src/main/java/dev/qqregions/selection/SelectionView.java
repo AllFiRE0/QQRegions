@@ -128,7 +128,18 @@ public class SelectionView {
         if (changed) {
             idle = 0;
             hidden = false;
-        } else if (hidden) {
+        } else {
+            idle++;
+        }
+        int hideCalls = plugin.config().viewHideAfterCalls();
+        if (hideCalls > 0 && idle >= hideCalls) {
+            if (!hidden) {
+                hidden = true;
+                cleanup();
+            }
+            return;
+        }
+        if (hidden) {
             return;
         }
         if (plugin.config().blockView()) {
@@ -272,6 +283,25 @@ public class SelectionView {
                 + '|' + act.highlight.asRGB();
         boolean changed = !fp.equals(lastFp);
         lastFp = fp;
+        if (changed) {
+            idle = 0;
+            hidden = false;
+        } else {
+            idle++;
+        }
+        // Авто-скрытие select-подсветки по бездействию (view-hide-after):
+        // если игрок НЕ меняет выделение, контур гаснет сам, а не висит вечно.
+        int hideCalls = plugin.config().viewHideAfterCalls();
+        if (hideCalls > 0 && idle >= hideCalls) {
+            if (!hidden) {
+                hidden = true;
+                cleanup();
+            }
+            return;
+        }
+        if (hidden) {
+            return;
+        }
         if (cfg.blockView()) {
             if (!changed && !unloadedPending && !forceHeal()) {
                 return;
