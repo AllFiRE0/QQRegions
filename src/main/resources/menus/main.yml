@@ -2,27 +2,23 @@
 #  QQRegions — главное меню территорий (/region, /tr, /territory
 #  без аргументов).
 #
-#  Динамические слоты (menu-slots) заполняются ПРЕДЛОЖЕНИЯМИ рынка
-#  (продажа/аренда): ЛКМ на чужое — купить/арендовать, на своё —
-#  телепорт к региону («посмотреть в живую»).
-#
-#  Слоты (можно менять сколько угодно):
+#  Кнопки выстроены в один ряд:
 #    0  — «Назад» (по умолчанию ВЫКЛЮЧЕНА, включается в config.yml:
 #         interactive.main-menu.back-enabled: true; команда —
 #         interactive.main-menu.back-command)
-#    4  — Магазин территорий (рынок)
+#    1  — Магазин территорий (рынок)
+#    2  — Моя территория: управление регионом, если игрок внутри,
+#         иначе — меню выбора территории ({my-region-lore})
+#    3  — Поиск региона по названию (ввод в чат → меню результатов)
+#    4  — Мои объявления (рынок сразу во вкладке своих объявлений)
+#    5  — Расширения (+регионы / +блоки)
+#    6  — Мои флаги
+#    7  — Магазин флагов
 #    8  — Справка
-#    10 — Мой регион: владельцы/участники сейчас на месте (клик —
-#         полное info-меню с шаблонами под роль)
-#    11 — Поиск региона по названию (ввод в чат → меню результатов)
-#    47 — Мои объявления (рынок сразу во вкладке своих объявлений)
-#    48 — Расширения (+регионы / +блоки)
-#    49 — Мои флаги
-#    50 — Магазин флагов
-#    45/53 — предыдущая/следующая страница (автоматически)
-#    12-15,19-24,28-33,37-42 — предложения рынка
+#
+#  Псевдокоманды: @menu:<имя>, @region-info-or-pick, @region-search
 # ============================================================
-config-version: 2
+config-version: 3
 update_interval: 20
 
 Menus:
@@ -36,9 +32,10 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "market":
-        slot: 4
+        slot: 1
         material: CHEST
         name: "&6Магазин территорий"
         lore:
@@ -46,6 +43,56 @@ Menus:
           - "&7Выставить свой на продажу/в аренду"
         commands:
           - "@menu:market"
+      "myregion":
+        slot: 2
+        material: MAP
+        name: "&bМоя территория"
+        lore:
+          - "{my-region-lore}"
+        commands:
+          - "@region-info-or-pick"
+      "regionsearch":
+        slot: 3
+        material: COMPASS
+        name: "&eПоиск региона"
+        lore:
+          - "&7Введите название в чат"
+          - "&7Откроется список совпадений"
+        commands:
+          - "@region-search"
+      "myoffers":
+        slot: 4
+        material: GOLD_NUGGET
+        name: "&6Мои объявления"
+        lore:
+          - "&7Управление вашими объявлениями:"
+          - "&7сроки, отмена, автовозврат"
+        commands:
+          - "@market-mine"
+      "blocks":
+        slot: 5
+        material: GOLD_BLOCK
+        name: "&6Расширение территорий"
+        lore:
+          - "&7Пакеты площади и «+N регионов»"
+        commands:
+          - "@menu:blocks"
+      "myflags":
+        slot: 6
+        material: WRITABLE_BOOK
+        name: "&bМои флаги"
+        lore:
+          - "&7Купленные в магазине флаги"
+        commands:
+          - "@menu:myflags"
+      "flagshop":
+        slot: 7
+        material: REDSTONE_TORCH
+        name: "&eМагазин флагов"
+        lore:
+          - "&7Купить флаг, доступный по праву"
+        commands:
+          - "@menu:flagshop"
       "help":
         slot: 8
         material: BOOK
@@ -55,91 +102,3 @@ Menus:
           - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"
-      "myregion":
-        slot: 10
-        material: MAP
-        name: "&bМой регион: &f{region-name}"
-        lore:
-          - "&8Владельцы:"
-          - "{owners}"
-          - "&8Участники:"
-          - "{members}"
-          - ""
-          - "&7Клик — информация о регионе"
-          - "&7и управление по вашей роли"
-        commands:
-          - "@region-info"
-      "regionsearch":
-        slot: 11
-        material: COMPASS
-        name: "&eПоиск региона"
-        lore:
-          - "&7Введите название в чат"
-          - "&7Откроется список совпадений"
-        commands:
-          - "@region-search"
-      "blocks":
-        slot: 48
-        material: GOLD_BLOCK
-        name: "&6Расширение территорий"
-        lore:
-          - "&7Пакеты площади и «+N регионов»"
-        commands:
-          - "@menu:blocks"
-      "myoffers":
-        slot: 47
-        material: GOLD_NUGGET
-        name: "&6Мои объявления"
-        lore:
-          - "&7Управление вашими объявлениями:"
-          - "&7сроки, отмена, автовозврат"
-        commands:
-          - "@market-mine"
-      "myflags":
-        slot: 49
-        material: WRITABLE_BOOK
-        name: "&bМои флаги"
-        lore:
-          - "&7Купленные в магазине флаги"
-        commands:
-          - "@menu:myflags"
-      "flagshop":
-        slot: 50
-        material: REDSTONE_TORCH
-        name: "&eМагазин флагов"
-        lore:
-          - "&7Купить флаг, доступный по праву"
-        commands:
-          - "@menu:flagshop"
-    navigation:
-      prev:
-        material: ARROW
-        name: "&eНазад"
-      next:
-        material: ARROW
-        name: "&eВперёд"
-    # Слоты предложений рынка (слоты 10-11 заняты кнопками «Мой регион»
-    # и «Поиск региона», поэтому пул начинается с 12).
-    menu-slots:
-      - 12
-      - 13
-      - 14
-      - 15
-      - 19
-      - 20
-      - 21
-      - 22
-      - 23
-      - 24
-      - 28
-      - 29
-      - 30
-      - 31
-      - 32
-      - 33
-      - 37
-      - 38
-      - 39
-      - 40
-      - 41
-      - 42

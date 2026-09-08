@@ -3,7 +3,7 @@
 #  Статичные кнопки с командами плагина. Полный список — в
 #  lang.yml (help.commands), текстовый вывод /region help.
 # ============================================================
-config-version: 1
+config-version: 2
 update_interval: 20
 
 Menus:
@@ -17,6 +17,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "back":
         slot: 0
@@ -96,6 +97,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "back":
         slot: 0

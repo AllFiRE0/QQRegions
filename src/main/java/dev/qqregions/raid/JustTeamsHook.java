@@ -191,8 +191,8 @@ public final class JustTeamsHook {
         return balance(team);
     }
 
-    /** Онлайн-игроки клана (по членам клана, с подстраховкой через Bukkit). */
-    public List<UUID> onlineMembers(TeamRef team) {
+    /** Все члены клана (UUID) — по списку Team.getMembers(). */
+    public List<UUID> memberUuids(TeamRef team) {
         List<UUID> out = new ArrayList<>();
         if (team == null || !enabled() || mTeamGetMembers == null) {
             return out;
@@ -204,17 +204,32 @@ public final class JustTeamsHook {
             }
             for (Object m : it) {
                 UUID uuid = teamPlayerUuid(m);
-                if (uuid == null) {
-                    continue;
-                }
-                boolean online = teamPlayerOnline(m);
-                Player p = Bukkit.getPlayer(uuid);
-                if (online && p != null) {
+                if (uuid != null) {
                     out.add(uuid);
                 }
             }
         } catch (Throwable t) {
-            plugin.dbg("JustTeamsHook.onlineMembers: " + t.getMessage());
+            plugin.dbg("JustTeamsHook.memberUuids: " + t.getMessage());
+        }
+        return out;
+    }
+
+    /** Общее число игроков клана. */
+    public int totalMembers(TeamRef team) {
+        return memberUuids(team).size();
+    }
+
+    /** Онлайн-игроки клана (по членам клана, с подстраховкой через Bukkit). */
+    public List<UUID> onlineMembers(TeamRef team) {
+        List<UUID> out = new ArrayList<>();
+        if (team == null || !enabled()) {
+            return out;
+        }
+        for (UUID uuid : memberUuids(team)) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null && p.isOnline()) {
+                out.add(uuid);
+            }
         }
         return out;
     }

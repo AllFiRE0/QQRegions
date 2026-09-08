@@ -9,11 +9,14 @@
 #
 #  Переменные: {region} {world} {player} {role} {owners} {members}
 #              {type} {area} {volume} {priority} {status}
+#              {my-regions} {max-regions} {max-blocks} — лимиты игрока
+#  Рейд-кнопка: {raid-clan} {raid-balance} {raid-online} {raid-total}
+#               {raid-in-region} {raid-needed}
 #
 #  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @teleport,
 #                 asConsole!..., asPlayer!..., close
 # ============================================================
-config-version: 1
+config-version: 3
 update_interval: 20
 
 Menus:
@@ -28,6 +31,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "region":
         slot: 10
@@ -35,56 +39,32 @@ Menus:
         name: "&fРегион: &b{region}"
         lore:
           - "&7Мир: &f{world}"
-          - "&7Ваша роль: &aВладелец"
-      "type":
-        slot: 11
-        material: STONE_BRICKS
-        name: "&fТип: &7{type}"
-        lore:
+          - "&7Тип: &f{type}"
           - "&7Статус: &a{status}"
-      "area":
-        slot: 12
-        material: GRASS_BLOCK
-        name: "&fПлощадь: &7{area} &fблоков"
+          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
+          - "&7Приоритет: &f{priority}"
+          - "&7Ваша роль: &aВладелец"
+          - "&7Ваших регионов: &f{my-regions}&7/&f{max-regions}"
+          - "&7Максимум блоков выделения: &f{max-blocks}"
+      "people":
+        slot: 11
+        material: PLAYER_HEAD
+        name: "&fИгроки территории"
         lore:
-          - "&7Объём: &f{volume} &7блоков"
-      "priority":
-        slot: 13
-        material: REPEATER
-        name: "&fПриоритет: &7{priority}"
-        lore:
-          - "&7Чем выше — тем важнее регион"
-      "owners":
-        slot: 14
-        material: DIAMOND
-        name: "&fВладельцы:"
-        lore:
+          - "&7Владельцы:"
           - "{owners}"
-      "members":
-        slot: 15
-        material: GOLD_INGOT
-        name: "&fУчастники:"
-        lore:
+          - "&7Участники:"
           - "{members}"
       "flags":
-        slot: 20
+        slot: 19
         material: REDSTONE_TORCH
         name: "&eФлаги"
         lore:
           - "&7Открыть редактор флагов"
         commands:
           - "@menu:flags"
-      "market":
-        slot: 24
-        material: GOLD_INGOT
-        name: "&eРынок"
-        lore:
-          - "&7Продать регион или сдать в аренду"
-        permission: qqregions.market
-        commands:
-          - "@menu:market"
       "players":
-        slot: 21
+        slot: 20
         material: PLAYER_HEAD
         name: "&eИгроки"
         lore:
@@ -92,7 +72,7 @@ Menus:
         commands:
           - "@menu:players"
       "teleport":
-        slot: 22
+        slot: 21
         material: ENDER_PEARL
         name: "&eТелепорт"
         lore:
@@ -101,13 +81,47 @@ Menus:
         commands:
           - "@teleport"
       "highlight":
-        slot: 16
+        slot: 22
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
           - "&7Показать границы региона"
         commands:
           - "@highlight"
+      "market":
+        slot: 23
+        material: GOLD_INGOT
+        name: "&eРынок"
+        lore:
+          - "&7Продать регион или сдать в аренду"
+        permission: qqregions.market
+        commands:
+          - "@menu:market"
+      "delete":
+        slot: 24
+        material: BARRIER
+        name: "&cУдалить территорию"
+        lore:
+          - "&7Разделить территорию навсегда"
+          - "&cПодтверждение откроется отдельно"
+        permission: qqregions.delete
+        role-required: owner
+        commands:
+          - "@menu:confirmdelete"
+      "raid":
+        slot: 25
+        material: NETHERITE_SWORD
+        name: "&cРейд клана"
+        lore:
+          - "&7Клан: &f{raid-clan}"
+          - "&7Баланс клана: &f{raid-balance}"
+          - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
+          - "&7В регионе: &f{raid-in-region}&7/&f{raid-needed}"
+          - "&7Требует клан (JustTeams)"
+        permission: qqregions.raid
+        role-required: other
+        commands:
+          - "@raid:start"
       "help":
         slot: 8
         material: BOOK
@@ -116,26 +130,6 @@ Menus:
           - "&7Команды плагина"
         commands:
           - "@menu:help"
-      "delete":
-        slot: 23
-        material: BARRIER
-        name: "&cУдалить регион"
-        lore:
-          - "&7Нажмите для удаления"
-        permission: qqregions.delete
-        commands:
-          - "asConsole! rg delete -w {world} {region}"
-      "raid":
-        slot: 19
-        material: NETHERITE_SWORD
-        name: "&cРейд клана"
-        lore:
-          - "&7Запустить рейд на регион &f{region}"
-          - "&7Требует клан (JustTeams)"
-        permission: qqregions.raid
-        role-required: other
-        commands:
-          - "@raid:start"
 
   "member":
     role-required: member
@@ -148,6 +142,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "region":
         slot: 10
@@ -155,34 +150,21 @@ Menus:
         name: "&fРегион: &b{region}"
         lore:
           - "&7Мир: &f{world}"
-          - "&7Ваша роль: &eУчастник"
-      "type":
-        slot: 11
-        material: STONE_BRICKS
-        name: "&fТип: &7{type}"
-        lore:
+          - "&7Тип: &f{type}"
           - "&7Статус: &a{status}"
-      "area":
-        slot: 12
-        material: GRASS_BLOCK
-        name: "&fПлощадь: &7{area} &fблоков"
+          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
+          - "&7Приоритет: &f{priority}"
+          - "&7Ваша роль: &eУчастник"
+          - "&7Ваших регионов: &f{my-regions}&7/&f{max-regions}"
+          - "&7Максимум блоков выделения: &f{max-blocks}"
+      "people":
+        slot: 11
+        material: PLAYER_HEAD
+        name: "&fИгроки территории"
         lore:
-          - "&7Объём: &f{volume} &7блоков"
-      "priority":
-        slot: 13
-        material: REPEATER
-        name: "&fПриоритет: &7{priority}"
-      "owners":
-        slot: 14
-        material: DIAMOND
-        name: "&fВладельцы:"
-        lore:
+          - "&7Владельцы:"
           - "{owners}"
-      "members":
-        slot: 15
-        material: GOLD_INGOT
-        name: "&fУчастники:"
-        lore:
+          - "&7Участники:"
           - "{members}"
       "players":
         slot: 20
@@ -193,7 +175,7 @@ Menus:
         commands:
           - "@menu:players"
       "highlight":
-        slot: 16
+        slot: 21
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
@@ -208,17 +190,6 @@ Menus:
           - "&7Команды плагина"
         commands:
           - "@menu:help"
-      "raid":
-        slot: 19
-        material: NETHERITE_SWORD
-        name: "&cРейд клана"
-        lore:
-          - "&7Запустить рейд на регион &f{region}"
-          - "&7Требует клан (JustTeams)"
-        permission: qqregions.raid
-        role-required: other
-        commands:
-          - "@raid:start"
 
   "other":
     role-required: other
@@ -231,6 +202,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "region":
         slot: 10
@@ -238,39 +210,36 @@ Menus:
         name: "&fРегион: &b{region}"
         lore:
           - "&7Мир: &f{world}"
+          - "&7Тип: &f{type}"
+          - "&7Статус: &a{status}"
+          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
+          - "&7Приоритет: &f{priority}"
           - "&7Ваша роль: &7Посторонний"
-      "type":
+      "people":
         slot: 11
-        material: STONE_BRICKS
-        name: "&fТип: &7{type}"
-      "area":
-        slot: 12
-        material: GRASS_BLOCK
-        name: "&fПлощадь: &7{area} &fблоков"
-        lore:
-          - "&7Объём: &f{volume} &7блоков"
-      "owners":
-        slot: 13
-        material: DIAMOND
-        name: "&fВладельцы:"
-        lore:
-          - "{owners}"
-      "members":
-        slot: 14
-        material: GOLD_INGOT
-        name: "&fУчастники:"
-        lore:
-          - "{members}"
-      "players":
-        slot: 15
         material: PLAYER_HEAD
-        name: "&eИгроки"
+        name: "&fИгроки территории"
         lore:
-          - "&7Просмотр владельцев и участников"
+          - "&7Владельцы:"
+          - "{owners}"
+          - "&7Участники:"
+          - "{members}"
+      "raid":
+        slot: 19
+        material: NETHERITE_SWORD
+        name: "&cРейд клана"
+        lore:
+          - "&7Клан: &f{raid-clan}"
+          - "&7Баланс клана: &f{raid-balance}"
+          - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
+          - "&7В регионе: &f{raid-in-region}&7/&f{raid-needed}"
+          - "&7Требует клан (JustTeams)"
+        permission: qqregions.raid
+        role-required: other
         commands:
-          - "@menu:players"
+          - "@raid:start"
       "highlight":
-        slot: 16
+        slot: 20
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
@@ -285,14 +254,3 @@ Menus:
           - "&7Команды плагина"
         commands:
           - "@menu:help"
-      "raid":
-        slot: 19
-        material: NETHERITE_SWORD
-        name: "&cРейд клана"
-        lore:
-          - "&7Запустить рейд на регион &f{region}"
-          - "&7Требует клан (JustTeams)"
-        permission: qqregions.raid
-        role-required: other
-        commands:
-          - "@raid:start"

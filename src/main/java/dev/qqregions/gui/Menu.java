@@ -390,10 +390,17 @@ public class Menu {
         String role = ctx.get("role");
         for (Map.Entry<Integer, MenuItem> e : buttons.entrySet()) {
             Integer slot = e.getKey();
-            if (slot != null && slot >= 0 && slot < size && e.getValue().visible(role, isAdmin)) {
-                inv.setItem(slot, e.getValue().build(plugin, player, ctx));
+            MenuItem mi = e.getValue();
+            // кнопка рейда (команда @raid:start) видна только при включённом
+            // рейде в конфиге (raid.enabled) — иначе кнопка скрывается
+            List<String> bcmds = mi.commands();
+            boolean raidHidden = bcmds != null && bcmds.contains("@raid:start")
+                    && !plugin.config().raid().enabled;
+            if (slot != null && slot >= 0 && slot < size
+                    && mi.visible(role, isAdmin) && !raidHidden) {
+                inv.setItem(slot, mi.build(plugin, player, ctx));
                 if (slotMap != null) {
-                    slotMap.put(slot, e.getValue());
+                    slotMap.put(slot, mi);
                 }
             }
         }

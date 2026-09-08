@@ -265,6 +265,7 @@ market:
   disabled: "&cРынок отключён в конфиге (market.enabled: false)."
   economy-off: "&cЭкономика (Vault) недоступна — рынок выключен."
   no-region: "&cРегион не найден: вы не в регионе и название не указано."
+  sell-no-duration: "&eУ продажи нет срока — &f{sell-usage}&e. Чтобы сдать в аренду: &f{rent-usage}"
   not-owner: "&cВы не владелец региона &7{region}&c."
   bad-price: "&cНекорректная или слишком маленькая сумма."
   bad-args: "&cНекорректная сумма или время аренды."
@@ -450,6 +451,35 @@ menu:
   lore-pack-area: "&7Увеличивает выделение на &f{pack-amount}&7 блоков"
   lore-pack-region: "&7Добавляет &f{pack-amount}&7 к лимиту регионов"
   lore-pack-repeatable: "&7Цена: &f{price} &8(повторяемый)"
+  # --- Кнопка «Моя территория» в главном меню ---
+  main-myregion-here: "&7Управление регионом — вы сейчас внутри территории"
+  main-myregion-pick: "&7Нажмите — откроется меню выбора региона"
+  # --- Поиск игроков (playersearch) ---
+  ps-group-owner: "&bВладельца"
+  ps-group-member: "&aУчастника"
+  ps-add-as: "&7Добавить как: {ps-group}"
+  ps-click-add: "&aЛКМ — добавить в регион"
+  ps-click-group: "&eШифт+ЛКМ — сменить группу"
+  ps-click-remove: "&cПКМ — убрать из региона"
+  ps-group-changed: "&eГруппа добавления: {group}"
+  ps-role-owner: "&aвладельцем"
+  ps-role-member: "&aучастником"
+  ps-role-changed: "&aИгрок &f{target} &aтеперь является {ps-role}."
+  # --- Выбор территории (regionpicker) ---
+  rp-sort-near: "&aпо близости"
+  rp-sort-far: "&aпо удалённости"
+  rp-sort-az: "&aпо A-Z"
+  rp-sort-za: "&aпо Z-A"
+  rp-sort-members: "&aпо людям"
+  rp-sort-changed: "&eСортировка: {sort}"
+  rp-world-line: "&7Мир: &f{rp-world}"
+  rp-type-line: "&7Тип: &f{rp-type}"
+  rp-people-line: "&7Игроков: &f{rp-people}"
+  rp-dist-line: "&7Расстояние: &f{rp-dist} &7блоков"
+  rp-dist-none: "&7—"
+  rp-click: "&eКлик — информация о регионе"
+  # --- Рейд-кнопка в инфо-меню (пустое значение без данных о клане) ---
+  raid-empty: "&7—"
 
 shop:
   none-owned: "&7У вас нет купленных флагов. Магазин: &f/region market flags"

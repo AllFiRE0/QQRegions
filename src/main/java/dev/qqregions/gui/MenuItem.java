@@ -4,16 +4,19 @@ import dev.qqregions.QQRegions;
 import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +41,9 @@ public class MenuItem {
     /** tooltip: false — убрать всплывающее окно у КОНКРЕТНОЙ кнопки
      *  (например у фона из стекла). По умолчанию тултип показывается. */
     private boolean tooltip = true;
+    /** UUID игрока для PLAYER_HEAD: при сборке кнопки подставляется голова
+     *  скина этого игрока (через setOwningPlayer). */
+    private String ownerUuid;
 
     /** имя флага для динамических кнопок, null для статичных */
     private final String flag;
@@ -134,12 +140,27 @@ public class MenuItem {
         return tooltip;
     }
 
+    /** Поставить голову игрока (для PLAYER_HEAD): скин по UUID игрока. */
+    public MenuItem ownerUuid(String ownerUuid) {
+        this.ownerUuid = ownerUuid;
+        return this;
+    }
+
     /** Собрать физический предмет с применением контекста и замен. */
     public ItemStack build(QQRegions plugin, Player player, Map<String, String> ctx) {
         Material m = Material.matchMaterial(material);
         ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
+            // голова игрока: подставить скин по UUID (PLAYER_HEAD)
+            if (ownerUuid != null && m == Material.PLAYER_HEAD && meta instanceof SkullMeta sm) {
+                try {
+                    sm.setOwningPlayer(Bukkit.getOfflinePlayer(UUID.fromString(ownerUuid)));
+                    meta = sm;
+                } catch (Throwable ignored) {
+                    // невалидный UUID — без скина
+                }
+            }
             // скрыть служебные строки предметов (урон меча, эффекты зелий,
             // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,

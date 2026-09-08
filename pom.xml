@@ -76,6 +76,16 @@
             <version>${placeholderapi.version}</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- MiniMessage (adventure) для градиентов и мини-тегов в любых
+             строках (имена/описания предметов, сообщения). Leaf 26.2 уже
+             содержит Adventure в рантайме; зависимость только для компиляции. -->
+        <dependency>
+            <groupId>net.kyori</groupId>
+            <artifactId>adventure-text-minimessage</artifactId>
+            <version>4.19.0</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>

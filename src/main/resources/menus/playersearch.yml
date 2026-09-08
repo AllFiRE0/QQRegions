@@ -1,0 +1,93 @@
+# ============================================================
+#  QQRegions — меню поиска игроков (кнопка «Добавить игроков»
+#  в меню игроков). Все игроки сервера: онлайн — первыми, затем
+#  оффлайн. Головы скин подставляются по UUID игрока.
+#
+#  Клики по «голове»:
+#    ЛКМ       — добавить игрока в выбранную группу
+#    ПКМ       — убрать игрока из региона
+#    Шифт+ЛКМ  — сменить группу (владелец <-> участник)
+#  Группа добавления (владелец/участник) переключается кнопкой
+#  @ps-toggle на слоте 4 ({ps-group}).
+#
+#  Переменные: {region} {world} {player} {role} {ps-group}
+#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @ps-toggle, @back
+# ============================================================
+config-version: 1
+update_interval: 20
+
+Menus:
+  "default":
+    role-required: owner
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Поиск игроков ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+      tooltip: false
+    buttons:
+      "back":
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в {back-target}"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
+      "grptoggle":
+        slot: 4
+        material: ANVIL
+        name: "&eДобавлять как: {ps-group}"
+        lore:
+          - "&7Шифт+ЛКМ по игроку — сменить группу"
+          - "&7ЛКМ — добавить в текущую группу"
+          - "&7ПКМ — убрать из региона"
+        commands:
+          - "@ps-toggle"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
+    menu-slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Предыдущая страница"
+        slot: 44
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        lore:
+          - "&7Следующая страница"
+        slot: 53

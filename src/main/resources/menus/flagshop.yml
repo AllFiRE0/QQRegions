@@ -9,7 +9,7 @@
 #
 #  Динамические кнопки: {flag-name} {flag} {price}
 # ============================================================
-config-version: 1
+config-version: 2
 update_interval: 20
 
 Menus:
@@ -23,6 +23,7 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
       "back":
         slot: 0

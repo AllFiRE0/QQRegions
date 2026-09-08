@@ -34,7 +34,7 @@
 #  {groups-list} — подсказка со списком групп, текущая выделена.
 #  Переводы групп и значений — в replace.yml (блоки flag-groups/flag-values).
 # ============================================================
-config-version: 1
+config-version: 2
 update_interval: 20
 
 Menus:
@@ -49,15 +49,8 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
       "help":
         slot: 8
         material: BOOK
@@ -66,14 +59,6 @@ Menus:
           - "&7Команды и справка плагина"
         commands:
           - "@menu:help"
-      "players":
-        slot: 53
-        material: PLAYER_HEAD
-        name: "&eИгроки"
-        lore:
-          - "&7Управление участниками и владельцами"
-        commands:
-          - "@menu:players"
       "back":
         slot: 0
         material: ARROW
@@ -211,15 +196,8 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
       "help":
         slot: 8
         material: BOOK
@@ -315,15 +293,8 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
       "help":
         slot: 8
         material: BOOK
@@ -417,15 +388,8 @@ Menus:
       enabled: true
       material: GRAY_STAINED_GLASS_PANE
       name: " "
+      tooltip: false
     buttons:
-      "info":
-        slot: 45
-        material: PAPER
-        name: "&eИнформация"
-        lore:
-          - "&7Назад к информации о регионе"
-        commands:
-          - "@menu:info"
       "help":
         slot: 8
         material: BOOK

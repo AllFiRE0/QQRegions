@@ -722,6 +722,12 @@ public class RegionCommand {
             String regionName = args.length > regionIdx ? args[regionIdx] : null;
             ProtectedRegion region = resolveRegion(p, regionName);
             if (region == null) {
+                if (!rent && regionName != null && parsePeriod(regionName) > 0) {
+                    lang(p, "market.sell-no-duration",
+                            "sell-usage", label + " sell <сумма> [регион]",
+                            "rent-usage", label + " rent <сумма> <время> [регион]");
+                    return;
+                }
                 lang(p, "market.no-region");
                 return;
             }

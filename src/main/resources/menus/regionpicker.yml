@@ -1,0 +1,91 @@
+# ============================================================
+#  QQRegions — меню выбора территории (кнопка «Моя территория»
+#  в главном меню, если игрок не стоит внутри региона).
+#  Все регионы всех миров, клик по кнопке — информация о регионе.
+#
+#  Сортировка (@rpsort, {rp-sort}):
+#    near    — ближайшие к игроку
+#    far     — дальние от игрока
+#    az      — по имени A-Z
+#    za      — по имени Z-A
+#    members — по количеству игроков (владельцы + участники)
+#
+#  Переменные: {region} {world} {player} {role} {rp-sort}
+#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @rpsort, @rinfo:мир:регион, @back
+# ============================================================
+config-version: 1
+update_interval: 20
+
+Menus:
+  "default":
+    priority: 5
+    permission-group: ""
+    placeholder-group: ""
+    title: "&#000000Выбор территории ({page}/{pages})"
+    size: 6
+    fill:
+      enabled: true
+      material: GRAY_STAINED_GLASS_PANE
+      name: " "
+      tooltip: false
+    buttons:
+      "back":
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в {back-target}"
+        lore:
+          - "&7Вернуться в предыдущее меню"
+        commands:
+          - "@back"
+      "sort":
+        slot: 4
+        material: HOPPER
+        name: "&eСортировка: {rp-sort}"
+        lore:
+          - "&7Ближайшие / дальние / по A-Z / Z-A / по людям"
+          - "&7ЛКМ — переключить сортировку"
+        commands:
+          - "@rpsort"
+      "help":
+        slot: 8
+        material: BOOK
+        name: "&eПомощь"
+        lore:
+          - "&7Команды и справка плагина"
+        commands:
+          - "@menu:help"
+    menu-slots:
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+      - 19
+      - 20
+      - 21
+      - 22
+      - 23
+      - 24
+      - 25
+      - 28
+      - 29
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+    navigation:
+      prev:
+        material: ARROW
+        name: "&eНазад"
+        lore:
+          - "&7Предыдущая страница"
+        slot: 44
+      next:
+        material: ARROW
+        name: "&eВперёд"
+        lore:
+          - "&7Следующая страница"
+        slot: 53
