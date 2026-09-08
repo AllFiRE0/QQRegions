@@ -2,7 +2,6 @@ package dev.qqregions.wg;
 
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
-import com.sk89q.worldedit.math.BoundingBox;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.domains.DefaultDomain;
 import com.sk89q.worldguard.internal.platform.WorldGuardPlatform;
@@ -153,12 +152,19 @@ public class Wg {
         if (rm == null) {
             return List.of();
         }
+        int mnX = min.getBlockX(), mnY = min.getBlockY(), mnZ = min.getBlockZ();
+        int mxX = max.getBlockX(), mxY = max.getBlockY(), mxZ = max.getBlockZ();
         try {
-            BoundingBox box = BoundingBox.fromMinMax(min, max);
-            ApplicableRegionSet set = rm.getApplicableRegions(box);
+            // BoundingBox/getApplicableRegions(box) в WE 7.0.x НЕТ — перебор
+            // регионов с AABB-пересечением (для кубоидных регионов точно,
+            // с полигонами — по bounding box, для авто-показа этого достаточно).
             List<ProtectedRegion> out = new ArrayList<>();
-            for (ProtectedRegion r : set.getRegions()) {
-                if (r.intersects(box)) {
+            for (ProtectedRegion r : rm.getRegions().values()) {
+                BlockVector3 rMin = r.getMinimumPoint();
+                BlockVector3 rMax = r.getMaximumPoint();
+                if (rMin.getBlockX() <= mxX && rMax.getBlockX() >= mnX
+                        && rMin.getBlockY() <= mxY && rMax.getBlockY() >= mnY
+                        && rMin.getBlockZ() <= mxZ && rMax.getBlockZ() >= mnZ) {
                     out.add(r);
                 }
             }
