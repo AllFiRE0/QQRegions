@@ -43,7 +43,7 @@ Menus:
         name: "&aПодтвердить"
         lore:
           - "&7{pc-action} &f{pc-player}&7: {region}"
-          - "&8Действие будет выполнено сразу"
+          #- "&8Действие будет выполнено сразу"
         commands:
           - "@pc-confirm"
       "info":
@@ -54,8 +54,8 @@ Menus:
           - "&7Роль: &b{pc-role}"
           - "&7Баланс: &f{pc-balance} {pc-balance-symbol}"
           - "&7Клан: &f{pc-clan}"
-          - "&7Регионов: &f{pc-regions}&8/&f{pc-max} &8(&f{pc-reg-owner}&8 вл. + &f{pc-reg-member}&8 уч.)"
-          - "&8Подтверждение операции с игроком"
+          - "&7Территорий: &f{pc-regions}&8/&f{pc-max} &8(&f{pc-reg-owner}&8 вл. + &f{pc-reg-member}&8 уч.)"
+          #- "&8Подтверждение операции с игроком"
         commands: []
       "cancel":
         slot: 15
