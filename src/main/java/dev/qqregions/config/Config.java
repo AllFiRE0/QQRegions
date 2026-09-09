@@ -69,6 +69,9 @@ public class Config {
     private int viewHideDistance = 0;
     /** Авто-скрытие командной подсветки выделения (сек; 0 = держать, пока есть). */
     private int cmdViewHideAfter = 0;
+    /** Максимальная дальность луча установки точки (команды /select point и кнопки
+     *  Точка 1/2): дальше не берём блок, точка = позиция игрока. 1000 = дефолт. */
+    private int pointMaxDistance = 1000;
 
     private ParticleOptions particles;
     private BossBarOptions bossbar;
@@ -165,6 +168,7 @@ public class Config {
         viewHideAfter = Math.max(0, cfg.getInt("interactive.view-hide-after", 60));
         viewHideDistance = Math.max(0, cfg.getInt("interactive.view-hide-distance", 0));
         cmdViewHideAfter = Math.max(0, cfg.getInt("interactive.command-selection-hide-after", 60));
+        pointMaxDistance = Math.max(10, cfg.getInt("interactive.select-point-max-distance", 1000));
 
         buttonMaterials.clear();
         buttonSlots.clear();
@@ -375,6 +379,11 @@ public class Config {
      *  Не влияет на интерактивный select (у него свой view-hide-after). */
     public int cmdViewHideAfter() {
         return cmdViewHideAfter;
+    }
+
+    /** Максимальная дальность луча установки точки (команды/кнопки Точка 1/2). */
+    public int pointMaxDistance() {
+        return pointMaxDistance;
     }
 
     /** Настройки рынка / аренды (Vault + sell/rent/buy). */

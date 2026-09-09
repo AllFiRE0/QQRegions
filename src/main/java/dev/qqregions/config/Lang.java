@@ -149,6 +149,12 @@ public class Lang {
         return cfg.isString(key);
     }
 
+    /** Ключ сообщения об установке точки: pos-set-<т> (цветные координаты),
+     *  с фолбэком на pos-set, если на сервере старый lang.yml без новых ключей. */
+    public String posSetKey(int which) {
+        return has("select.pos-set-" + which) ? "select.pos-set-" + which : "select.pos-set";
+    }
+
     public List<?> getList(String key) {
         return cfg.getList(key);
     }

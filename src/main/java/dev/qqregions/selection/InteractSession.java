@@ -226,9 +226,10 @@ public class InteractSession {
     }
 
     /** Кнопки «точка 1/2»: как /region select point — берём блок по прицелу
-     *  (до 300 блоков), иначе позицию игрока. Работает и в воздухе, и по блоку. */
+     *  (не дальше interactive.select-point-max-distance), иначе позицию игрока.
+     *  Работает и в воздухе, и по блоку. */
     private void setPoint(int which) {
-        Block target = player.getTargetBlockExact(300);
+        Block target = player.getTargetBlockExact(plugin.config().pointMaxDistance());
         BlockVector3 pos = target != null
                 ? BlockVector3.at(target.getX(), target.getY(), target.getZ())
                 : BlockVector3.at(player.getLocation().getBlockX(),
@@ -238,7 +239,7 @@ public class InteractSession {
         sel.setPos(which, pos);
         mgr.set(player, sel);
         syncWorldEdit();
-        plugin.lang().send(player, "select.pos-set",
+        plugin.lang().send(player, plugin.lang().posSetKey(which),
                 "point", plugin.lang().fmt("select.point-" + which),
                 "x", String.valueOf(pos.getBlockX()),
                 "y", String.valueOf(pos.getBlockY()),

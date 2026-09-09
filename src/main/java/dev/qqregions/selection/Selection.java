@@ -11,11 +11,17 @@ public class Selection {
     private final World world;
     private BlockVector3 pos1;
     private BlockVector3 pos2;
+    /** Какую точку (1|2) ставили последней — цвет объёма подхватывает её. */
+    private int lastPoint = 2;
 
     public Selection(World world, BlockVector3 pos1, BlockVector3 pos2) {
         this.world = world;
         this.pos1 = pos1;
         this.pos2 = pos2;
+    }
+
+    public int lastPoint() {
+        return lastPoint;
     }
 
     public World getWorld() {
@@ -27,6 +33,7 @@ public class Selection {
     }
 
     public void setPos(int index, BlockVector3 p) {
+        lastPoint = index;
         if (index == 1) {
             pos1 = p;
         } else {
@@ -108,7 +115,9 @@ public class Selection {
 
     /** Выделение с прижатой точкой (для интерактивного режима). */
     public Selection withPoint(int index, BlockVector3 p) {
-        return new Selection(world, index == 1 ? p : pos1, index == 1 ? pos2 : p);
+        Selection s = new Selection(world, index == 1 ? p : pos1, index == 1 ? pos2 : p);
+        s.lastPoint = index;
+        return s;
     }
 
     /** Проверка, что внутри выделения нет других выделений/путем сравнения. */

@@ -17,6 +17,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -508,5 +509,11 @@ public class SelectionManager implements Listener {
         if (h != null) {
             hideHud(h);
         }
+    }
+
+    /** Зачистка осиротевших дисплеев выделения из перезагружаемых чанков. */
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent e) {
+        SelectionView.sweepChunk(plugin, e.getChunk());
     }
 }

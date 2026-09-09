@@ -85,7 +85,7 @@ public class SelectCommand {
         sel.setPos(which, pos);
         mgr.set(p, sel);
         mgr.touch(p);
-        send(p, "select.pos-set",
+        send(p, plugin.lang().posSetKey(which),
                 "point", plugin.lang().fmt("select.point-" + which),
                 "x", String.valueOf(pos.getBlockX()),
                 "y", String.valueOf(pos.getBlockY()),
@@ -100,7 +100,7 @@ public class SelectCommand {
             return;
         }
         int which = Integer.parseInt(args[1]);
-        Block target = p.getTargetBlockExact(300);
+        Block target = p.getTargetBlockExact(plugin.config().pointMaxDistance());
         BlockVector3 pos = target != null
                 ? BlockVector3.at(target.getX(), target.getY(), target.getZ())
                 : BlockVector3.at(p.getLocation().getBlockX(),
@@ -110,7 +110,7 @@ public class SelectCommand {
         sel.setPos(which, pos);
         mgr.set(p, sel);
         mgr.touch(p);
-        send(p, "select.pos-set",
+        send(p, plugin.lang().posSetKey(which),
                 "point", plugin.lang().fmt("select.point-" + which),
                 "x", String.valueOf(pos.getBlockX()),
                 "y", String.valueOf(pos.getBlockY()),

@@ -3,14 +3,17 @@ package dev.qqregions.selection;
 import com.sk89q.worldedit.math.BlockVector3;
 import dev.qqregions.QQRegions;
 import dev.qqregions.config.Config;
+import org.bukkit.Chunk;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -174,13 +177,17 @@ public class SelectionView {
         Config cfg = plugin.config();
         Config.PointStyle s1 = cfg.pointStyle(1);
         Config.PointStyle s2 = cfg.pointStyle(2);
+        // Объём красится цветом ПОСЛЕДНЕЙ установленной точки: поставил 1 —
+        // оранжевый контур, 2 — зелёный.
+        Config.PointStyle vol = sel.lastPoint() == 1 ? s1 : s2;
         BlockVector3 p1 = sel.getPos(1);
         BlockVector3 p2 = sel.getPos(2);
         String frame = sel.getWorld().getName()
                 + '|' + sel.min() + '|' + sel.max()
                 + '|' + p1 + '|' + p2
                 + '|' + s1.highlight.asRGB() + '|' + s2.highlight.asRGB()
-                + '|' + s1.block.name() + '|' + s2.block.name();
+                + '|' + s1.block.name() + '|' + s2.block.name()
+                + '|' + sel.lastPoint();
         boolean changed = !frame.equals(cmdFp);
         cmdFp = frame;
         if (changed) {
@@ -204,7 +211,7 @@ public class SelectionView {
             if (!changed && !unloadedPending && !forceHeal()) {
                 return;
             }
-            renderBlockView(sel, s2.highlight, s2.block, null);
+            renderBlockView(sel, vol.highlight, vol.block, null);
             placeCmdMarker(1, sel.getWorld(), p1, s1);
             placeCmdMarker(2, sel.getWorld(), p2, s2);
             return;
@@ -221,7 +228,7 @@ public class SelectionView {
                 return;
             }
         }
-        renderParticles(sel, s2.highlight, null);
+        renderParticles(sel, vol.highlight, null);
         markerCube(sel.getWorld(), po, s1.highlight, p1);
         markerCube(sel.getWorld(), po, s2.highlight, p2);
     }
@@ -267,7 +274,7 @@ public class SelectionView {
     /**
      * Рендер в select-режиме: контур объёма — цветом активной точки,
      * маркеры ОБЕИХ точек всегда видны и каждый своим цветом (точка 1 —
-     * серый, точка 2 — оранжевый), чтобы при переключении не терять соседа.
+     * оранжевый, точка 2 — зелёный), чтобы при переключении не терять соседа.
      */
     public void renderSelect(Selection sel, Config.PointStyle p1, Config.PointStyle p2, int activePoint) {
         Config cfg = plugin.config();
@@ -325,6 +332,22 @@ public class SelectionView {
         Config.ParticleOptions po = cfg.particles();
         markerCube(sel.getWorld(), po, p1.highlight, sel.getPos(1));
         markerCube(sel.getWorld(), po, p2.highlight, sel.getPos(2));
+    }
+
+    /** Зачистка загружаемого чанка от осиротевших дисплеев выделения: если
+     *  дисплей уже был сохранён в файл чанка (старые сборки / выгрузка в
+     *  момент гибели сессии), после перезагрузки чанка он всплывает и висит
+     *  вечно. Мы его помечаем тегом при спавне, поэтому при загрузке чанка
+     *  все наши дисплеи без живого владельца удаляем; активные сессии
+     *  переспавнят свои в следующем проходе (forceHeal). */
+    public static void sweepChunk(QQRegions plugin, Chunk chunk) {
+        NamespacedKey key = new NamespacedKey(plugin, "select-display");
+        for (Entity e : chunk.getEntities()) {
+            if (e instanceof BlockDisplay
+                    && e.getPersistentDataContainer().has(key)) {
+                e.remove();
+            }
+        }
     }
 
     /** Удаляет все спавненные сущности (выход из сессии / смена режима). */
@@ -722,6 +745,12 @@ public class SelectionView {
         }
         try {
             BlockDisplay d = world.spawn(displayLoc(world, p), BlockDisplay.class);
+            // Не сохранять дисплеи в чанк: иначе при выгрузке чанка во время
+            // активного выделения сущность пишется в файл чанка и остаётся
+            // «зависшей» после завершения сессии — снять её можно только /kill.
+            d.setPersistent(false);
+            d.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "select-display"), PersistentDataType.BYTE, (byte) 1);
             d.setBlock(mat.createBlockData());
             d.setTransformation(new Transformation(
                     new Vector3f(), new Quaternionf(),
