@@ -44,7 +44,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fРегион: &b{region}"
+        name: "&fТерритория: &b{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Тип: &f{type}"
@@ -52,7 +52,7 @@ Menus:
           - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
           - "&7Приоритет: &f{priority}"
           - "&7Ваша роль: &aВладелец"
-          - "&7Ваших регионов: &f{my-regions}&7/&f{max-regions}"
+          - "&7Ваших территорий: &f{my-regions}&7/&f{max-regions}"
           - "&7Максимум блоков выделения: &f{max-blocks}"
       "people":
         slot: 11
@@ -84,7 +84,7 @@ Menus:
         material: ENDER_PEARL
         name: "&eТелепорт"
         lore:
-          - "&7Переместиться в центр региона"
+          - "&7Переместиться в центр территории"
         permission: qqregions.admin
         commands:
           - "@teleport"
@@ -93,7 +93,7 @@ Menus:
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
-          - "&7Показать границы региона"
+          - "&7Показать границы территории"
         commands:
           - "@highlight"
       "market":
@@ -101,7 +101,7 @@ Menus:
         material: GOLD_INGOT
         name: "&eРынок"
         lore:
-          - "&7Продать регион или сдать в аренду"
+          - "&7Продать территорию или сдать в аренду"
         permission: qqregions.market
         commands:
           - "@menu:market"
@@ -124,7 +124,7 @@ Menus:
           - "&7Клан: &f{raid-clan}"
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"
           - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
-          - "&7В регионе: &f{raid-in-region}&7/&f{raid-needed}"
+          - "&7На территории: &f{raid-in-region}&7/&f{raid-needed}"
           - "&7Требует клан (JustTeams)"
         permission: qqregions.raid
         role-required: other
@@ -144,7 +144,7 @@ Menus:
     priority: 20
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Инфо о регионе ({region})"
+    title: "&#000000Инфо о ({region})"
     size: 6
     fill:
       enabled: true
@@ -163,7 +163,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fРегион: &b{region}"
+        name: "&fТерритория: &b{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Тип: &f{type}"
@@ -171,7 +171,7 @@ Menus:
           - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
           - "&7Приоритет: &f{priority}"
           - "&7Ваша роль: &eУчастник"
-          - "&7Ваших регионов: &f{my-regions}&7/&f{max-regions}"
+          - "&7Ваших территорий: &f{my-regions}&7/&f{max-regions}"
           - "&7Максимум блоков выделения: &f{max-blocks}"
       "people":
         slot: 11
@@ -195,7 +195,7 @@ Menus:
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
-          - "&7Показать границы региона"
+          - "&7Показать границы территории"
         commands:
           - "@highlight"
       "help":
@@ -212,7 +212,7 @@ Menus:
     priority: 10
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Инфо о регионе ({region})"
+    title: "&#000000Инфо о ({region})"
     size: 6
     fill:
       enabled: true
@@ -231,7 +231,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fРегион: &b{region}"
+        name: "&fТерритория: &b{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Тип: &f{type}"
@@ -256,7 +256,7 @@ Menus:
           - "&7Клан: &f{raid-clan}"
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"
           - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
-          - "&7В регионе: &f{raid-in-region}&7/&f{raid-needed}"
+          - "&7На территории: &f{raid-in-region}&7/&f{raid-needed}"
           - "&7Требует клан (JustTeams)"
         permission: qqregions.raid
         role-required: other
@@ -267,7 +267,7 @@ Menus:
         material: GLOWSTONE_DUST
         name: "&eПодсветка границ"
         lore:
-          - "&7Показать границы региона"
+          - "&7Показать границы территории"
         commands:
           - "@highlight"
       "help":
