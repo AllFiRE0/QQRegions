@@ -23,6 +23,8 @@ command:
     - "territory"
     - "tr"
     - "rg"
+    - "region"
+    - "regions"
     - "private"
     - "zone"
 
@@ -47,6 +49,11 @@ restrictions:
     - "spawn"
     - "jail"
     - "pvp"
+    - "__global__"
+    - "pvparena"
+    - "arena"
+    - "pvp_arena"
+    - "mine"
 
 # ------------------------------------------------------------
 # Название региона
@@ -54,7 +61,8 @@ restrictions:
 region-name:
   # Регулярное выражение допустимого названия. И как общий формат,
   # и как проверка при интерактивном вводе имени.
-  regex: "[A-Za-zА-Яа-я0-9_-]{3,32}"
+  # Русский + Английский "[A-Za-zА-Яа-я0-9_-]{3,32}"
+  regex: "[A-Za-z0-9_-]{3,32}"
   # WorldGuard хранит названия только строчными буквами.
   force-lowercase: true
 
@@ -148,12 +156,19 @@ interactive:
     - "tphere"
     - "pvp"
     - "home"
+    - "homes"
     - "warp"
+    - "warps"
     - "spawn"
     - "back"
     - "dback"
     - "deathback"
     - "world"
+    - "backpack"
+    - "bp"
+    - "battlepass"
+    - "quest"
+    - "mine"
   # Передавать наше выделение в WorldEdit-селекцию игрока, чтобы
   # sVis (Selection Visualizer) автоматически подсвечивал область.
   sync-worldedit: true
@@ -695,7 +710,7 @@ highlight:
       # Промежуточные значения — произвольный сдвиг между центром блока (0.0)
       # и внешней гранью (0.5); 1.0 = целиком за внешней гранью региона;
       # − значения уводят во внутрь региона до центра блока (0.0).
-      across-offset: 0.5
+      across-offset: 0.4
       # Светиться ли в цвет highlight.particles.dust-color.
       glow: true
       # ЦВЕТ ЗАБОРА ПО РОЛИ ИГРОКА (перекрывают базовый material/glow):
