@@ -1076,13 +1076,13 @@ raid:
   # Оповещения этапов. commands: asConsole!... / asPlayer!...
   notify:
     start:
-      message: "&8[&cКлан&8] &f{clan} &cнападает на регион &f{region}&7!"
+      message: "&8[&cКлан&8] &f{clan} &cнападает на территорию &f{region}&7!"
       commands: []
     thief:
-      message: "&2Вор &f{thief} &2получил доступ к региону &f{region}&2."
+      message: "&2Вор &f{thief} &2получил доступ к территории &f{region}&2."
       commands: []
     end:
-      message: "&7Рейд на &f{region} &7завершён: &f{clan}&7 получил ресурсы региона."
+      message: "&7Рейд на &f{region} &7завершён: &f{clan}&7 теперь участник территории."
       commands: []
     reset:
       message: "&cРейд на &f{region} &cсорван!"
