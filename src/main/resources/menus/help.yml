@@ -48,7 +48,7 @@ Menus:
       "create-delete":
         slot: 11
         material: GRASS_BLOCK
-        name: "&fРегионы"
+        name: "&fТерритории"
         lore:
           - "&7/region create <название>"
           - "&7/region delete [название]"
@@ -66,27 +66,27 @@ Menus:
         material: GLOWSTONE_DUST
         name: "&fПодсветка"
         lore:
-          - "&7/region visible [регион] [тип] — показать"
+          - "&7/region visible [территория] [тип] — показать"
           - "&7/region visible off — скрыть все"
           - "&7/region visible type [тип] — тип по умолчанию"
           - "&7/region visible self on|off — подсветка «для себя» (по флагу)"
-          - "&7/region visible true|allow|false|deny [тип] [регион] — флаг"
+          - "&7/region visible true|allow|false|deny [тип] [территория] — флаг"
       "market-help":
         slot: 14
         material: GOLD_INGOT
         name: "&fРынок"
         lore:
-          - "&7/region sell <ник> <сумма> [регион]"
-          - "&7/region rent <ник> <сумма> <время> [регион]"
-          - "&7/region buy [регион]"
-          - "&7/region tenant [регион]"
+          - "&7/region sell <ник> <сумма> [территория]"
+          - "&7/region rent <ник> <сумма> <время> [территория]"
+          - "&7/region buy [территория]"
+          - "&7/region tenant [территория]"
           - "&7/region market flags|blocks — магазин"
       "raid":
         slot: 15
         material: NETHERITE_SWORD
         name: "&fРейд клана"
         lore:
-          - "&7/region raid [регион] — рейд клана" #(JustTeams)
+          - "&7/region raid [территория] — рейд клана" #(JustTeams)
   "compact":
     priority: 1
     permission-group: ""
