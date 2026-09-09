@@ -120,12 +120,12 @@ public final class Actions {
                 fo = parseSafe(m.group(3), 20);
                 text = m.group(4);
             }
-            p.sendTitle(Msg.color(text), Msg.color(""), fi, st, fo);
+            p.sendTitle(Msg.toLegacy(Msg.color(text)), Msg.toLegacy(Msg.color("")), fi, st, fo);
             return;
         }
         if (lower.startsWith("title!")) {
             body = msg.substring("title!".length()).trim();
-            p.sendTitle(Msg.color(body), Msg.color(""), 20, 40, 20);
+            p.sendTitle(Msg.toLegacy(Msg.color(body)), Msg.toLegacy(Msg.color("")), 20, 40, 20);
             return;
         }
         if (lower.startsWith("actionbar:")) {
