@@ -236,7 +236,8 @@ public class SelectCommand {
             org.bukkit.util.Vector dir = p.getLocation().getDirection();
             apply(p, sel -> sel.withExpandedFacing(dir, amount), "select.expanded");
         } else {
-            apply(p, sel -> sel.withExpanded(direction, amount), "select.expanded");
+            ExpandDirection dir = direction;
+            apply(p, sel -> sel.withExpanded(dir, amount), "select.expanded");
         }
     }
 
