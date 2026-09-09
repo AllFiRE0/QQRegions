@@ -12,6 +12,9 @@
 #  Динамические кнопки строятся из предложений рынка (market.yml):
 #    {market-type} {market-region} {market-world} {market-price} {market-price-symbol}
 #    {market-lister} {market-volume} {market-loc} {market-age} {market-period}
+#  Кнопка «Сортировка»: имя статичное, лор — {market-sort-list} (режимы по
+#  вертикали, текущий подсвечен &a; подписи — lang menu.market-sort-*),
+#  цикл режимов — псевдокоманда @sort. Используется и {market-sort} (текущий).
 # ============================================================
 config-version: 2
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
@@ -58,9 +61,9 @@ Menus:
       "sort":
         slot: 3
         material: HOPPER
-        name: "&eСортировка: &fНазвание"
+        name: "&eСортировка"
         lore:
-          - "&7Цикл: Название → Цена → По умолчанию"
+          - "{market-sort-list}"
         commands:
           - "@sort"
 #      "blocks":

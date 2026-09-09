@@ -156,6 +156,51 @@ public final class Yml {
         return true;
     }
 
+    /** Индекс начала инлайнового комментария " #..." ВНЕ кавычек (позиция
+     *  пробела перед '#'); -1, если комментария нет. Работает и со значением
+     *  типа "" или 'text' — маркеры кавычек отслеживаются, '#' внутри кавычек
+     *  (например &#000000 в строке) комментарием не считается. */
+    private static int inlineIndex(String raw) {
+        boolean inS = false, inD = false;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '\'' && !inD) {
+                inS = !inS;
+            } else if (c == '"' && !inS) {
+                inD = !inD;
+            } else if (c == '#' && !inS && !inD && i > 0 && raw.charAt(i - 1) == ' ') {
+                return i - 1;
+            }
+        }
+        return -1;
+    }
+
+    /** Инлайновые комментарии старых ключей (дот-путь -> " #..." без ведущей
+     *  части строки). Для пустых значений вида `key: "" #"пояснение"` — чтобы
+     *  при перезаписи пояснение не терялось, а значение оставалось пустым. */
+    private static Map<String, String> collectInline(String old) {
+        Map<String, String> out = new HashMap<>();
+        List<String> keys = new ArrayList<>();
+        List<Integer> inds = new ArrayList<>();
+        for (String line : old.split("\n", -1)) {
+            String t = line.trim();
+            if (t.startsWith("#") || t.startsWith("-")) {
+                continue;
+            }
+            if (!parseKeyLine(line, keys, inds)) {
+                continue;
+            }
+            int idx = inlineIndex(line);
+            if (idx >= 0) {
+                String tail = line.substring(idx);
+                if (!tail.isEmpty()) {
+                    out.putIfAbsent(pathOf(keys), tail);
+                }
+            }
+        }
+        return out;
+    }
+
     /** Дот-путь строго текущего ключа (keys уже содержит его):
      *  например ["select", "interactive-help"] -> "select.interactive-help". */
     private static String pathOf(List<String> keys) {
@@ -204,7 +249,8 @@ public final class Yml {
     /** Перекинуть сохранённые комментарии в новый дамп по совпадающим ключам. */
     private static String preserveComments(String old, String nv) {
         Map<String, List<String>> comments = collectComments(old);
-        if (comments.isEmpty()) {
+        Map<String, String> inline = collectInline(old);
+        if (comments.isEmpty() && inline.isEmpty()) {
             return nv;
         }
         Set<String> placed = new HashSet<>();
@@ -227,7 +273,12 @@ public final class Yml {
                     }
                 }
             }
-            out.append(line).append('\n');
+            String tail = inline.get(path);
+            if (tail != null && line.indexOf('#') < 0) {
+                out.append(line).append(tail).append('\n');
+            } else {
+                out.append(line).append('\n');
+            }
         }
         return out.toString();
     }

@@ -49,6 +49,7 @@ public final class RaidManager {
 
     private final QQRegions plugin;
     private JustTeamsHook teams;
+    private boolean warnedTeams;
 
     private State state = State.IDLE;
     private String worldName;
@@ -77,6 +78,18 @@ public final class RaidManager {
 
     public void reload() {
         teams.reload();
+        if (plugin.config().raid().enabled && !teams.enabled()) {
+            if (!warnedTeams) {
+                warnedTeams = true;
+                plugin.getLogger().warning("Рейд клана включён в config.yml, но хук JustTeams не подключён: "
+                        + (teams.failReason().isEmpty()
+                        ? "связаться с плагином не удалось" : teams.failReason())
+                        + ". Кнопка «Рейд» будет показывать статус клана «—». "
+                        + "Проверьте, что JustTeams установлен и загружен, затем /region reload.");
+            }
+        } else if (teams.enabled()) {
+            warnedTeams = false;
+        }
         if (state == State.IDLE) {
             return;
         }

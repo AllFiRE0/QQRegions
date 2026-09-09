@@ -37,8 +37,10 @@ import java.util.regex.Pattern;
  */
 public class MenuManager implements Listener {
 
-    /** Режимы сортировки предложений рынка (переключаются @sort). */
-    private static final List<String> MARKET_SORT = List.of("name", "price", "default");
+    /** Режимы сортировки предложений рынка (переключаются @sort):
+     *  название A-Z/Z-A, цена по возрастанию/убыванию, по умолчанию. */
+    private static final List<String> MARKET_SORT = List.of("name-az", "name-za",
+            "price-asc", "price-desc", "default");
 
     /** Режимы сортировки выбора территории (переключаются @rpsort):
      *  близкие/дальние/по A-Z/Z-A/по людям +-, по площади +-. */
@@ -562,6 +564,8 @@ public class MenuManager implements Listener {
             ctx.put("market-title", mineView
                     ? plugin.lang().get("menu.market-title-mine")
                     : plugin.lang().get("menu.market-title-all"));
+            ctx.put("market-sort", marketSortLabel(ctx.getOrDefault("_sort", "default")));
+            ctx.put("market-sort-list", sortPickList("market-sort", ctx.getOrDefault("_sort", "default")));
         }
         // Главное меню: если открыто по сохранённому контексту без
         // {my-region-lore} (например @back с пустой историей и т.п.) — считаем
@@ -1340,10 +1344,14 @@ public class MenuManager implements Listener {
             }
             cols.add(o);
         }
-        if (sort.equals("name")) {
+        if (sort.equals("name-az") || sort.equals("name")) {
             cols.sort((a, b) -> a.region.compareToIgnoreCase(b.region));
-        } else if (sort.equals("price")) {
+        } else if (sort.equals("name-za")) {
+            cols.sort((a, b) -> b.region.compareToIgnoreCase(a.region));
+        } else if (sort.equals("price-asc") || sort.equals("price")) {
             cols.sort((a, b) -> Double.compare(a.price, b.price));
+        } else if (sort.equals("price-desc")) {
+            cols.sort((a, b) -> Double.compare(b.price, a.price));
         }
         for (dev.qqregions.market.Offer o : cols) {
             boolean sale = o.kind == dev.qqregions.market.Offer.Kind.SALE;
@@ -2247,7 +2255,14 @@ public class MenuManager implements Listener {
     /** Цветной список режимов сортировки для кнопки-фильтра: текущий — &a,
      *  остальные — &7, по одному на строку. Ключи lang: menu.<prefix>-<режим>. */
     private String sortPickList(String prefix, String current) {
-        List<String> order = prefix.startsWith("rp-") ? REGION_SORT : PLAYER_SORT;
+        List<String> order;
+        if (prefix.startsWith("market")) {
+            order = MARKET_SORT;
+        } else if (prefix.startsWith("rp-")) {
+            order = REGION_SORT;
+        } else {
+            order = PLAYER_SORT;
+        }
         StringBuilder sb = new StringBuilder();
         for (String mode : order) {
             String label = plugin.lang().get("menu." + prefix + "-" + mode);
@@ -2291,6 +2306,7 @@ public class MenuManager implements Listener {
         String empty = plugin.lang().get("menu.raid-empty");
         ctx.put("raid-clan", empty);
         ctx.put("raid-balance", empty);
+        ctx.put("raid-balance-symbol", "");
         ctx.put("raid-online", empty);
         ctx.put("raid-total", empty);
         ctx.put("raid-in-region", empty);
@@ -2847,14 +2863,21 @@ public class MenuManager implements Listener {
         plugin.lang().sendMsg(p, "market.search-cancel");
     }
 
-    /** Цикл сортировки предложений рынка: Название → Цена → По умолчанию. */
+    /** Цикл сортировки предложений рынка: Название A-Z → Название Z-A →
+     *  Цена по возрастанию → Цена по убыванию → По умолчанию. */
     private void cycleSort(Player p, OpenMenu om) {
         String cur = om.ctx.getOrDefault("_sort", "default");
         int idx = MARKET_SORT.indexOf(cur);
         String next = MARKET_SORT.get((idx + 1) % MARKET_SORT.size());
         om.ctx.put("_sort", next);
-        plugin.lang().send(p, "market.sort-set", "mode", next);
+        plugin.lang().send(p, "market.sort-set", "mode", marketSortLabel(next));
         render(p, om.menu, om.ctx, om.page, om.role, om.kind);
+    }
+
+    /** Локализованная подпись режима сортировки рынка (menu.market-sort-*). */
+    private String marketSortLabel(String sort) {
+        String label = plugin.lang().get("menu.market-sort-" + sort);
+        return label == null || label.isEmpty() ? sort : label;
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

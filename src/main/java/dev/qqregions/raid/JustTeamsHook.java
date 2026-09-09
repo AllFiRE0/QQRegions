@@ -25,6 +25,7 @@ public final class JustTeamsHook {
     private Object justTeams;       // eu.kotori.justTeams.JustTeams
     private Object teamManager;     // eu.kotori.justTeams.team.TeamManager
     private Object storage;         // eu.kotori.justTeams.storage.IDataStorage
+    private String failReason = "";
 
     private Method mGetInstance;
     private Method mGetTeamManager;
@@ -64,17 +65,20 @@ public final class JustTeamsHook {
         mGetPlayerTeamCached = mGetPlayerTeam = null;
         mMarkTeamModified = mPublishCrossServerUpdate = mUpdateTeamBalance = null;
         teamClass = teamPlayerClass = null;
+        failReason = "";
         try {
             Class<?> clazz = Class.forName("eu.kotori.justTeams.JustTeams");
             mGetInstance = clazz.getMethod("getInstance");
             Object inst = mGetInstance.invoke(null);
             if (inst == null) {
+                failReason = "JustTeams.getInstance() вернул null";
                 return;
             }
             justTeams = inst;
             mGetTeamManager = clazz.getMethod("getTeamManager");
             teamManager = mGetTeamManager.invoke(inst);
             if (teamManager == null) {
+                failReason = "JustTeams.getTeamManager() вернул null";
                 return;
             }
 
@@ -114,12 +118,19 @@ public final class JustTeamsHook {
                 }
             }
         } catch (Throwable t) {
+            failReason = String.valueOf(t.getMessage());
             plugin.dbg("JustTeamsHook: " + t.getMessage());
         }
     }
 
     public boolean enabled() {
-        return justTeams != null && teamManager != null && mGetPlayerTeamCached != null;
+        return justTeams != null && teamManager != null
+                && (mGetPlayerTeamCached != null || mGetPlayerTeam != null);
+    }
+
+    /** Причина, почему хук не подключился (для диагноза; пусто = ОК). */
+    public String failReason() {
+        return failReason;
     }
 
     /** Клан игрока (сначала кэш, при пустом кэше — полный запрос). */

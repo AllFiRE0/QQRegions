@@ -437,6 +437,12 @@ menu:
   market-title-mine: "&6Мои объявления"
   market-tab-switch-mine: "&eОткрыта вкладка «Мои объявления»."
   market-tab-switch-all: "&eОткрыта вкладка «Все объявления»."
+  # Режимы сортировки предложений рынка (кнопка «Сортировка», @sort).
+  market-sort-name-az: "По названию A-Z"
+  market-sort-name-za: "По названию Z-A"
+  market-sort-price-asc: "Цена по возрастанию"
+  market-sort-price-desc: "Цена по убыванию"
+  market-sort-default: "По умолчанию"
   own-only: "&7Это действие доступно в ваших вкладках «Мои объявления»."
   market-teleported: "&aТелепорт к &7{region}&a."
   market-teleport-disabled: "&cТелепорт к территории из объявления отключён на сервере."

@@ -125,7 +125,7 @@ Menus:
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"
           - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
           - "&7На территории: &f{raid-in-region}&7/&f{raid-needed}"
-          - "&7Требует клан (JustTeams)"
+          - "&7Требуется состоять в клане."
         permission: qqregions.raid
         role-required: other
         commands:
@@ -257,7 +257,7 @@ Menus:
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"
           - "&7Онлайн клана: &f{raid-online}&7/&f{raid-total}"
           - "&7На территории: &f{raid-in-region}&7/&f{raid-needed}"
-          - "&7Требует клан (JustTeams)"
+          - "&7Требуется состоять в клане."
         permission: qqregions.raid
         role-required: other
         commands:
