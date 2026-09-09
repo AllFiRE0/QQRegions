@@ -209,6 +209,15 @@ public class Menu {
                 || player.hasPermission("qqregions.flags." + key);
     }
 
+    /** Полный доступ игрока к флагу: отдельное право (<prefix><флаг> или
+     *  qqregions.flags.use.<флаг>/legacy qqregions.flags.<флаг>), админ/оп,
+     *  либо группа-шаблон из config.yml flag-groups (право
+     *  qqregions.flags.group.<имя> — открывает пачку флагов). */
+    public static boolean canUseFlag(QQRegions plugin, Player player, String prefix, String flag) {
+        return canSeeFlag(player, prefix, flag)
+                || flag != null && plugin.config().flagGroupAllows(player, flag);
+    }
+
     /**
      * Строит список кнопок флагов — ОДНА кнопка на флаг (устраняет дубли 5x).
      * Кнопка показывает текущую группу флага; ЛКМ = переключить значение
@@ -249,7 +258,7 @@ public class Menu {
                 visible = owned != null && owned.contains(key);
             } else {
                 boolean ownedFlag = owned != null && owned.contains(key);
-                visible = ownedFlag || canSeeFlag(player, tpl.permissionPrefix, id);
+                visible = ownedFlag || canUseFlag(plugin, player, tpl.permissionPrefix, id);
             }
             if (!visible) {
                 continue;

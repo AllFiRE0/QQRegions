@@ -11,6 +11,7 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -91,6 +92,9 @@ public class Config {
     private Set<String> flagsShopIgnore = new HashSet<>();
     /** flags-names: пользовательские названия флагов (key = id флага, value = название). */
     private final Map<String, String> flagNameReplace = new HashMap<>();
+    /** flag-groups: группы-шаблоны прав на флаги (конфиг) — право
+     *  qqregions.flags.group.<имя> открывает сразу весь список флагов. */
+    private final List<FlagGroup> flagGroups = new ArrayList<>();
     /** regions.max-regions: лимит регионов на игрока (0 = без лимита). */
     private int maxRegions;
 
@@ -198,6 +202,19 @@ public class Config {
                 if (v != null) {
                     flagNameReplace.put(k.toLowerCase(java.util.Locale.ROOT), v);
                 }
+            }
+        }
+        flagGroups.clear();
+        ConfigurationSection fg = cfg.getConfigurationSection("flag-groups");
+        if (fg != null) {
+            for (String key : fg.getKeys(false)) {
+                ConfigurationSection g = fg.getConfigurationSection(key);
+                if (g == null) {
+                    continue;
+                }
+                Set<String> flags = new HashSet<>(lower(g.getStringList("flags")));
+                boolean all = flags.contains("*") || flags.contains("ALL");
+                flagGroups.add(new FlagGroup(key, flags, all));
             }
         }
         maxRegions = Math.max(0, cfg.getInt("regions.max-regions", 0));
@@ -452,7 +469,44 @@ public class Config {
         return maxRegions;
     }
 
+    /** Есть ли у игрока группа-шаблон прав (config.yml flag-groups), открывающая
+     *  флаг. Право группы: qqregions.flags.group.<имя>. Несколько групп
+     *  суммируются; флаг "<имя>": ["*"] открывает ВСЕ флаги. Отдельные права
+     *  qqregions.flags.use.<флаг>/qqregions.flags.<флаг> здесь НЕ проверяются —
+     *  их смотрит Menu.canSeeFlag, а итоговый доступ — Menu.canUseFlag. */
+    public boolean flagGroupAllows(Player player, String flagId) {
+        if (player == null || flagId == null) {
+            return false;
+        }
+        String key = flagId.toLowerCase(java.util.Locale.ROOT);
+        for (FlagGroup g : flagGroups) {
+            if (player.hasPermission(g.permission) && (g.all || g.flags.contains(key))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ---------------- вложенные опции ----------------
+
+    /** Группа-шаблон прав на флаги (config.yml flag-groups). Право
+     *  qqregions.flags.group.<имя> открывает сразу весь список флагов —
+     *  выдача «пачкой» вместо права на каждый флаг по отдельности. */
+    public static class FlagGroup {
+        /** Полное право группы (qqregions.flags.group.<имя>, id в нижнем регистре). */
+        public final String permission;
+        /** Ид флагов группы (нижний регистр). */
+        public final Set<String> flags;
+        /** true — "[*]" в списке: открывает все флаги (для не-админов). */
+        public final boolean all;
+
+        FlagGroup(String key, Set<String> flags, boolean all) {
+            this.permission = "qqregions.flags.group."
+                    + (key == null ? "" : key.toLowerCase(java.util.Locale.ROOT));
+            this.flags = flags;
+            this.all = all;
+        }
+    }
 
     /** Стиль точки выделения: панель хотбара, цвет частиц/свечения, блок-дисплей. */
     public static class PointStyle {

@@ -699,11 +699,12 @@ public class MenuManager implements Listener {
             return;
         }
 // флаг-кнопка: клик требует право <prefix><флаг> или qqregions.flags.use.<флаг>/
-        // qqregions.flags.<флаг> (см. Menu.canSeeFlag). Купленные флаги кликаются без права.
+        // qqregions.flags.<флаг> (см. Menu.canSeeFlag) или группу-шаблон flag-groups
+        // (см. Menu.canUseFlag). Купленные флаги кликаются без права.
         Menu.DynamicFlags dyn = om.menu.dynamicFlags();
         String flagPermPrefix = dyn == null ? null : dyn.permissionPrefix;
         if (item.isDynamic() && item.flag() != null && !item.flag().isEmpty()
-                && !Menu.canSeeFlag(p, flagPermPrefix, item.flag())) {
+                && !Menu.canUseFlag(plugin, p, flagPermPrefix, item.flag())) {
             String flagKey = item.flag().toLowerCase(java.util.Locale.ROOT);
             if (!plugin.shop().ownedFlags(p.getUniqueId()).contains(flagKey)) {
                 return;
@@ -2389,6 +2390,14 @@ public class MenuManager implements Listener {
                 }
                 continue;
             }
+            // Гейт магазина: флаг показывается только с правом на него —
+            // qqregions.flags.use.<флаг> или группа-шаблон flag-groups
+            // (см. Menu.canUseFlag; даётся группам через LuckPerms или игроку
+            // по отдельности). Принимаются и legacy qqregions.flags.<флаг>.
+            // Админ/оп видят всё. Купленные флаги обработаны выше.
+            if (!Menu.canUseFlag(plugin, player, "qqregions.flags.use.", id)) {
+                continue;
+            }
             double price = plugin.shop().priceOf(key);
             if (price <= 0) {
                 continue;
@@ -2506,6 +2515,14 @@ public class MenuManager implements Listener {
         String id = parts[1].trim();
         String res;
         if ("flag".equals(kind)) {
+            // Страховка: покупать флаг можно только с правом qqregions.flags.use.<флаг>
+            // или группы-шаблона flag-groups (см. Menu.canUseFlag), либо владея
+            // им (тогда ответит "already").
+            if (!Menu.canUseFlag(plugin, p, "qqregions.flags.use.", id)
+                    && !plugin.shop().ownedFlags(p.getUniqueId())
+                    .contains(id.toLowerCase(java.util.Locale.ROOT))) {
+                return;
+            }
             res = plugin.shop().buyFlag(p.getUniqueId(), id);
         } else {
             res = plugin.shop().buyProduct(p.getUniqueId(), kind, id);

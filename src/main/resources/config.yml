@@ -129,9 +129,31 @@ interactive:
   # заблокирует и /ah sell, и /ah bids, и сам /ah.
   blocked-commands:
     - "ah"
+    - "auction"
+    - "auc"
+    - "sellitem"
+    - "seller"
     - "sell"
     - "shop"
+    - "pay"
+    - "money"
     - "baltop"
+    - "rt"
+    - "rtp"
+    - "randomtp"
+    - "tpr"
+    - "trp"
+    - "tpa"
+    - "tpo"
+    - "tphere"
+    - "pvp"
+    - "home"
+    - "warp"
+    - "spawn"
+    - "back"
+    - "dback"
+    - "deathback"
+    - "world"
   # Передавать наше выделение в WorldEdit-селекцию игрока, чтобы
   # sVis (Selection Visualizer) автоматически подсвечивал область.
   sync-worldedit: true
@@ -856,6 +878,48 @@ flags-names:
   # deny-message: "Сообщение при входе"
   # entry: "Вход в регион"
 
+# Группы-шаблоны прав на флаги. Выдайте игроку право
+#   qqregions.flags.group.<имя группы>
+# — и он сразу получит ВСЕ флаги из списка этой группы: видеть их в меню
+# флагов и в магазине флагов и покупать. «Пачкой», без выдачи права на
+# каждый флаг по отдельности (точечные права qqregions.flags.use.<флаг>
+# продолжают работать отдельно и суммируются). У игрока может быть
+# несколько групп — флаги суммируются. В списке флагов "*" = все флаги
+# (для не-админов). Админ/оп видят и покупают всё всегда.
+# Пример: новичка положите в LuckPerms-группу с правом qqregions.flags.group.newbie,
+# старожила — qqregions.flags.group.veteran, и группы сами раздадут флаги.
+flag-groups:
+  newbie:
+    flags:
+      - "pvp"
+      - "chest-access"
+      - "sleep"
+      - "tnt"
+      - "potion-splash"
+      - "item-pickup"
+      - "item-frame-rotation"
+      - "item-drop"
+      - "creeper-explosion"
+      - "other-explosion"
+      - "enderman-grief"
+      - "snow-fall"
+      - "snow-melt"
+      - "mob-spawning"
+      - "fire-spread"
+      - "lava-flow"
+      - "water-flow"
+      - "enderpearl"
+      - "chorus-fruit-teleport"
+  # veteran:
+  #   flags:
+  #     - "pvp"
+  #     - "build"
+  #     - "entry"
+  #     - "chest-access"
+  #     - "greeting"
+  #   # flags:
+  #   #   - "*"        # все флаги (или несколько групп по отдельности)
+
 # ------------------------------------------------------------
 # Рынок: продажа и аренда регионов (/region sell|rent|buy|tenant|market).
 # Требует Vault + плагин экономики (EssentialsX, CMI, ...) — мягкая
@@ -890,7 +954,7 @@ market:
     # Подключать ли Vault (false — экономии нет, команды откажут).
     enabled: true
     # Символ валюты и его позиция: 1000 ₽ (AFTER) | ₽ 1000 (BEFORE).
-    symbol: "₽"
+    symbol: "#FFFE72Ⓜ&r"
     symbol-position: AFTER
     # Сколько знаков после запятой (0-2).
     decimal-places: 0

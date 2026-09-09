@@ -19,6 +19,9 @@
 #  флагу требуют этого права; админ (qqregions.admin) видит и может менять
 #  все флаги. Привилегии вида qqregions.flags.use.* выдавайте игрокам —
 #  флагов без права никто не увидит, whitelist видимость НЕ даёт.
+#  Группы-шаблоны: право qqregions.flags.group.<имя> (config.yml flag-groups)
+#  открывает сразу весь список флагов группы (действует совместно с точечными
+#  правами qqregions.flags.use.<флаг>).
 #
 #  Переменные: {region} {world} {player} {role} {flag} {flag-name} {group}
 #              {group-label} {groups-list} {flag-group} {flag-group-label}

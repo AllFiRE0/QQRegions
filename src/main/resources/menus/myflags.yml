@@ -31,7 +31,7 @@ Menus:
         commands:
           - "@back"
       "market":
-        slot: 45
+        slot: 3
         material: GOLD_INGOT
         name: "&eРынок"
         lore:
@@ -39,7 +39,7 @@ Menus:
         commands:
           - "@menu:market"
       "flagshop":
-        slot: 46
+        slot: 5
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
@@ -96,8 +96,8 @@ Menus:
       prev:
         material: ARROW
         name: "&eНазад"
-        slot: 47
+        slot: 45
       next:
         material: ARROW
         name: "&eВперёд"
-        slot: 51
+        slot: 53
