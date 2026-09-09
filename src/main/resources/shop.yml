@@ -124,33 +124,47 @@ flags:
 
 area-packs:
   # Пакеты площади выделения. Один пакет = один раз (max-purchases: 1).
-  big:
+  small:
     name: "Большая территория"
     blocks: 20000
     price: 5000
     material: GOLD_INGOT
     priority: 0
     bought-display: HIDE
-  mega:
+  common:
     name: "Огромная территория"
-    blocks: 100000
+    blocks: 30000
     price: 20000
     material: GOLD_INGOT
     priority: 1
+    bought-display: HIDE
+  large:
+    name: "Огромная территория"
+    blocks: 40000
+    price: 50000
+    material: GOLD_INGOT
+    priority: 2
+    bought-display: HIDE
+  big:
+    name: "Огромная территория"
+    blocks: 50000
+    price: 120000
+    material: GOLD_INGOT
+    priority: 3
     bought-display: HIDE
 
 region-packs:
   # Пакеты «+регион»: повторяемые (max-purchases: 0) или с лимитом.
   plus1:
-    name: "+1 регион"
+    name: "+1 территория"
     regions: 1
-    price: 2500
+    price: 250000
     material: EMERALD
     priority: 10
   plus5:
-    name: "+5 регионов"
+    name: "+2 территории"
     regions: 5
-    price: 10000
+    price: 1500000
     material: EMERALD
     priority: 11
 
