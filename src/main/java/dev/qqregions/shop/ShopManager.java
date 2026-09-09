@@ -212,8 +212,12 @@ public List<ShopProduct> products(String kind) {
 
     private ShopProduct readProduct(String section, String id) {
         String base = section + "." + id + ".";
-        String kind = "region".equals(section) ? "region"
-                : "area".equals(section) ? "area" : "custom";
+        // kind — по имени СЕКЦИИ shop.yml (getKeys(false)→"area-packs"/"region-packs"
+        // и т.п.), а не по короткому типу: было "region".equals(section) — никогда
+        // не совпадало, и ВСЕ пакеты получали kind="custom" (баг «Покупка не
+        // найдена» у пакетов + неверные дефолты материала и max-purchases).
+        String kind = "region-packs".equals(section) ? "region"
+                : "area-packs".equals(section) ? "area" : "custom";
         String name = shop.getString(base + "name", id);
         double price = shop.getDouble(base + "price", 0);
         int amount = Math.max(1, shop.getInt(base + "amount",
