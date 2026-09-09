@@ -642,7 +642,11 @@ public class Wg {
         }
         RegionManager rm = manager(world);
         if (rm != null) {
-            rm.save();
+            try {
+                rm.save();
+            } catch (StorageException e) {
+                return false;
+            }
         }
         return true;
     }
