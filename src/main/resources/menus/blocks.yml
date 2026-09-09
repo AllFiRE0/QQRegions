@@ -1,7 +1,7 @@
 # ============================================================
 #  QQRegions — расширения (/region market blocks)
 #  Пакеты площади (area-packs, max-blocks выделения) и пакеты
-#  «+регион» (region-packs, лимит regions.max-regions).
+#  «+территория» (region-packs, лимит regions.max-regions).
 #  Цены и состав — shop.yml. Покупки на игрока навсегда.
 #
 #  Динамические кнопки: {pack-name} {pack-amount} {price} {price-symbol}

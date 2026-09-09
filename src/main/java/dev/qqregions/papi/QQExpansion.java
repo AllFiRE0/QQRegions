@@ -76,11 +76,11 @@ public class QQExpansion extends PlaceholderExpansion {
                 "%qqregions_raid_remaining%",
                 "%qqregions_raid_time%",
                 "%qqregions_raid_cooldown%",
-                "%qqregions_region_price_<мир>:<регион>%",
-                "%qqregions_region_for_sale_<мир>:<регион>%",
-                "%qqregions_region_for_rent_<мир>:<регион>%",
-                "%qqregions_region_owner_<мир>:<регион>%",
-                "%qqregions_region_rent_time_<мир>:<регион>%"
+                "%qqregions_region_price_<мир>:<территория>%",
+                "%qqregions_region_for_sale_<мир>:<территория>%",
+                "%qqregions_region_for_rent_<мир>:<территория>%",
+                "%qqregions_region_owner_<мир>:<территория>%",
+                "%qqregions_region_rent_time_<мир>:<территория>%"
         );
     }
 
@@ -263,7 +263,7 @@ public class QQExpansion extends PlaceholderExpansion {
         return w == null || r == null ? "" : plugin.wg().owners(r);
     }
 
-    /** "мир:регион" -> активный оффер (или по типу kind). */
+    /** "мир:территория" -> активный оффер (или по типу kind). */
     private dev.qqregions.market.Offer activeOn(String key, Boolean saleWant) {
         String[] parts = key.split(":", 2);
         if (parts.length < 2) {

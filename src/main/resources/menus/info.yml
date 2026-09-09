@@ -1,7 +1,7 @@
-﻿# ============================================================
-#  QQRegions — информационное меню региона (/territory info)
+# ============================================================
+#  QQRegions — информационное меню территории (/territory info)
 #
-#  Шаблоны выбираются по роли игрока в регионе (role-required):
+#  Шаблоны выбираются по роли игрока в территории (role-required):
 #    owner  — владелец: всё + флаги + управление игроками + телепорт
 #    member — участник: база + списки, без флагов
 #    other  — посторонний: только базовая информация
@@ -44,7 +44,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fТерритория: &b{region}"
+        name: "&7Территория: #59806f{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Ваша роль: &aВладелец"
@@ -108,10 +108,10 @@ Menus:
       "delete":
         slot: 24
         material: BARRIER
-        name: "&cУдалить территорию"
+        name: "&8Удалить территорию"
         lore:
           - "&7Разделить территорию навсегда"
-          - "&cПодтверждение откроется отдельно"
+          - "&8Подтверждение откроется отдельно"
         permission: qqregions.delete
         role-required: owner
         commands:
@@ -119,7 +119,7 @@ Menus:
       "raid":
         slot: 25
         material: NETHERITE_SWORD
-        name: "&cРейд клана"
+        name: "&8Рейд клана"
         lore:
           - "&7Клан: &f{raid-clan}"
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"
@@ -163,7 +163,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fТерритория: &b{region}"
+        name: "&7Территория: #59806f{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Тип: &f{type}"
@@ -231,7 +231,7 @@ Menus:
       "region":
         slot: 10
         material: NAME_TAG
-        name: "&fТерритория: &b{region}"
+        name: "&7Территория: #59806f{region}"
         lore:
           - "&7Мир: &f{world}"
           - "&7Тип: &f{type}"
@@ -251,7 +251,7 @@ Menus:
       "raid":
         slot: 19
         material: NETHERITE_SWORD
-        name: "&cРейд клана"
+        name: "&8Рейд клана"
         lore:
           - "&7Клан: &f{raid-clan}"
           - "&7Баланс клана: &f{raid-balance} {raid-balance-symbol}"

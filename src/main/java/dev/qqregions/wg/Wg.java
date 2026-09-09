@@ -81,7 +81,7 @@ public class Wg {
             territoryVisible = null;
         }
         if (territoryVisible == null) {
-            plugin.getLogger().severe("Флаг territory-visible НЕ зарегистрирован. Вход в регионы "
+            plugin.getLogger().severe("Флаг territory-visible НЕ зарегистрирован. Вход в территории "
                     + "не будет подсвечиваться (команда /region visible продолжит работать).");
         }
         // Флаг типа подсветки региона: значение particles|blocks|territory

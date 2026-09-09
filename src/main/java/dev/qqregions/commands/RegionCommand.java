@@ -723,8 +723,8 @@ public class RegionCommand {
             if (region == null) {
                 if (!rent && regionName != null && parsePeriod(regionName) > 0) {
                     lang(p, "market.sell-no-duration",
-                            "sell-usage", label + " sell <сумма> [регион]",
-                            "rent-usage", label + " rent <сумма> <время> [регион]");
+                            "sell-usage", label + " sell <сумма> [территория]",
+                            "rent-usage", label + " rent <сумма> <время> [территория]");
                     return;
                 }
                 lang(p, "market.no-region");
@@ -796,10 +796,10 @@ public class RegionCommand {
         }
     }
 
-    /** /region rent dur <минут> [регион] — срок объявления аренды (для владельца). */
+    /** /region rent dur <минут> [территория] — срок объявления аренды (для владельца). */
     private void doRentDur(Player p, String label, String[] args) {
         if (args.length < 3) {
-            lang(p, "general.usage", "usage", label + " rent dur <минут> [регион]");
+            lang(p, "general.usage", "usage", label + " rent dur <минут> [территория]");
             return;
         }
         long minutes = parseLong(args[2]);

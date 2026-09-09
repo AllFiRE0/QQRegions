@@ -806,7 +806,7 @@ public class HighlightManager implements Listener {
                     .append(" across=").append(f.acrossOffset)
                     .append(" бюджет=").append(budget);
             plugin.getLogger().info(sb.toString());
-            plugin.getLogger().info("[territory-fence] регион x=" + minX + ".." + maxX
+            plugin.getLogger().info("[territory-fence] территория x=" + minX + ".." + maxX
                     + " z=" + minZ + ".." + maxZ
                     + " всего=" + dedup.size() + " (до дедупа=" + list.size() + ")");
             int n = Math.min(8, dedup.size());

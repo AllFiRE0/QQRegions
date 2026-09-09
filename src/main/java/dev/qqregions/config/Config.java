@@ -152,9 +152,9 @@ public class Config {
         timeFmtTwoUnits = !"ONE".equalsIgnoreCase(cfg.getString("time-format.units", "TWO"));
 
         point1 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-1"),
-                Material.GRAY_STAINED_GLASS_PANE, Color.fromRGB(0x6b6b6b), Material.GRAY_CONCRETE);
+                Material.ORANGE_STAINED_GLASS_PANE, Color.fromRGB(0xff8c00), Material.ORANGE_TERRACOTTA);
         point2 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-2"),
-                Material.YELLOW_STAINED_GLASS_PANE, Color.fromRGB(0xffa500), Material.ORANGE_CONCRETE);
+                Material.GREEN_STAINED_GLASS_PANE, Color.fromRGB(0x00a651), Material.GREEN_CONCRETE);
 
         viewMode = cfg.getString("interactive.view-mode", "PARTICLES").toUpperCase(java.util.Locale.ROOT);
         viewDistance = cfg.getInt("interactive.view-distance", 200);
@@ -811,9 +811,9 @@ public class Config {
                 normalColor = BarColor.WHITE;
                 normalText = "&8[{current}&8/&8{max}&8] &7блоков";
                 fullColor = BarColor.RED;
-                fullText = "&c{value-color}{current}&8/&8{max}&c — максимум блоков!";
+                fullText = "&8{value-color}{current}&8/&8{max}&8 — максимум блоков!";
                 conflictColor = BarColor.YELLOW;
-                conflictText = "&eВыделение пересекает чужой регион!";
+                conflictText = "&7Выделение пересекает чужую территорию!";
                 valueColor = "&f";
                 return;
             }
@@ -830,9 +830,9 @@ public class Config {
             normalColor = Colors.bar(s.getString("normal.color", "WHITE"), BarColor.WHITE);
             normalText = s.getString("normal.text", "&8[{current}&8/&8{max}&8] &7блоков");
             fullColor = Colors.bar(s.getString("full.color", "RED"), BarColor.RED);
-            fullText = s.getString("full.text", "&c{value-color}{current}&8/&8{max}&c — максимум блоков!");
+            fullText = s.getString("full.text", "&8{value-color}{current}&8/&8{max}&8 — максимум блоков!");
             conflictColor = Colors.bar(s.getString("conflict.color", "YELLOW"), BarColor.YELLOW);
-            conflictText = s.getString("conflict.text", "&eВыделение пересекает чужой регион!");
+            conflictText = s.getString("conflict.text", "&7Выделение пересекает чужую территорию!");
             valueColor = s.getString("value-color", "&f");
         }
     }
@@ -1308,8 +1308,8 @@ public class Config {
                     updateTicks = 20;
                     color = BarColor.RED;
                     style = BarStyle.SEGMENTED_10;
-                    text = "&cЗахват {region}: &f{time} • нападающих &f{count}&c/&f{total}";
-                    thiefText = "&2Вор &f{thief}&2: &f{time}";
+                    text = "&8Захват #59806f{region}&8: &f{time} • нападающих &f{count}&8/&f{total}";
+                    thiefText = "&7Вор &f{thief}&7: &f{time}";
                     thiefColor = BarColor.GREEN;
                     thiefBar = new ThiefBar(null);
                     return;
@@ -1330,8 +1330,8 @@ public class Config {
                     st = BarStyle.SEGMENTED_10;
                 }
                 style = st;
-                text = s.getString("text", "&cЗахват {region}: &f{time} • нападающих &f{count}&c/&f{total}");
-                thiefText = s.getString("thief-text", "&2Вор &f{thief}&2: &f{time}");
+                text = s.getString("text", "&8Захват #59806f{region}&8: &f{time} • нападающих &f{count}&8/&f{total}");
+                thiefText = s.getString("thief-text", "&7Вор &f{thief}&7: &f{time}");
                 BarColor tc;
                 try {
                     tc = BarColor.valueOf(s.getString("thief-color", "GREEN"));
@@ -1356,7 +1356,7 @@ public class Config {
                         enabled = true;
                         color = BarColor.RED;
                         style = BarStyle.SOLID;
-                        text = "&cВремя нахождения на территории: &f{time}";
+                        text = "&8Время нахождения на территории: &f{time}";
                         return;
                     }
                     enabled = s.getBoolean("enabled", true);
@@ -1374,7 +1374,7 @@ public class Config {
                         st = BarStyle.SOLID;
                     }
                     style = st;
-                    text = s.getString("text", "&cВремя нахождения на территории: &f{time}");
+                    text = s.getString("text", "&8Время нахождения на территории: &f{time}");
                 }
             }
         }

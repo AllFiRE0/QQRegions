@@ -181,11 +181,11 @@ flag-names:
 # Используется в {flag-value-label} (flags.yml). {value} = сырое значение.
 flag-values:
   - placeholder: 'allow'
-    replacement: '&aвключено'
+    replacement: '&fвключено'
   - placeholder: 'deny'
-    replacement: '&cвыключено'
+    replacement: '&8выключено'
   - placeholder: 'true'
-    replacement: '&aда'
+    replacement: '&fда'
   - placeholder: 'false'
     replacement: '&7нет'
   - placeholder: 'default'

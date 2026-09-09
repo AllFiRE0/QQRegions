@@ -2,7 +2,7 @@ name: QQRegions
 version: '1.0.0'
 main: dev.qqregions.QQRegions
 api-version: '26.2'
-description: Мощное управление регионами поверх WorldGuard
+description: Мощное управление территориями поверх WorldGuard
 website: https://github.com/AllF1RE
 author: AllF1RE
 
@@ -24,16 +24,16 @@ permissions:
     description: Перезагрузка конфигурации (/region reload)
     default: op
   qqregions.create:
-    description: Создание регионов
+    description: Создание территорияов
     default: true
   qqregions.delete:
-    description: Удаление регионов
+    description: Удаление территорияов
     default: true
   qqregions.select:
     description: Выделение территории
     default: true
   qqregions.info:
-    description: Информация о регионе (/region info)
+    description: Информация о территории (/region info)
     default: true
   qqregions.manage:
     description: Управление участниками и владельцами
@@ -42,16 +42,16 @@ permissions:
     description: Меню флагов
     default: true
   qqregions.visible:
-    description: Подсветка границ регионов (/region visible)
+    description: Подсветка границ территорияов (/region visible)
     default: true
   qqregions.market:
-    description: Рынок регионов (sell/rent/buy/tenant/market)
+    description: Рынок территорияов (sell/rent/buy/tenant/market)
     default: true
   qqregions.raid:
     description: Запуск рейдов клана (JustTeams)
     default: true
   qqregions.admin:
-    description: Полный доступ, включая регионы чужих игроков
+    description: Полный доступ, включая территории чужих игроков
     default: op
     children:
       qqregions.reload: true
@@ -71,5 +71,5 @@ permissions:
     description: Работать в мирах из disabled-worlds
     default: op
   qqregions.bypass.banned-regions:
-    description: Работать с регионами из banned-regions
+    description: Работать с территориями из banned-regions
     default: op

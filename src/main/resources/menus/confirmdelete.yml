@@ -2,7 +2,7 @@
 #  QQRegions — меню подтверждения удаления территории.
 #  Открывается кнопкой «Удалить территорию» в info-меню.
 #
-#  Подтверждение: @region-delete (удаляет регион через WG API,
+#  Подтверждение: @region-delete (удаляет территория через WG API,
 #  с проверкой роли владельца/админа и правом qqregions.delete).
 #  Отмена: @back (возврат в инфо-меню).
 #
@@ -16,7 +16,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&cУдалить территорию: &f{region}"
+    title: "&8Удалить территорию: &f{region}"
     size: 3
     fill:
       enabled: true
@@ -27,7 +27,7 @@ Menus:
       "confirm":
         slot: 11
         material: RED_DYE
-        name: "&cДа, удалить"
+        name: "&8Да, удалить"
         lore:
           - "&7Территория &f{region} &7будет удалена навсегда"
           - "&7Восстановить её будет нельзя"
