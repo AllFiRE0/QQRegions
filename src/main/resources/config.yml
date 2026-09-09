@@ -910,6 +910,13 @@ flag-groups:
       - "water-flow"
       - "enderpearl"
       - "chorus-fruit-teleport"
+      - "interact"
+      - "use"
+      - "walljump"
+      - "sleep"
+      - "season-effects"
+      - "sit"
+      - "territory-visible"
   # veteran:
   #   flags:
   #     - "pvp"

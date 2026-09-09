@@ -89,14 +89,38 @@ flags:
   default-price: 1000
   # Цены отдельных флагов (перебивают default-price).
   prices:
-    pvp: 500
-    build: 800
-    entry: 600
-    deny-message: 750
-    chest-access: 1200
-    greeting: 300
-    farewell: 300
-    territory-visible: 500
+    pvp: 4000
+    chest-access: 2200
+    sleep: 1000
+    tnt: 20000
+    potion-splash: 15000
+    item-pickup: 5000
+    item-frame-rotation: 2500
+    item-drop: 2000
+    creeper-explosion: 20000
+    other-explosion: 25000
+    enderman-grief: 5000
+    snow-fall: 8000
+    snow-melt: 8000
+    mob-spawning: 50000
+    fire-spread: 20000
+    lava-flow: 35000
+    water-flow: 35000
+    enderpearl: 9000
+    chorus-fruit-teleport: 30000
+    interact: 2000
+    use: 2000
+    walljump: 12000
+    sleep: 7000
+    season-effects: 100000
+    sit: 10000
+    territory-visible: 50000
+    # нет в flag-grops
+    greeting: 3000
+    farewell: 3000
+    build: 8000
+    entry: 6000
+    deny-message: 7500
 
 area-packs:
   # Пакеты площади выделения. Один пакет = один раз (max-purchases: 1).
