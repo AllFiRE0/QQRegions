@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -40,6 +41,11 @@ public class SelectionView {
     private final Map<BlockVector3, Entity> viewBlocks = new HashMap<>();
     private Entity viewMarker;
     private Entity viewMarker2;
+    /** Цвет/блок последнего отрисованного объёма: если кадр геометрически тот же,
+     *  но сменился цвет (последняя точка 1/2, активная точка select), дисплеи
+     *  перекрашиваются без пересоздания, а не оставляют старый контур. */
+    private Color lastVolColor = null;
+    private Material lastVolMat = null;
     private int timer = 0;
     /** Отпечаток последнего кадра: если не изменился — BLOCKS-рендер пропускается
      * (без спама NBT-пакетов и debug-лога в покое). */
@@ -373,6 +379,8 @@ public class SelectionView {
             viewCmdMarker2 = null;
         }
         timer = 0;
+        lastVolColor = null;
+        lastVolMat = null;
     }
 
     // ---------- PARTICLES ----------
@@ -633,9 +641,17 @@ public class SelectionView {
             changed = true;
         }
 
-        // Блок/свечение — только когда кадр реально менялся (не гоняем NBT
-        // пакеты по всем дисплеям каждый тик в покое).
-        if (changed) {
+        // Блок/свечение — только когда кадр менялся геометрически ИЛИ сменился
+        // цвет/блок объёма (последняя точка 1/2, активная точка select): в
+        // покое NBT-пакеты не гоняем, но «чистая» смена цвета перекрашивает
+        // существующие дисплеи — иначе после переустановки точки объём так и
+        // висит старым цветом, а переехавшие маркеры «примешивают» чужой цвет.
+        boolean recolor = changed
+                || !Objects.equals(color, lastVolColor)
+                || !Objects.equals(blockMat, lastVolMat);
+        lastVolColor = color;
+        lastVolMat = blockMat;
+        if (recolor) {
             for (Entity e : viewBlocks.values()) {
                 if (e instanceof BlockDisplay bd) {
                     bd.setBlock(blockMat.createBlockData());

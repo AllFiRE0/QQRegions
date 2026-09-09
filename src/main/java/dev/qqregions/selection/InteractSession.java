@@ -512,13 +512,18 @@ public class InteractSession {
             return;
         }
         Config cfg = plugin.config();
+        // Объём и маркер красим цветом ПОСЛЕДНЕЙ установленной точки (точка 1 —
+        // оранжевый, точка 2 — зелёный), как в командном / select point: иначе
+        // кнопки «Точка 1»/«Точка 2» вне select-режима всегда давали зелёный
+        // (по умолчанию стиля точки 2).
+        Config.PointStyle st = sel.lastPoint() == 1 ? cfg.pointStyle(1) : cfg.pointStyle(2);
         if (selectingMode) {
             view.renderSelect(sel, cfg.pointStyle(1), cfg.pointStyle(2), activePoint);
         } else if (sel.volume() <= 1) {
             // одиночная точка — маркер вместо объёма
-            view.renderNow(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, sel.getPos(1));
+            view.renderNow(sel, st.highlight, st.block, sel.getPos(1));
         } else {
-            view.update(sel, cfg.particles().dustColor, cfg.pointStyle(2).block, null);
+            view.update(sel, st.highlight, st.block, null);
         }
 
         if (cfg.bossbar().enabled) {

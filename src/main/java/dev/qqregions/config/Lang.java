@@ -174,26 +174,19 @@ public class Lang {
             }
             msg = msg.replace("{" + kv[i] + "}", kv[i + 1]);
         }
-        return msg;
-    }
-
-    /** fmt + префикс плагина. */
-    public String prefixed(String key, String... kv) {
-        return get("prefix") + fmt(key, kv);
+        // Префикс плагина добавляется ТОЛЬКО через заполнитель {qqregions_prefix}.
+        return msg.replace("{qqregions_prefix}", get("prefix"));
     }
 
     public Component comp(String key, String... kv) {
         return Msg.color(fmt(key, kv));
     }
 
-    public Component compPrefixed(String key, String... kv) {
-        return Msg.color(prefixed(key, kv));
-    }
-
     /**
      * Отправить сообщение игроку, учитывая спец-префикс "actionbar:N!" в конце
      * перевода: тогда текст идёт в экшнбар и повторяется N секунд (каждые 20
-     * тиков), без [префикса] плагина. Иначе — обычное сообщение с префиксом.
+     * тиков), без [префикса] плагина. Иначе — обычное сообщение в чат; префикс
+     * плагина выводится ТОЛЬКО если в переводе есть {qqregions_prefix}.
      */
     private static final Pattern ACTIONBAR_PREFIX =
             Pattern.compile("^actionbar:(\\d+)!(.*)$", Pattern.DOTALL);
@@ -206,14 +199,16 @@ public class Lang {
             return;
         }
         if (msg.isBlank()) {
-            // '' = выключено: ничего не выводим (даже пустую строку с префиксом).
+            // '' = выключено: ничего не выводим (даже пустую строку).
             return;
         }
-        p.sendMessage(compPrefixed(key, kv));
+        // Префикс плагина добавляется ТОЛЬКО через заполнитель {qqregions_prefix}.
+        p.sendMessage(Msg.color(msg));
     }
 
-    /** Префиксная отправка для консоли/командного отправителя: без actionbar
-     *  (он только у Player), но с той же семантикой '' = выключено. */
+    /** Отправка для консоли/командного отправителя: без actionbar (он только у
+     *  Player), но с той же семантикой '' = выключено. Префикс — только через
+     *  {qqregions_prefix}. */
     public void send(CommandSender sender, String key, String... kv) {
         if (sender instanceof Player p) {
             send(p, key, kv);
@@ -223,7 +218,7 @@ public class Lang {
         if (msg == null || msg.isBlank()) {
             return;
         }
-        sender.sendMessage(Msg.color(get("prefix") + msg));
+        sender.sendMessage(Msg.color(msg));
     }
 
     /**
