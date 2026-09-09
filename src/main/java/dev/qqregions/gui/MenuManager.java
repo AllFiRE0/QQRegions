@@ -2330,8 +2330,8 @@ public class MenuManager implements Listener {
         ctx.put("raid-clan", team.name());
         double bal = teams.balance(team);
         if (bal >= 0) {
-            ctx.put("raid-balance", plugin.market().economy().formatAmount(bal));
-            ctx.put("raid-balance-symbol", plugin.market().economy().symbol());
+            ctx.put("raid-balance", plugin.raid().raidMoney(bal));
+            ctx.put("raid-balance-symbol", plugin.raid().raidSymbol());
         }
         List<UUID> online = teams.onlineMembers(team);
         ctx.put("raid-online", String.valueOf(online.size()));

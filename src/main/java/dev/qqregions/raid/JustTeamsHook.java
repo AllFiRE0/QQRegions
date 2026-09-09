@@ -26,6 +26,9 @@ public final class JustTeamsHook {
     private Object teamManager;     // eu.kotori.justTeams.team.TeamManager
     private Object storage;         // eu.kotori.justTeams.storage.IDataStorage
     private String failReason = "";
+    /** Не пытаться пере-подключиться чаще этого интервала (мс). */
+    private static final long RETRY_MS = 2000;
+    private volatile long nextRetryAt = 0;
 
     private Method mGetInstance;
     private Method mGetTeamManager;
@@ -123,7 +126,23 @@ public final class JustTeamsHook {
         }
     }
 
+    /** Ленивое пере-подключение: если первый коннект был раньше включения
+     *  JustTeams (onEnable-порядок плагинов), повторяем попытку по таймеру
+     *  с кулдауном. Только при НЕздоровом состоянии (не перезапускаем живой). */
+    private void ensure() {
+        long now = System.currentTimeMillis();
+        if (justTeams != null && teamManager != null) {
+            return;
+        }
+        if (now < nextRetryAt) {
+            return;
+        }
+        nextRetryAt = now + RETRY_MS;
+        reload();
+    }
+
     public boolean enabled() {
+        ensure();
         return justTeams != null && teamManager != null
                 && (mGetPlayerTeamCached != null || mGetPlayerTeam != null);
     }

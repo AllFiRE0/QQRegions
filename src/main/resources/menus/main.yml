@@ -41,14 +41,14 @@ Menus:
         material: CHEST
         name: "&6Магазин территорий"
         lore:
-          - "&7Купить или арендовать регион"
+          - "&7Аренда/Покупка территорий"
           - "&7Выставить свой на продажу/в аренду"
         commands:
           - "@menu:market"
       "myregion":
         slot: 11
         material: MAP
-        name: "&bМоя территория"
+        name: "&bТерритория"
         lore:
           - "{my-region-lore}"
         commands:
@@ -56,10 +56,10 @@ Menus:
       "regionsearch":
         slot: 12
         material: COMPASS
-        name: "&eПоиск региона"
+        name: "&eПоиск территории"
         lore:
           - "&7Введите название в чат"
-          - "&7Откроется список совпадений"
+          - "&7чтобы быстро найти нужные"
         commands:
           - "@region-search"
       "myoffers":
@@ -92,7 +92,7 @@ Menus:
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
-          - "&7Купить флаг, доступный по праву"
+          - "&7Покупка доступных флагов"
         commands:
           - "@menu:flagshop"
       "help":

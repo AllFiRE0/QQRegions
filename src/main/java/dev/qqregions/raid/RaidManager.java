@@ -65,6 +65,14 @@ public final class RaidManager {
     private BossBar bar;
     private NamespacedKey barKey;
 
+    /** Персональный боссбар таймера вора (display.thief-bar). */
+    private int thiefBarTicks;
+    private BossBar thiefBar;
+    private NamespacedKey thiefBarKey;
+
+    /** Последняя списанная за рейд сумма (-1 — экономика не задействована). */
+    private double lastCharged = -1;
+
     private enum State { IDLE, CAPTURING, THIEF, COOLDOWN }
 
     public RaidManager(QQRegions plugin) {
@@ -209,6 +217,8 @@ public final class RaidManager {
         this.thiefTicks = 0;
         this.cooldownTicks = 0;
         this.displayTicks = 0;
+        this.thiefBarTicks = 0;
+        this.lastCharged = -1;
         this.state = State.CAPTURING;
         plugin.dbg("[Raid] начат: " + regionName + " от " + clan.name()
                 + " нападающих " + attackers.size());
@@ -274,8 +284,12 @@ public final class RaidManager {
         Config.RaidOptions o = plugin.config().raid();
         notify(o.notifyThief, ctxWith(
                 "thief", nameOf(thief),
-                "time", String.valueOf(o.thiefSeconds)));
+                "time", timer(o.thiefSeconds),
+                "cost", costOfLastCharge(),
+                "cost-symbol", raidSymbol(),
+                "currency", raidSymbol()));
         thiefTicks = 0;
+        thiefBarTicks = 0;
         if (o.thiefSeconds <= 0) {
             endThiefPhase();
             return;
@@ -298,6 +312,7 @@ public final class RaidManager {
             return;
         }
         showThief();
+        showThiefBar();
     }
 
     private void endThiefPhase() {
@@ -306,6 +321,7 @@ public final class RaidManager {
         if (w != null && r != null && thief != null) {
             plugin.wg().removePlayer(w, r, thief, false);
         }
+        notifyThiefEnd();
         notify(plugin.config().raid().notifyEnd, ctx());
         int cd = plugin.config().raid().cooldownSeconds;
         cooldownTicks = cd * 20;
@@ -342,7 +358,8 @@ public final class RaidManager {
         clan = null;
         attackers.clear();
         thief = null;
-        capturedTicks = thiefTicks = cooldownTicks = displayTicks = 0;
+        capturedTicks = thiefTicks = cooldownTicks = displayTicks = thiefBarTicks = 0;
+        lastCharged = -1;
         if (!silent) {
             plugin.dbg("[Raid] сброшен");
         }
@@ -359,7 +376,7 @@ public final class RaidManager {
         displayTicks = 0;
         int total = o.captureSeconds;
         int passed = capturedTicks / 20;
-        String time = String.valueOf(Math.max(0, total - passed));
+        String time = timer(Math.max(0, total - passed));
         showBar(o.display.text,
                 o.display.color, o.display.style,
                 ctxWith("time", time,
@@ -373,10 +390,43 @@ public final class RaidManager {
         Config.RaidOptions o = plugin.config().raid();
         int total = o.thiefSeconds;
         int passed = thiefTicks / 20;
-        String time = String.valueOf(Math.max(0, total - passed));
+        String time = timer(Math.max(0, total - passed));
         showBar(o.display.thiefText, o.display.thiefColor, o.display.style,
                 ctxWith("thief", nameOf(thief), "time", time),
                 progress(passed, total));
+    }
+
+    /** Персональный боссбар таймера вора: виден только вору, полоса убывает
+     *  от полной к пустой за thief-time ({time} — в формате time-format). */
+    private void showThiefBar() {
+        Config.RaidOptions.RaidDisplay.ThiefBar tb = plugin.config().raid().display.thiefBar;
+        if (tb == null || !tb.enabled || thief == null) {
+            return;
+        }
+        Config.RaidOptions o = plugin.config().raid();
+        thiefBarTicks += 5;
+        if (thiefBarTicks < o.display.updateTicks) {
+            return;
+        }
+        thiefBarTicks = 0;
+        Player tp = Bukkit.getPlayer(thief);
+        if (tp == null || !tp.isOnline()) {
+            return;
+        }
+        int total = o.thiefSeconds;
+        int left = Math.max(0, total - thiefTicks / 20);
+        String time = timer(left);
+        String title = PlainTextComponentSerializer.plainText().serialize(
+                Msg.color(fillContext(tb.text, ctxWith("thief", nameOf(thief), "time", time))));
+        if (thiefBar == null) {
+            thiefBarKey = new NamespacedKey(plugin, "qqregions_raid_thiefbar_" + thief);
+            thiefBar = Bukkit.createBossBar(thiefBarKey, title, tb.color, tb.style);
+        } else {
+            thiefBar.setTitle(title);
+            thiefBar.setColor(tb.color);
+        }
+        thiefBar.setProgress(total <= 0 ? 0 : Math.max(0, Math.min(1.0, (double) left / total)));
+        thiefBar.addPlayer(tp);
     }
 
     private void showBar(String tpl, BarColor color, BarStyle style, java.util.Map<String, String> ctx, double progress) {
@@ -411,19 +461,30 @@ public final class RaidManager {
             bar = null;
             barKey = null;
         }
+        if (thiefBar != null) {
+            thiefBar.removeAll();
+            if (thiefBarKey != null) {
+                Bukkit.removeBossBar(thiefBarKey);
+            }
+            thiefBar = null;
+            thiefBarKey = null;
+        }
     }
 
     // ---------- монеты ----------
 
     private void chargeForRaid() {
         Config.RaidOptions.RaidEconomy e = plugin.config().raid().economy;
+        lastCharged = -1;
         if (!e.enabled) {
             return;
         }
         if (e.source == Config.RaidOptions.RaidSource.PLAYER) {
-            economyPlayerCharge(e.percent);
+            lastCharged = economyPlayerCharge(e.percent);
         } else {
-            teams.charge(clan, amountFor(teams.balanceRaw(clan)));
+            double amount = amountFor(teams.balanceRaw(clan));
+            teams.charge(clan, amount);
+            lastCharged = amount;
         }
     }
 
@@ -437,13 +498,48 @@ public final class RaidManager {
         return total * fractionOf(100, plugin.config().raid().economy.percent);
     }
 
-    /** Списать процент от ЛИЧНОГО баланса вора (Vault). */
-    private void economyPlayerCharge(double pct) {
+    /** Списать процент от ЛИЧНОГО баланса вора (Vault). Возвращает списанную сумму (-1 — не удалось). */
+    private double economyPlayerCharge(double pct) {
         if (!plugin.market().economy().enabled() || thief == null) {
-            return;
+            return -1;
         }
         double have = plugin.market().economy().balance(thief);
-        plugin.market().economy().withdraw(thief, have * fractionOf(100, pct));
+        double amount = have * fractionOf(100, pct);
+        plugin.market().economy().withdraw(thief, amount);
+        return amount;
+    }
+
+    /** Активна ли собственная валюта кланов (economy.source = CLAN): тогда баланс
+     *  и суммы в рейдах показываются в валюте raid.clan-currency, а НЕ в Vault. */
+    public boolean clanCurrency() {
+        return plugin.config().raid().economy.source == Config.RaidOptions.RaidSource.CLAN;
+    }
+
+    /** Число (без символа) в валюте рейда/клана: клановой, если source = CLAN,
+     *  иначе Vault (рыночной). */
+    public String raidMoney(double amount) {
+        if (clanCurrency()) {
+            return plugin.config().raid().clanCurrency.format(amount);
+        }
+        return plugin.market().economy().formatAmount(amount);
+    }
+
+    /** Символ валюты рейда/клана (пусто, если валюта недоступна). */
+    public String raidSymbol() {
+        if (clanCurrency()) {
+            return plugin.config().raid().clanCurrency.symbol;
+        }
+        return plugin.market().economy().symbol();
+    }
+
+    /** Отформатированная последняя сумма списания за рейд (пусто, если экономика неактивна). */
+    private String costOfLastCharge() {
+        return lastCharged < 0 ? "" : raidMoney(lastCharged);
+    }
+
+    /** Компактный таймер (time-format.units, единицы из lang.yml menu.time-*). */
+    private String timer(long seconds) {
+        return new dev.qqregions.util.TimeFmt(plugin).timer(seconds);
     }
 
     // ---------- вспомогательное ----------
@@ -553,24 +649,50 @@ public final class RaidManager {
         if (message != null && !message.isEmpty()) {
             Bukkit.broadcast(Msg.color(message));
         }
+        UUID first = attackers.isEmpty() ? null : attackers.iterator().next();
         for (String cmd : n.commands) {
-            runNotifyCommand(cmd, ctx);
+            runNotifyCommand(cmd, ctx,
+                    first == null ? null : Bukkit.getPlayer(first));
         }
     }
 
-    private void runNotifyCommand(String cmd, Map<String, String> ctx) {
+    /** Приватное уведомление конкретному игроку (например, вору об истечении таймера). */
+    private void notifyPlayer(Player target, Config.RaidOptions.RaidNotify n, Map<String, String> ctx) {
+        if (n == null || target == null) {
+            return;
+        }
+        String message = fillContext(n.message, ctx);
+        if (message != null && !message.isEmpty()) {
+            target.sendMessage(Msg.color(message));
+        }
+        for (String cmd : n.commands) {
+            runNotifyCommand(cmd, ctx, target);
+        }
+    }
+
+    /** Уведомить вора об истечении времени доступа (message шлётся только ему). */
+    private void notifyThiefEnd() {
+        if (thief == null) {
+            return;
+        }
+        Player tp = Bukkit.getPlayer(thief);
+        if (tp == null || !tp.isOnline()) {
+            return;
+        }
+        notifyPlayer(tp, plugin.config().raid().notifyThiefEnd, ctxWith("thief", nameOf(thief)));
+    }
+
+    private void runNotifyCommand(String cmd, Map<String, String> ctx, Player actor) {
         String c = fillContext(cmd, ctx);
         if (c == null || c.isBlank()) {
             return;
         }
         try {
             if (dev.qqregions.util.Actions.isAction(c)) {
-                UUID first = attackers.isEmpty() ? null : attackers.iterator().next();
-                Player p = first == null ? null : Bukkit.getPlayer(first);
-                if (p != null) {
-                    dev.qqregions.util.Actions.run(plugin, p, c);
+                if (actor != null) {
+                    dev.qqregions.util.Actions.run(plugin, actor, c);
                 } else {
-                    // онлайн-нападающего нет: только глобальные действия
+                    // онлайн-исполнителя нет: только глобальные действия
                     String lower = c.toLowerCase(Locale.ROOT);
                     if (lower.startsWith("asconsole!")) {
                         Bukkit.dispatchCommand(Bukkit.getConsoleSender(),

@@ -75,7 +75,6 @@ public final class QQRegions extends JavaPlugin {
         this.highlight = new HighlightManager(this);
         this.market = new MarketManager(this);
         this.raid = new RaidManager(this);
-        this.raid.reload();
         this.shop = new ShopManager(this);
         this.marketHolos = new MarketHolos(this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);

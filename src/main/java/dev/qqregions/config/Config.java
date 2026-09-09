@@ -54,6 +54,9 @@ public class Config {
     private boolean mainMenuBackEnabled = false;
     /** Команда кнопки «Назад» в главном меню (выполняется от имени игрока). */
     private String mainMenuBackCommand = "@back";
+    /** Показывать в таймерах (time-format.units) две старшие единицы (2д 5ч / 5ч 7м),
+     *  а не только одну (2д / 5ч). Действует на все механики: боссбар рейда и т.п. */
+    private boolean timeFmtTwoUnits = true;
     private PointStyle point1;
     private PointStyle point2;
     private String viewMode = "PARTICLES";
@@ -146,6 +149,7 @@ public class Config {
         blockedCommands = new ArrayList<>(lower(cfg.getStringList("interactive.blocked-commands")));
         syncWorldEdit = cfg.getBoolean("interactive.sync-worldedit", true);
         debug = cfg.getBoolean("debug", false);
+        timeFmtTwoUnits = !"ONE".equalsIgnoreCase(cfg.getString("time-format.units", "TWO"));
 
         point1 = new PointStyle(cfg.getConfigurationSection("interactive.select-points.point-1"),
                 Material.GRAY_STAINED_GLASS_PANE, Color.fromRGB(0x6b6b6b), Material.GRAY_CONCRETE);
@@ -304,6 +308,11 @@ public class Config {
 
     public String mainMenuBackCommand() {
         return mainMenuBackCommand;
+    }
+
+    /** Формат таймеров для всех механик (time-format.units): true = две старшие единицы. */
+    public boolean timeFmtTwoUnits() {
+        return timeFmtTwoUnits;
     }
 
     public boolean debug() {
@@ -1131,7 +1140,14 @@ public class Config {
      *   blacklist           — регионы (id), которые нельзя рейдить;
      *   owners-offline-required — владельцы/участники региона должны быть офлайн для старта;
      *   abort-on-owner-online  — сорвать рейд, если владелец/участник региона зашёл во время захвата;
-     *   economy             — списание монет (PLAYER = баланс инициатора, CLAN = банк клана).
+     *   economy             — списание монет (PLAYER = баланс инициатора, CLAN = банк клана);
+     *   clan-currency       — своя валюта банка клана (символ/формат), показывается,
+     *                         когда economy.source = CLAN (не путать с Vault);
+     *   display.thief-bar   — персональный боссбар таймера вора (виден только вору);
+     *   notify.thief-end    — приватное уведомление вору об истечении таймера.
+     *
+     * Время в плейсхолдерах {time} боссбаров/уведомлений форматируется правилом
+     * time-format.units (единицы надписей — из lang.yml menu.time-*).
      */
     public static class RaidOptions {
         public final boolean enabled;
@@ -1145,8 +1161,12 @@ public class Config {
         public final boolean abortOnOwnerOnline;
         public final RaidEconomy economy;
         public final RaidDisplay display;
+        /** Валюта банка клана (raid.clan-currency) — отображается, когда
+         *  economy.source = CLAN. НЕ путать с Vault-валютой рынка. */
+        public final ClanCurrency clanCurrency;
         public final RaidNotify notifyStart;
         public final RaidNotify notifyThief;
+        public final RaidNotify notifyThiefEnd;
         public final RaidNotify notifyEnd;
         public final RaidNotify notifyReset;
 
@@ -1158,16 +1178,18 @@ public class Config {
                 minAttackers = 2;
                 onlinePercent = 50;
                 captureSeconds = 60;
-                thiefSeconds = 60;
+                thiefSeconds = 300;
                 cooldownSeconds = 300;
                 blacklist = Set.of();
                 ownersOfflineRequired = true;
                 abortOnOwnerOnline = true;
                 economy = new RaidEconomy(null);
                 display = new RaidDisplay(null);
+                clanCurrency = new ClanCurrency(null);
                 RaidNotify def = new RaidNotify("", List.of());
                 notifyStart = def;
                 notifyThief = def;
+                notifyThiefEnd = def;
                 notifyEnd = def;
                 notifyReset = def;
                 return;
@@ -1176,15 +1198,17 @@ public class Config {
             minAttackers = Math.max(1, s.getInt("min-attackers", 2));
             onlinePercent = s.getDouble("online-percent", 50);
             captureSeconds = Math.max(1, s.getInt("capture-time", 60));
-            thiefSeconds = Math.max(1, s.getInt("thief-time", 60));
+            thiefSeconds = Math.max(1, s.getInt("thief-time", 300));
             cooldownSeconds = Math.max(0, s.getInt("cooldown-time", 300));
             blacklist = new HashSet<>(lower(s.getStringList("blacklist")));
             ownersOfflineRequired = s.getBoolean("owners-offline-required", true);
             abortOnOwnerOnline = s.getBoolean("abort-on-owner-online", true);
             economy = new RaidEconomy(s.getConfigurationSection("economy"));
             display = new RaidDisplay(s.getConfigurationSection("display"));
+            clanCurrency = new ClanCurrency(s.getConfigurationSection("clan-currency"));
             notifyStart = new RaidNotify(s.getConfigurationSection("notify.start"));
             notifyThief = new RaidNotify(s.getConfigurationSection("notify.thief"));
+            notifyThiefEnd = new RaidNotify(s.getConfigurationSection("notify.thief-end"));
             notifyEnd = new RaidNotify(s.getConfigurationSection("notify.end"));
             notifyReset = new RaidNotify(s.getConfigurationSection("notify.reset"));
         }
@@ -1221,6 +1245,50 @@ public class Config {
             }
         }
 
+        /** Валюта банка клана (raid.clan-currency). Отдельный формат и символ —
+         *  это СВОЯ валюта кланов (для рейдов/баланса клана), она не связана с
+         *  Vault-балансом игроков. Используется, когда economy.source = CLAN. */
+        public static class ClanCurrency {
+            public final String symbol;
+            public final boolean grouping;
+            public final String groupSeparator;
+            public final String decimalSeparator;
+            public final int decimalPlaces;
+
+            ClanCurrency(ConfigurationSection s) {
+                if (s == null) {
+                    symbol = "⚔";
+                    grouping = true;
+                    groupSeparator = " ";
+                    decimalSeparator = ".";
+                    decimalPlaces = 0;
+                    return;
+                }
+                symbol = s.getString("symbol", "⚔");
+                grouping = s.getBoolean("grouping", true);
+                groupSeparator = s.getString("group-separator", " ");
+                decimalSeparator = s.getString("decimal-separator", ".");
+                decimalPlaces = Math.max(0, Math.min(4, s.getInt("decimal-places", 0)));
+            }
+
+            /** Число БЕЗ символа (формат как у рынка, но со своим разделителем). */
+            public String format(double amount) {
+                String gs = (groupSeparator == null || groupSeparator.isEmpty()) ? " " : groupSeparator;
+                String ds = (decimalSeparator == null || decimalSeparator.isEmpty()) ? "." : decimalSeparator;
+                if (gs.equals(".") || gs.equals(ds)) {
+                    gs = " ";
+                }
+                java.text.DecimalFormatSymbols sym = new java.text.DecimalFormatSymbols(java.util.Locale.ROOT);
+                sym.setGroupingSeparator(gs.charAt(0));
+                sym.setDecimalSeparator(ds.charAt(0));
+                StringBuilder pat = new StringBuilder(grouping ? "#,##0" : "#0");
+                if (decimalPlaces > 0) {
+                    pat.append('.').append("0".repeat(decimalPlaces));
+                }
+                return new java.text.DecimalFormat(pat.toString(), sym).format(amount);
+            }
+        }
+
         /** Боссбар/экшнбар процесса рейда. */
         public static class RaidDisplay {
             public final String mode;
@@ -1231,6 +1299,8 @@ public class Config {
             /** Полоса фазы «вора» (после захвата): {thief} {time}. */
             public final String thiefText;
             public final BarColor thiefColor;
+            /** Отдельный персональный боссбар ТОЛЬКО для вора (таймер доступа). */
+            public final ThiefBar thiefBar;
 
             RaidDisplay(ConfigurationSection s) {
                 if (s == null) {
@@ -1238,9 +1308,10 @@ public class Config {
                     updateTicks = 20;
                     color = BarColor.RED;
                     style = BarStyle.SEGMENTED_10;
-                    text = "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}";
-                    thiefText = "&2Вор &f{thief}&2: &f{time}&2 сек";
+                    text = "&cЗахват {region}: &f{time} • нападающих &f{count}&c/&f{total}";
+                    thiefText = "&2Вор &f{thief}&2: &f{time}";
                     thiefColor = BarColor.GREEN;
+                    thiefBar = new ThiefBar(null);
                     return;
                 }
                 mode = s.getString("mode", "ACTIONBAR").toUpperCase(java.util.Locale.ROOT);
@@ -1259,8 +1330,8 @@ public class Config {
                     st = BarStyle.SEGMENTED_10;
                 }
                 style = st;
-                text = s.getString("text", "&cЗахват {region}: &f{time}&c сек • нападающих &f{count}&c/&f{total}");
-                thiefText = s.getString("thief-text", "&2Вор &f{thief}&2: &f{time}&2 сек");
+                text = s.getString("text", "&cЗахват {region}: &f{time} • нападающих &f{count}&c/&f{total}");
+                thiefText = s.getString("thief-text", "&2Вор &f{thief}&2: &f{time}");
                 BarColor tc;
                 try {
                     tc = BarColor.valueOf(s.getString("thief-color", "GREEN"));
@@ -1268,6 +1339,43 @@ public class Config {
                     tc = BarColor.GREEN;
                 }
                 thiefColor = tc;
+                thiefBar = new ThiefBar(s.getConfigurationSection("thief-bar"));
+            }
+
+            /** Персональный боссбар таймера вора (display.thief-bar): виден только
+             *  вору, полоса отсчитывает от полной к пустой за thief-time. */
+            public static class ThiefBar {
+                public final boolean enabled;
+                public final BarColor color;
+                public final BarStyle style;
+                /** Плейсхолдеры: {thief} {time}. */
+                public final String text;
+
+                ThiefBar(ConfigurationSection s) {
+                    if (s == null) {
+                        enabled = true;
+                        color = BarColor.RED;
+                        style = BarStyle.SOLID;
+                        text = "&cВремя нахождения на территории: &f{time}";
+                        return;
+                    }
+                    enabled = s.getBoolean("enabled", true);
+                    BarColor c;
+                    try {
+                        c = BarColor.valueOf(s.getString("color", "RED"));
+                    } catch (IllegalArgumentException e) {
+                        c = BarColor.RED;
+                    }
+                    color = c;
+                    BarStyle st;
+                    try {
+                        st = BarStyle.valueOf(s.getString("style", "SOLID"));
+                    } catch (IllegalArgumentException e) {
+                        st = BarStyle.SOLID;
+                    }
+                    style = st;
+                    text = s.getString("text", "&cВремя нахождения на территории: &f{time}");
+                }
             }
         }
 

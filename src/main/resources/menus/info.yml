@@ -47,13 +47,13 @@ Menus:
         name: "&fТерритория: &b{region}"
         lore:
           - "&7Мир: &f{world}"
-          - "&7Тип: &f{type}"
-          - "&7Статус: &a{status}"
+          - "&7Ваша роль: &aВладелец"
+          #- "&7Тип: &f{type}"
+          #- "&7Статус: &a{status}"
           - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
           - "&7Приоритет: &f{priority}"
-          - "&7Ваша роль: &aВладелец"
           - "&7Ваших территорий: &f{my-regions}&7/&f{max-regions}"
-          - "&7Максимум блоков выделения: &f{max-blocks}"
+          - "&7Доступно в области: &f{max-blocks}"
       "people":
         slot: 11
         material: PLAYER_HEAD
@@ -76,7 +76,7 @@ Menus:
         material: PLAYER_HEAD
         name: "&eИгроки"
         lore:
-          - "&7Управление участниками и владельцами"
+          - "&7Управление участниками"
         commands:
           - "@menu:players"
       "teleport":
@@ -101,7 +101,7 @@ Menus:
         material: GOLD_INGOT
         name: "&eРынок"
         lore:
-          - "&7Продать территорию или сдать в аренду"
+          - "&7Приобрести территорию"
         permission: qqregions.market
         commands:
           - "@menu:market"

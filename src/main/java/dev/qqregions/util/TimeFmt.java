@@ -50,4 +50,48 @@ public final class TimeFmt {
         }
         parts.add(plugin.lang().get(key).replace("{n}", String.valueOf(n)));
     }
+
+    /**
+     * Компактный таймер (обратный отсчёт, секунды) для боссбаров/механик.
+     * Отличается от {@link #format}: показывает только старшие ненулевые единицы
+     * (две, если включено time-format.units: TWO, иначе одну) и пуст при 0:
+     * месяц(30д)→дни, →часы, →минуты, →секунды, < 1 сек — пусто.
+     * Единицы и разделитель — те же, что у {@link #format} (lang.yml menu.time-*).
+     */
+    public String timer(long seconds) {
+        if (seconds <= 0) {
+            return "";
+        }
+        long[] units = {2_592_000L, 86_400L, 3_600L, 60L, 1L};
+        String[] keys = {"menu.time-month", "menu.time-day", "menu.time-hour", "menu.time-min", "menu.time-sec"};
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        int first = -1;
+        for (int i = 0; i < units.length; i++) {
+            if (seconds >= units[i]) {
+                first = i;
+                break;
+            }
+        }
+        if (first < 0) {
+            first = units.length - 1;
+        }
+        add(parts, seconds / units[first], keys[first]);
+        if (plugin.config().timeFmtTwoUnits() && first + 1 < units.length) {
+            long rest = (seconds % units[first]) / units[first + 1];
+            if (rest > 0) {
+                add(parts, rest, keys[first + 1]);
+            }
+        }
+        if (parts.isEmpty()) {
+            return "";
+        }
+        return String.join(plugin.lang().get("menu.time-join"), parts);
+    }
+
+    private void add(java.util.List<String> parts, long n, String key) {
+        if (n <= 0) {
+            return;
+        }
+        parts.add(plugin.lang().get(key).replace("{n}", String.valueOf(n)));
+    }
 }
