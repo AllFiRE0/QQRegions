@@ -177,17 +177,12 @@ public final class ShopManager {
         }
         return null;
     }
-
-    public List<ShopProduct> products(String kind) {
-        String section = switch (kind == null ? "" : kind.toLowerCase(Locale.ROOT)) {
-            case "area" -> "area-packs";
-            case "region" -> "region-packs";
-            case "custom" -> "custom-items";
-            default -> null;
-        };
+public List<ShopProduct> products(String kind) {
+        String section = section(kind);
         if (section == null) {
             return List.of();
         }
+
         List<ShopProduct> out = new ArrayList<>();
         ConfigurationSection sc = shop.getConfigurationSection(section);
         if (sc == null) {
@@ -197,6 +192,22 @@ public final class ShopManager {
             out.add(readProduct(section, id));
         }
         return out;
+    }
+
+    /** Секция shop.yml для типа товара (area/region/custom), null — нет такого. */
+    private static String section(String kind) {
+        return switch (kind == null ? "" : kind.toLowerCase(Locale.ROOT)) {
+            case "area" -> "area-packs";
+            case "region" -> "region-packs";
+            case "custom" -> "custom-items";
+            default -> null;
+        };
+    }
+
+    /** Секция shop.yml для типа товара (для сообщений в логе). */
+    private static String productsSection(String kind) {
+        String s = section(kind);
+        return s == null ? "<bad-kind>" : s;
     }
 
     private ShopProduct readProduct(String section, String id) {
@@ -308,6 +319,8 @@ public final class ShopManager {
     public String buyFlag(UUID uuid, String flagId) {
         String key = flagId == null ? "" : flagId.toLowerCase(Locale.ROOT);
         if (key.isEmpty() || plugin.wg().flag(key) == null) {
+            plugin.getLogger().warning("shop-buy: FLAG не найден в реестре WG: \""
+                    + flagId + "\" (в меню кнопка, но флага нет у WorldGuard)");
             return "not-found";
         }
         if (!economyEnabled()) {
@@ -318,6 +331,8 @@ public final class ShopManager {
         }
         double price = priceOf(key);
         if (price <= 0) {
+            plugin.getLogger().warning("shop-buy: FLAG \"" + key
+                    + "\" не продаётся: цена " + price + " (нет в shop.yml flags.prices / 0)");
             return "not-found";
         }
         if (!plugin.market().economy().has(uuid, price)) {
@@ -341,12 +356,17 @@ public final class ShopManager {
     public String buyProduct(UUID uuid, String kind, String id) {
         ShopProduct p = product(kind, id);
         if (p == null) {
+            plugin.getLogger().warning("shop-buy: PACK kind=" + kind + " id=\"" + id
+                    + "\" НЕ найден в shop.yml (секция " + productsSection(kind) + ") — "
+                    + "кнопка устарела или товар удалён из конфига");
             return "not-found";
         }
         if (!economyEnabled()) {
             return "no-economy";
         }
         if (p.price() <= 0) {
+            plugin.getLogger().warning("shop-buy: PACK \"" + p.id() + "\" (kind=" + kind
+                    + ") не продаётся: цена " + p.price() + " (нет price: в shop.yml или 0)");
             return "not-found";
         }
         int count = purchasedCount(uuid, p.kind(), p.id());

@@ -2460,6 +2460,11 @@ public class MenuManager implements Listener {
                 }
                 continue;
             }
+            // Товар без цены (нет price: в shop.yml или 0) НЕ продаётся:
+            // не выводим кнопку (иначе клик даст shop.not-found).
+            if (p.price() <= 0) {
+                continue;
+            }
             Map<String, String> pc = bakePackCtx(ctx, p);
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
