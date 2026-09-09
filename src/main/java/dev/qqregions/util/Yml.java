@@ -11,6 +11,14 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Утилиты конфигов: автоматическое обновление файлов плагина (config.yml,
@@ -109,5 +117,118 @@ public final class Yml {
                 cfg.set(key, defs.get(key));
             }
         }
+    }
+
+    // ---------- сохранение с переносом комментариев ----------
+
+    private static final Pattern KEY_LINE =
+            Pattern.compile("^(\\s*)([A-Za-z0-9_.\\-]+)\\s*:.*$");
+
+    /** Сохранить конфиг, перенеся комментарии из старой версии файла на те же
+     *  ключи (новые ключи пишутся без комментариев). Нужен там, где файл может
+     *  переписываться (добавление новых ключей при обновлении) — чтобы не
+     *  сбрасывать комментарии разработчика сервера. */
+    public static void savePreserving(File file, FileConfiguration cfg) throws IOException {
+        String nv = cfg.saveToString();
+        if (!file.exists()) {
+            Files.write(file.toPath(), nv.getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        String old = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+        Files.write(file.toPath(), preserveComments(old, nv).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Ключ строки (маппинг) из дампа: только строки вида " indent key:".
+     *  Списки ("- ...") и прочее игнорируются — их строки проходят как есть. */
+    private static boolean parseKeyLine(String line, List<String> keys, List<Integer> inds) {
+        Matcher m = KEY_LINE.matcher(line);
+        if (!m.matches()) {
+            return false;
+        }
+        int indent = m.group(1).length();
+        while (!inds.isEmpty() && inds.get(inds.size() - 1) >= indent) {
+            inds.remove(inds.size() - 1);
+            keys.remove(keys.size() - 1);
+        }
+        String key = m.group(2);
+        keys.add(key);
+        inds.add(indent);
+        return true;
+    }
+
+    /** Дот-путь строго текущего ключа (keys уже содержит его):
+     *  например ["select", "interactive-help"] -> "select.interactive-help". */
+    private static String pathOf(List<String> keys) {
+        if (keys.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < keys.size(); i++) {
+            if (i > 0) {
+                sb.append('.');
+            }
+            sb.append(keys.get(i));
+        }
+        return sb.toString();
+    }
+
+    /** Старые комментарии по ключам: ключ -> строки-комментарии (как в файле,
+     *  с оригинальными отступами), стоящие НЕПОСРЕДСТВЕННО над этим ключом. */
+    private static Map<String, List<String>> collectComments(String old) {
+        Map<String, List<String>> out = new HashMap<>();
+        List<String> keys = new ArrayList<>();
+        List<Integer> inds = new ArrayList<>();
+        List<String> pending = new ArrayList<>();
+        for (String line : old.split("\n", -1)) {
+            String t = line.trim();
+            if (t.startsWith("#")) {
+                pending.add(line);
+                continue;
+            }
+            if (t.startsWith("-")) {
+                continue;
+            }
+            if (!parseKeyLine(line, keys, inds)) {
+                continue;
+            }
+            if (!pending.isEmpty()) {
+                String path = pathOf(keys);
+                out.putIfAbsent(path, new ArrayList<>());
+                out.get(path).addAll(pending);
+            }
+            pending.clear();
+        }
+        return out;
+    }
+
+    /** Перекинуть сохранённые комментарии в новый дамп по совпадающим ключам. */
+    private static String preserveComments(String old, String nv) {
+        Map<String, List<String>> comments = collectComments(old);
+        if (comments.isEmpty()) {
+            return nv;
+        }
+        Set<String> placed = new HashSet<>();
+        StringBuilder out = new StringBuilder(nv.length() + 512);
+        List<String> keys = new ArrayList<>();
+        List<Integer> inds = new ArrayList<>();
+        for (String line : nv.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("-") || !parseKeyLine(line, keys, inds)) {
+                out.append(line).append('\n');
+                continue;
+            }
+            String path = pathOf(keys);
+            if (!placed.contains(path)) {
+                placed.add(path);
+                List<String> cs = comments.get(path);
+                if (cs != null) {
+                    for (String c : cs) {
+                        out.append(c).append('\n');
+                    }
+                }
+            }
+            out.append(line).append('\n');
+        }
+        return out.toString();
     }
 }

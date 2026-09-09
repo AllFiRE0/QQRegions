@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,8 +31,11 @@ public class Lang {
 
     private final QQRegions plugin;
     private FileConfiguration cfg;
-    /** Встроенные переводы из jar — опора для пустых/битых значений файла. */
+    /** Встроенные переводы из jar — опора для отсутствующих ключей файла. */
     private FileConfiguration defs;
+    /** Ключи, реально присутствующие в файле игрока: '' в файле = «выключено»,
+     *  и не подменяется дефолтом. Заполняется ДО наложения defaults на cfg. */
+    private Set<String> fileKeys;
     /** Активные задачи экшнбаров (уникальный UUID игрока). */
     private final Map<UUID, Integer> actionbarTasks = new HashMap<>();
 
@@ -68,27 +72,18 @@ public class Lang {
             // сообщения не были пустыми; файл игрока не перезаписываем.
             cfg = defsLocal(defs);
             this.defs = defs;
+            this.fileKeys = new java.util.HashSet<>();
             return;
         }
+        // Снапшот ключей ДО наложения дефолтов: пустое значение в файле
+        // остаётся пустым ('' = выключено), к отсутствующим подтянутся дефолты.
+        this.fileKeys = new java.util.HashSet<>(loaded.getKeys(true));
         cfg = loaded;
         cfg.setDefaults(defs);
         cfg.options().copyDefaults(true);
-        // Лечим пустые значения: если в файле игрока строка пустая, а во
-        // встроенном переводе не пустая — восстанавливаем (иначе в чате
-        // оставался бы только префикс [QQRegions]).
-        for (String key : defs.getKeys(true)) {
-            if (!defs.isString(key)) {
-                continue;
-            }
-            String dv = defs.getString(key, "");
-            if (dv.isEmpty()) {
-                continue;
-            }
-            String own = cfg.getString(key, null);
-            if (own == null || own.isEmpty()) {
-                cfg.set(key, dv);
-            }
-        }
+        // НЕ восстанавливаем дефолты для пустых значений игрока: '' в lang.yml
+        // означает «сообщение выключено» (и не перезаписывается при релоаде).
+        // Отсутствующие ключи и так подтягиваются из дефолтов (copyDefaults).
         // Списки (lore кнопок и пр.): отсутствующие у игрока — из дефолтов.
         for (String key : defs.getKeys(true)) {
             if (!defs.isList(key)) {
@@ -98,16 +93,29 @@ public class Lang {
                 cfg.set(key, defs.getList(key));
             }
         }
-        // Авто-обновление: проставляем актуальную версию lang.yml (новые
-        // переводы уже подтянулись через defaults выше; пользовательские
-        // непустые значения сохраняются).
+        // Сохраняем ТОЛЬКО если реально что-то изменилось (появились новые
+        // ключи из jar / поднялся config-version): иначе файл игрока — вместе
+        // с его комментариями — на релоаде НЕ трогаем. Перезапись идёт через
+        // savePreserving, переносящий комментарии разработчика сервера.
         int jarVer = dev.qqregions.util.Yml.version(defs);
-        if (jarVer > 0 && dev.qqregions.util.Yml.version(loaded) < jarVer) {
+        this.defs = defs;
+        boolean changed = jarVer > 0 && dev.qqregions.util.Yml.version(loaded) < jarVer;
+        if (!changed) {
+            for (String key : defs.getKeys(true)) {
+                if (!fileKeys.contains(key)) {
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        if (jarVer > 0) {
             cfg.set(dev.qqregions.util.Yml.VERSION_KEY, jarVer);
         }
-        this.defs = defs;
         try {
-            cfg.save(file);
+            dev.qqregions.util.Yml.savePreserving(file, cfg);
         } catch (IOException e) {
             plugin.getLogger().warning("Не удалось сохранить lang.yml: " + e.getMessage());
         }
@@ -123,17 +131,17 @@ public class Lang {
     }
 
     public String get(String key) {
-        String v = cfg.getString(key);
-        if (v == null || v.isEmpty()) {
-            // Файл игрока пуст/сломан — подстраховываемся встроенным переводом.
-            if (defs != null) {
-                String d = defs.getString(key, "");
-                if (!d.isEmpty()) {
-                    return d;
-                }
-            }
-            plugin.dbg("no lang value for '" + key + "'");
+        if (fileKeys != null && fileKeys.contains(key)) {
+            // Ключ есть в файле игрока: '' = «выключено» (не подменяем дефолтом);
+            // значение возвращается как есть.
+            String v = cfg.getString(key);
+            return v == null ? "" : v;
         }
+        // Ключ отсутствует в файле игрока — дефолт из jar ('' если и его нет).
+        if (defs != null && defs.isString(key)) {
+            return defs.getString(key, "");
+        }
+        String v = cfg.getString(key);
         return v == null ? "" : v;
     }
 
@@ -191,7 +199,25 @@ public class Lang {
             sendActionbar(p, m.group(2), parseIntSafe(m.group(1)));
             return;
         }
+        if (msg.isBlank()) {
+            // '' = выключено: ничего не выводим (даже пустую строку с префиксом).
+            return;
+        }
         p.sendMessage(compPrefixed(key, kv));
+    }
+
+    /** Префиксная отправка для консоли/командного отправителя: без actionbar
+     *  (он только у Player), но с той же семантикой '' = выключено. */
+    public void send(CommandSender sender, String key, String... kv) {
+        if (sender instanceof Player p) {
+            send(p, key, kv);
+            return;
+        }
+        String msg = fmt(key, kv);
+        if (msg == null || msg.isBlank()) {
+            return;
+        }
+        sender.sendMessage(Msg.color(get("prefix") + msg));
     }
 
     /**
@@ -211,7 +237,11 @@ public class Lang {
             dispatch(p, fmt(key, kv));
             return;
         }
-        sender.sendMessage(Msg.color(fmt(key, kv)));
+        String msg = fmt(key, kv);
+        if (msg == null || msg.isBlank()) {
+            return;
+        }
+        sender.sendMessage(Msg.color(msg));
     }
 
     /**
@@ -220,13 +250,17 @@ public class Lang {
      * Для текстов, которые собираются в другом месте (например, RaidManager).
      */
     public void sendRaw(Player p, String text) {
-        if (text == null) {
+        if (text == null || text.isBlank()) {
             return;
         }
         dispatch(p, text);
     }
 
     private void dispatch(Player p, String text) {
+        if (text == null || text.isBlank()) {
+            // '' = выключено: не выводим даже пустую строку.
+            return;
+        }
         Matcher m = ACTIONBAR_PREFIX.matcher(text);
         if (m.matches()) {
             sendActionbar(p, m.group(2), parseIntSafe(m.group(1)));
@@ -262,8 +296,11 @@ public class Lang {
         }
     }
 
-    /** Экшнбар, обновляемый в течение N секунд (раз в 20 тиков). */
+    /** Экшнбар, обновляемый в течение N секунд (раз в 20 тиков). '' = выключено. */
     public void sendActionbar(Player p, String raw, int seconds) {
+        if (raw == null || raw.isBlank()) {
+            return;
+        }
         UUID id = p.getUniqueId();
         Integer prev = actionbarTasks.remove(id);
         if (prev != null) {

@@ -6,7 +6,6 @@ import dev.qqregions.config.Lang;
 import dev.qqregions.config.SelectionTemplate;
 import dev.qqregions.selection.Selection;
 import dev.qqregions.wg.RegionException;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
@@ -930,11 +929,7 @@ public class RegionCommand {
     }
 
     private void lang(CommandSender sender, String key, String... kv) {
-        if (sender instanceof Player p) {
-            plugin.lang().send(p, key, kv);
-        } else {
-            sender.sendMessage(plugin.lang().compPrefixed(key, kv));
-        }
+        plugin.lang().send(sender, key, kv);
     }
 
     static String fmt(long v) {
