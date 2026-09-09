@@ -7,356 +7,332 @@
 
 config-version: 7
 
-prefix: '&8[&bQQRegions&8] '
+prefix: "&8[&bQQRegions&8] "
 
 general:
-  only-player: '&cЭта команда доступна только игрокам.'
-  no-permission: '&cУ вас недостаточно прав.'
-  reloaded: '&aКонфигурация перезагружена.'
-  reloaded-summary: '&7Алиасы: &f{aliases}'
-  reload-failed: '&cНе удалось перезагрузить конфигурацию: &7{error}'
-  disabled-world: '&cПлагин отключён в этом мире.'
-  player-not-found: '&cИгрок &7{player} &cне найден.'
-  unknown-subcommand: '&cНеизвестная подкоманда. Введите &7/{alias} help'
-  usage: '&7Использование: &f/{usage}'
+  only-player: "&cЭта команда доступна только игрокам."
+  no-permission: "&cУ вас недостаточно прав."
+  reloaded: "&aКонфигурация перезагружена."
+  reloaded-summary: "&7Алиасы: &f{aliases}"
+  reload-failed: "&cНе удалось перезагрузить конфигурацию: &7{error}"
+  disabled-world: "&cПлагин отключён в этом мире."
+  player-not-found: "&cИгрок &7{player} &cне найден."
+  unknown-subcommand: "&cНеизвестная подкоманда. Введите &7/{alias} help"
+  usage: "&7Использование: &f/{usage}"
 
 # Шаблоны синтаксиса команд (подставляются в general.usage после имени команды).
 usage:
-  create: create <название>
-  add: add [member|owner] <ник> [регион]
-  remove: remove [member|owner] <ник> [регион]
-  sell: sell [ник] <сумма> [регион]
-  sell-target: sell <ник> <сумма> [регион]
-  rent: rent [ник] <сумма> <время> [регион]
-  rent-target: rent <ник> <сумма> <время> [регион]
-  rent-public: rent <сумма> <время> [регион]
-  select-expand: select expand [сторона] <количество>
-  select-outset: select outset <количество> [h|v|horizontal|vertical]
-  select-view: select view <ник>|off
+  create: "create <название>"
+  add: "add [member|owner] <ник> [регион]"
+  remove: "remove [member|owner] <ник> [регион]"
+  sell: "sell [ник] <сумма> [регион]"
+  sell-target: "sell <ник> <сумма> [регион]"
+  rent: "rent [ник] <сумма> <время> [регион]"
+  rent-target: "rent <ник> <сумма> <время> [регион]"
+  rent-public: "rent <сумма> <время> [регион]"
+  select-expand: "select expand [сторона] <количество>"
+  select-outset: "select outset <количество> [h|v|horizontal|vertical]"
+  select-view: "select view <ник>|off"
 
 select:
-  point-1: точка 1
-  point-2: точка 2
-  pos-set: '&a{point} &aустановлена: &7({x}, {y}, {z})'
-  reset: '&eВыделение сброшено.'
-  cleared: '&7Выделение очищено.'
-  none: '&cСначала выделите область.'
-  max-built: '&aВыделение расширено до максимума: &7{blocks} &aблоков.'
-  chunk-built: '&aВыделено &7{chunks} &aчанков (&7{blocks} &aблоков).'
-  chunk-over: '&cДоступно максимум &7{chunks} &cчанков.'
-  expanded: '&aОбласть расширена: &7{blocks} &aблоков.'
-  outset: '&aОбласть расширена во все стороны: &7{blocks} &aблоков.'
-  over-limit: '&cПревышен лимит блоков (&7{current}&c/&7{max}&c).'
-  below-min: '&cОбласть меньше минимального размера (&7{current}&c/&7{min}&c).'
-  point-locked: '&cТочка упёрлась в ограничения.'
-  invalid-amount: '&cНекорректное количество: &7{amount}'
-  invalid-side: '&cНекорректная сторона: &7{side} &c(&7north, south, east, west, up,
-    down&c).'
-  interactive-on: '&aРежим выделения включён.'
-  interactive-help: '&7ПКМ/ЛКМ кнопкой — действие (&aсоздать&7, &8точка 1&7, &6точка
-    2&7, &eвыделить&7, &6сброс&7, &cотмена&7). Хотбар свободен, слоты кнопок настраиваются
-    в config.yml.'
-  interactive-off: '&7Режим выделения выключен.'
-  interactive-select-mode: '&aВыберите &7{point} &aс помощью колеса мыши.'
-  interactive-on-fail: '&cНе удалось сохранить инвентарь — сессия выделения не запущена.'
-  inventory-restored: '&aИнвентарь восстановлен после аварийного выхода из сессии
-    выделения.'
-  command-blocked: '&cКоманда &7{cmd}&c заблокирована во время сессии выделения.'
-  point-pane-1: <gradient:#8f8f8f:#ffffff>Выберите область 1</gradient>
-  point-pane-2: <gradient:#ffa500:#ffff00>Выберите область 2</gradient>
-  confirmed: '&aВыбрано &7{blocks} &aблоков.'
-  conflict: '&eВнимание: выделение пересекает регион &7{region}&e.'
-  button-create: <gradient:#00ff41:#007a1f>Создать регион</gradient>
+  point-1: "точка 1"
+  point-2: "точка 2"
+  pos-set: "&a{point} &aустановлена: &7({x}, {y}, {z})"
+  reset: "&eВыделение сброшено."
+  cleared: "&7Выделение очищено."
+  none: "&cСначала выделите область."
+  max-built: "&aВыделение расширено до максимума: &7{blocks} &aблоков."
+  chunk-built: "&aВыделено &7{chunks} &aчанков (&7{blocks} &aблоков)."
+  chunk-over: "&cДоступно максимум &7{chunks} &cчанков."
+  expanded: "&aОбласть расширена: &7{blocks} &aблоков."
+  outset: "&aОбласть расширена во все стороны: &7{blocks} &aблоков."
+  over-limit: "&cПревышен лимит блоков (&7{current}&c/&7{max}&c)."
+  below-min: "&cОбласть меньше минимального размера (&7{current}&c/&7{min}&c)."
+  point-locked: "&cТочка упёрлась в ограничения."
+  invalid-amount: "&cНекорректное количество: &7{amount}"
+  invalid-side: "&cНекорректная сторона: &7{side} &c(&7north, south, east, west, up, down&c)."
+  interactive-on: "&aРежим выделения включён."
+  interactive-help: "&7ПКМ/ЛКМ кнопкой — действие (&aсоздать&7, &8точка 1&7, &6точка 2&7, &eвыделить&7, &6сброс&7, &cотмена&7). Хотбар свободен, слоты кнопок настраиваются в config.yml."
+  interactive-off: "&7Режим выделения выключен."
+  interactive-select-mode: "&aРежим выделения области. Активная точка: &7{point}&a. ЛКМ пустой рукой — сменить точку, ЛКМ+Шифт — подтвердить, колесо или клавиши &f4/6&a — двигать точку."
+  interactive-on-fail: "&cНе удалось сохранить инвентарь — сессия выделения не запущена."
+  inventory-restored: "&aИнвентарь восстановлен после аварийного выхода из сессии выделения."
+  command-blocked: "&cКоманда &7{cmd}&c заблокирована во время сессии выделения."
+  point-pane-1: "<gradient:#8f8f8f:#ffffff>Выберите область 1</gradient>"
+  point-pane-2: "<gradient:#ffa500:#ffff00>Выберите область 2</gradient>"
+  confirmed: "&aВыделение подтверждено: &7{blocks} &aблоков. Кнопки возвращены."
+  conflict: "&eВнимание: выделение пересекает регион &7{region}&e."
+  button-create: "<gradient:#00ff41:#007a1f>Создать регион</gradient>"
   button-create-lore:
-  - '&7Создать регион из текущего выделения.'
-  - ''
-  - '#FF5555Требуется выделенная область'
-  - '#FF5555(см. кнопку «Выделить область»)'
-  - ''
-  - '&fПравила имени:'
-  - '&7латиница/кириллица, цифры, &f_&7 и &f-&7,'
-  - '&7от &f3&7 до &f32&7 символов.'
-  - ''
-  - '&7ЛКМ/ПКМ кнопкой в руке — начать ввод имени в чат.'
-  button-point-1: <gradient:#555555:#9e9e9e>Точка 1</gradient>
+    - "&7Создать регион из текущего выделения."
+    - ""
+    - "#FF5555Требуется выделенная область"
+    - "#FF5555(см. кнопку «Выделить область»)"
+    - ""
+    - "&fПравила имени:"
+    - "&7латиница/кириллица, цифры, &f_&7 и &f-&7,"
+    - "&7от &f3&7 до &f32&7 символов."
+    - ""
+    - "&7ЛКМ/ПКМ кнопкой в руке — начать ввод имени в чат."
+  button-point-1: "<gradient:#555555:#9e9e9e>Точка 1</gradient>"
   button-point-1-lore:
-  - '&7Установить &8первую точку&7 выделения.'
-  - ''
-  - '&7Кнопка берёт блок по прицелу'
-  - '&7(до &f300&7 блоков), иначе —'
-  - '&7позицию игрока.'
-  - ''
-  - '&7ЛКМ/ПКМ кнопкой в руке — установить.'
-  button-point-2: <gradient:#ffa500:#ffcc00>Точка 2</gradient>
+    - "&7Установить &8первую точку&7 выделения."
+    - ""
+    - "&7Кнопка берёт блок по прицелу"
+    - "&7(до &f300&7 блоков), иначе —"
+    - "&7позицию игрока."
+    - ""
+    - "&7ЛКМ/ПКМ кнопкой в руке — установить."
+  button-point-2: "<gradient:#ffa500:#ffcc00>Точка 2</gradient>"
   button-point-2-lore:
-  - '&7Установить &6вторую точку&7 выделения.'
-  - ''
-  - '&7Кнопка берёт блок по прицелу'
-  - '&7(до &f300&7 блоков), иначе —'
-  - '&7позицию игрока.'
-  - ''
-  - '&7ЛКМ/ПКМ кнопкой в руке — установить.'
-  button-select: <gradient:#ffe600:#ffb300>Выделить область</gradient>
+    - "&7Установить &6вторую точку&7 выделения."
+    - ""
+    - "&7Кнопка берёт блок по прицелу"
+    - "&7(до &f300&7 блоков), иначе —"
+    - "&7позицию игрока."
+    - ""
+    - "&7ЛКМ/ПКМ кнопкой в руке — установить."
+  button-select: "<gradient:#ffe600:#ffb300>Выделить область</gradient>"
   button-select-lore:
-  - '&7Войти в режим выделения области.'
-  - ''
-  - '&7Управление &eSCM&7:'
-  - '&7колесо мыши или клавиши &f4/6&7 —'
-  - '&7двигать активную точку по взгляду.'
-  - '&7ЛКМ пустой рукой — сменить точку,'
-  - '&7ЛКМ + &fShift&7 — подтвердить.'
-  - ''
-  - '&7Точка 1 и точка 2 задают границы'
-  - '&7прямоугольной области.'
-  button-reset: <gradient:#ffa500:#ff6a00>Сброс выделения</gradient>
+    - "&7Войти в режим выделения области."
+    - ""
+    - "&7Управление &eSCM&7:"
+    - "&7колесо мыши или клавиши &f4/6&7 —"
+    - "&7двигать активную точку по взгляду."
+    - "&7ЛКМ пустой рукой — сменить точку,"
+    - "&7ЛКМ + &fShift&7 — подтвердить."
+    - ""
+    - "&7Точка 1 и точка 2 задают границы"
+    - "&7прямоугольной области."
+  button-reset: "<gradient:#ffa500:#ff6a00>Сброс выделения</gradient>"
   button-reset-lore:
-  - '&7Сбросить выделение к нулю.'
-  - ''
-  - '&7ЛКМ/ПКМ кнопкой в руке — сбросить.'
-  button-cancel: <gradient:#ff5555:#ff0000>Отмена</gradient>
+    - "&7Сбросить выделение к нулю."
+    - ""
+    - "&7ЛКМ/ПКМ кнопкой в руке — сбросить."
+  button-cancel: "<gradient:#ff5555:#ff0000>Отмена</gradient>"
   button-cancel-lore:
-  - '&7Выйти из режима выделения'
-  - '&7и вернуть инвентарь.'
-  - ''
-  - '&7ЛКМ/ПКМ кнопкой в руке — выйти.'
+    - "&7Выйти из режима выделения"
+    - "&7и вернуть инвентарь."
+    - ""
+    - "&7ЛКМ/ПКМ кнопкой в руке — выйти."
   point-pane-1-lore:
-  - '&8Активная точка &71&8.'
-  - ''
-  - '&7ЛКМ пустой рукой — сменить на &6точку 2&7.'
-  - '&7Колесо / клавиши &f4&7 и &f6&7 — двигать.'
+    - "&8Активная точка &71&8."
+    - ""
+    - "&7ЛКМ пустой рукой — сменить на &6точку 2&7."
+    - "&7Колесо / клавиши &f4&7 и &f6&7 — двигать."
   point-pane-2-lore:
-  - '&6Активная точка &62&6.'
-  - ''
-  - '&7ЛКМ пустой рукой — сменить на &8точку 1&7.'
-  - '&7Колесо / клавиши &f4&7 и &f6&7 — двигать.'
-  view-set: '&aПросмотр выделения игрока &f{target} &aвключён. ЛКМ/ПКМ — сменить точку,
-    колесо — двигать.'
-  view-offline: '&cИгрок &f{target} &cне в сети.'
-  view-self: '&cНельзя просматривать собственное выделение.'
-  view-no-selection: '&cУ игрока &f{target} &cнет активного выделения.'
-  view-off: '&7Просмотр выделения игрока выключен.'
+    - "&6Активная точка &62&6."
+    - ""
+    - "&7ЛКМ пустой рукой — сменить на &8точку 1&7."
+    - "&7Колесо / клавиши &f4&7 и &f6&7 — двигать."
+  view-set: "&aПросмотр выделения игрока &f{target} &aвключён. ЛКМ/ПКМ — сменить точку, колесо — двигать."
+  view-offline: "&cИгрок &f{target} &cне в сети."
+  view-self: "&cНельзя просматривать собственное выделение."
+  view-no-selection: "&cУ игрока &f{target} &cнет активного выделения."
+  view-off: "&7Просмотр выделения игрока выключен."
 
 create:
-  prompt: '&aВведите название региона в чат (&7cancel&a — отмена, выделение сохранится):'
-  cancelled: '&7Ввод названия отменён.'
-  invalid-name: '&cНедопустимое название региона. Допустимо: &7{regex}'
-  invalid-id: '&cНазвание региона содержит недопустимые символы. WorldGuard разрешает:
-    &7{charset}&c. Буквы — только латиница.'
-  ok: '&aРегион &7{region} &aсоздан в мире &7{world}&a. (&7{blocks} &aблоков)'
-  already-exists: '&cРегион &7{region} &cуже существует.'
-  fail: '&cНе удалось создать регион: &7{error}'
-  none: '&cСначала выделите область (см. &7/{alias} help&c).'
-  banned: '&cС регионом &7{region} &cработать запрещено.'
-  region-limit: '&cДостигнут лимит регионов: &f{max}&c. Доп. слоты — в меню рынка
-    (&f/region market&c).'
+  prompt: "&aВведите название региона в чат (&7cancel&a — отмена, выделение сохранится):"
+  cancelled: "&7Ввод названия отменён."
+  invalid-name: "&cНедопустимое название региона. Допустимо: &7{regex}"
+  invalid-id: "&cНазвание региона содержит недопустимые символы. WorldGuard разрешает: &7{charset}&c. Буквы — только латиница."
+  ok: "&aРегион &7{region} &aсоздан в мире &7{world}&a. (&7{blocks} &aблоков)"
+  already-exists: "&cРегион &7{region} &cуже существует."
+  fail: "&cНе удалось создать регион: &7{error}"
+  none: "&cСначала выделите область (см. &7/{alias} help&c)."
+  banned: "&cС регионом &7{region} &cработать запрещено."
+  region-limit: "&cДостигнут лимит регионов: &f{max}&c. Доп. слоты — в меню рынка (&f/region market&c)."
   cancel-words:
-  - cancel
-  - отмена
+    - "cancel"
+    - "отмена"
 
 delete:
-  ok: '&aРегион &7{region} &aудалён.'
-  not-owner: '&cВы не являетесь владельцем этого региона.'
-  not-found: '&cРегион &7{region} &cне найден.'
-  none: '&cРегион не найден: вы не в регионе и название не указано.'
-  fail: '&cНе удалось удалить регион: &7{error}'
+  ok: "&aРегион &7{region} &aудалён."
+  not-owner: "&cВы не являетесь владельцем этого региона."
+  not-found: "&cРегион &7{region} &cне найден."
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  fail: "&cНе удалось удалить регион: &7{error}"
 
 add:
-  ok-member: '&aИгрок &7{target} &aдобавлен в участники региона &7{region}&a.'
-  ok-owner: '&aИгрок &7{target} &aдобавлен во владельцы региона &7{region}&a.'
-  already: '&eИгрок &7{target} &eуже является &7{role}&e.'
-  not-allowed: '&cВы не можете редактировать регион &7{region}&c.'
+  ok-member: "&aИгрок &7{target} &aдобавлен в участники региона &7{region}&a."
+  ok-owner: "&aИгрок &7{target} &aдобавлен во владельцы региона &7{region}&a."
+  already: "&eИгрок &7{target} &eуже является &7{role}&e."
+  not-allowed: "&cВы не можете редактировать регион &7{region}&c."
 
 remove:
-  ok-member: '&aИгрок &7{target} &aудалён из участников региона &7{region}&a.'
-  ok-owner: '&aИгрок &7{target} &aудалён из владельцев региона &7{region}&a.'
-  not-in: '&cИгрок &7{target} &cне является &7{role}&c.'
-  last-owner: '&cНельзя удалить последнего владельца региона.'
-  not-allowed: '&cВы не можете редактировать регион &7{region}&c.'
+  ok-member: "&aИгрок &7{target} &aудалён из участников региона &7{region}&a."
+  ok-owner: "&aИгрок &7{target} &aудалён из владельцев региона &7{region}&a."
+  not-in: "&cИгрок &7{target} &cне является &7{role}&c."
+  last-owner: "&cНельзя удалить последнего владельца региона."
+  not-allowed: "&cВы не можете редактировать регион &7{region}&c."
 
 info:
-  title: '&8================[ &b{region} &8]================'
-  none: '&cРегион не найден: вы не в регионе и название не указано.'
-  world: '&7Мир: &f{world}'
-  type: '&7Тип: &f{type}'
-  owners: '&7Владельцы: &f{owners}'
-  members: '&7Участники: &f{members}'
-  area: '&7Площадь: &f{area} &7блоков | Объём: &f{volume}'
-  priority: '&7Приоритет: &f{priority}'
-  flags-title: '&7Флаги:'
-  flags-line: '  &7{flag}&8: &f{value}'
-  flags-none: '&7  нет'
-  menu-disabled: '&cИнформационное меню не настроено (файл &7menus/info.yml&c).'
+  title: "&8================[ &b{region} &8]================"
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  world: "&7Мир: &f{world}"
+  type: "&7Тип: &f{type}"
+  owners: "&7Владельцы: &f{owners}"
+  members: "&7Участники: &f{members}"
+  area: "&7Площадь: &f{area} &7блоков | Объём: &f{volume}"
+  priority: "&7Приоритет: &f{priority}"
+  flags-title: "&7Флаги:"
+  flags-line: "  &7{flag}&8: &f{value}"
+  flags-none: "&7  нет"
+  menu-disabled: "&cИнформационное меню не настроено (файл &7menus/info.yml&c)."
 
 flags:
-  not-owner: '&cВы не являетесь владельцем этого региона.'
-  menu-disabled: '&cМеню флагов не настроено (файл &7menus/flags.yml&c).'
+  not-owner: "&cВы не являетесь владельцем этого региона."
+  menu-disabled: "&cМеню флагов не настроено (файл &7menus/flags.yml&c)."
 
 members:
-  owner: владельцем
-  member: участником
+  owner: "владельцем"
+  member: "участником"
 
 visible:
-  disabled: '&cПодсветка регионов отключена в конфиге (highlight.enabled: false).'
-  none: '&cРегион не найден: вы не в регионе и название не указано.'
-  shown: '&aПодсветка региона &7{region} &aвключена (&7{type}&a, {seconds} с).'
-  hidden: '&7Подсветка региона &7{region} &aвыключена.'
-  hidden-all: '&7Все подсветки регионов скрыты.'
-  type-set: '&aТип подсветки по умолчанию: &7{type}'
-  type-current: '&aТекущий тип подсветки: &7{type}&a. Доступно: &7{types}'
-  type-invalid: '&cНедопустимый тип подсветки: &7{type} &c(&7particles&c / &7blocks&c
-    / &7territory&c).'
-  view-shown: '&eПросмотр подсветки региона &7{region}&e.'
-  flag-set: '&aФлаг &f{flag}&a региона &7{region} &aустановлен: &f{value}'
-  flag-fail: '&cНе удалось установить флаг подсветки.'
-  not-owner: '&cВы не владелец региона &7{region}&c — флаг подсветки менять нельзя.'
-  on-word: включена
-  off-word: выключена
-  self-current: '&7Личная подсветка &f«для себя»&7 (по флагу territory-visible): &f{state}&7.
-    Команда и меню показывают подсветку всегда.'
-  self-on: '&aЛичная подсветка «для себя» включена — флаг territory-visible будет
-    подсвечивать регионы.'
-  self-off: '&7Личная подсветка «для себя» выключена — флаг territory-visible не срабатывает
-    (команда и меню всё равно показывают подсветку).'
-  self-invalid: '&cИспользуйте: /&7region visible self <on|off>&c. Получено: &7{value}'
+  disabled: "&cПодсветка регионов отключена в конфиге (highlight.enabled: false)."
+  none: "&cРегион не найден: вы не в регионе и название не указано."
+  shown: "&aПодсветка региона &7{region} &aвключена (&7{type}&a, {seconds} с)."
+  hidden: "&7Подсветка региона &7{region} &aвыключена."
+  hidden-all: "&7Все подсветки регионов скрыты."
+  type-set: "&aТип подсветки по умолчанию: &7{type}"
+  type-current: "&aТекущий тип подсветки: &7{type}&a. Доступно: &7{types}"
+  type-invalid: "&cНедопустимый тип подсветки: &7{type} &c(&7particles&c / &7blocks&c / &7territory&c)."
+  view-shown: "&eПросмотр подсветки региона &7{region}&e."
+  flag-set: "&aФлаг &f{flag}&a региона &7{region} &aустановлен: &f{value}"
+  flag-fail: "&cНе удалось установить флаг подсветки."
+  not-owner: "&cВы не владелец региона &7{region}&c — флаг подсветки менять нельзя."
+  on-word: "включена"
+  off-word: "выключена"
+  self-current: "&7Личная подсветка &f«для себя»&7 (по флагу territory-visible): &f{state}&7. Команда и меню показывают подсветку всегда."
+  self-on: "&aЛичная подсветка «для себя» включена — флаг territory-visible будет подсвечивать регионы."
+  self-off: "&7Личная подсветка «для себя» выключена — флаг territory-visible не срабатывает (команда и меню всё равно показывают подсветку)."
+  self-invalid: "&cИспользуйте: /&7region visible self <on|off>&c. Получено: &7{value}"
 
 help:
-  header: '&8===== &bQQRegions &7v{version} &8====='
-  line: '&f{cmd}&8: &7{desc}'
+  header: "&8===== &bQQRegions &7v{version} &8====="
+  line: "&f{cmd}&8: &7{desc}"
   commands:
-  - usage: select
-    desc: Интерактивное выделение (без аргументов)
-  - usage: select pos|point <1|2>
-    desc: Установить точку выделения
-  - usage: select max
-    desc: Максимально разрешённая область вокруг игрока
-  - usage: select chunk [количество]
-    desc: Выделить область из чанков
-  - usage: select expand [сторона] <N>
-    desc: Расширить/сузить выделение
-  - usage: select outset <N> [h|v]
-    desc: Расширить во все стороны
-  - usage: create <название>
-    desc: Создать регион из выделения
-  - usage: delete [название]
-    desc: Удалить регион, которым вы владеете
-  - usage: info [название]
-    desc: Информация о регионе
-  - usage: add [member|owner] <ник> [регион]
-    desc: Добавить игрока в регион
-  - usage: remove [member|owner] <ник> [регион]
-    desc: Убрать игрока из региона
-  - usage: flags [название]
-    desc: Меню флагов (владельцы)
-  - usage: visible [название] [particles|blocks|territory]
-    desc: Показать/скрыть подсветку границ региона
-  - usage: visible type [particles|blocks|territory]
-    desc: Тип подсветки по умолчанию (без аргумента — текущий)
-  - usage: visible off
-    desc: Скрыть все подсветки
-  - usage: visible self on|off
-    desc: Личная подсветка «для себя» (действует только на флаг territory-visible)
-  - usage: view [регион] [particles|blocks|territory]
-    desc: Временно показать подсветку (без сохранения флага)
-  - usage: visible true|allow|false|deny [particles|blocks|territory] [регион]
-    desc: Установить флаг подсветки региона
-  - usage: select view <ник>
-    desc: Посмотреть выделение другого игрока
-  - usage: market flags
-    desc: Магазин флагов
-  - usage: market blocks
-    desc: 'Расширения: площадь и «+регион»'
-  - usage: raid [регион]
-    desc: Запустить рейд клана на регион (JustTeams)
-  - usage: sell [ник] <сумма> [регион]
-    desc: Продать регион (без ника — публичное объявление на рынке)
-  - usage: sell accept|decline|cancel|list <id>
-    desc: Принять/отклонить/отменить/показать сделки о продаже
-  - usage: rent [ник] <сумма> <время> [регион]
-    desc: Сдать регион в аренду (1m = 1 месяц; без ника — публично)
-  - usage: rent dur <минут> [регион]
-    desc: Срок действия объявления аренды
-  - usage: rent accept|decline|cancel|list <id>
-    desc: Принять/отклонить/отменить/показать аренды
-  - usage: buy [регион]
-    desc: Купить регион с публичного объявления
-  - usage: tenant [регион]
-    desc: Арендовать регион с публичного объявления
-  - usage: market
-    desc: Открыть меню рынка
-  - usage: reload
-    desc: Перезагрузить конфигурацию
+    - usage: "select"
+      desc: "Интерактивное выделение (без аргументов)"
+    - usage: "select pos|point <1|2>"
+      desc: "Установить точку выделения"
+    - usage: "select max"
+      desc: "Максимально разрешённая область вокруг игрока"
+    - usage: "select chunk [количество]"
+      desc: "Выделить область из чанков"
+    - usage: "select expand [сторона] <N>"
+      desc: "Расширить/сузить выделение"
+    - usage: "select outset <N> [h|v]"
+      desc: "Расширить во все стороны"
+    - usage: "create <название>"
+      desc: "Создать регион из выделения"
+    - usage: "delete [название]"
+      desc: "Удалить регион, которым вы владеете"
+    - usage: "info [название]"
+      desc: "Информация о регионе"
+    - usage: "add [member|owner] <ник> [регион]"
+      desc: "Добавить игрока в регион"
+    - usage: "remove [member|owner] <ник> [регион]"
+      desc: "Убрать игрока из региона"
+    - usage: "flags [название]"
+      desc: "Меню флагов (владельцы)"
+    - usage: "visible [название] [particles|blocks|territory]"
+      desc: "Показать/скрыть подсветку границ региона"
+    - usage: "visible type [particles|blocks|territory]"
+      desc: "Тип подсветки по умолчанию (без аргумента — текущий)"
+    - usage: "visible off"
+      desc: "Скрыть все подсветки"
+    - usage: "visible self on|off"
+      desc: "Личная подсветка «для себя» (действует только на флаг territory-visible)"
+    - usage: "view [регион] [particles|blocks|territory]"
+      desc: "Временно показать подсветку (без сохранения флага)"
+    - usage: "visible true|allow|false|deny [particles|blocks|territory] [регион]"
+      desc: "Установить флаг подсветки региона"
+    - usage: "select view <ник>"
+      desc: "Посмотреть выделение другого игрока"
+    - usage: "market flags"
+      desc: "Магазин флагов"
+    - usage: "market blocks"
+      desc: "Расширения: площадь и «+регион»"
+    - usage: "raid [регион]"
+      desc: "Запустить рейд клана на регион (JustTeams)"
+    - usage: "sell [ник] <сумма> [регион]"
+      desc: "Продать регион (без ника — публичное объявление на рынке)"
+    - usage: "sell accept|decline|cancel|list <id>"
+      desc: "Принять/отклонить/отменить/показать сделки о продаже"
+    - usage: "rent [ник] <сумма> <время> [регион]"
+      desc: "Сдать регион в аренду (1m = 1 месяц; без ника — публично)"
+    - usage: "rent dur <минут> [регион]"
+      desc: "Срок действия объявления аренды"
+    - usage: "rent accept|decline|cancel|list <id>"
+      desc: "Принять/отклонить/отменить/показать аренды"
+    - usage: "buy [регион]"
+      desc: "Купить регион с публичного объявления"
+    - usage: "tenant [регион]"
+      desc: "Арендовать регион с публичного объявления"
+    - usage: "market"
+      desc: "Открыть меню рынка"
+    - usage: "reload"
+      desc: "Перезагрузить конфигурацию"
 
 market:
-  disabled: '&cРынок отключён в конфиге (market.enabled: false).'
-  economy-off: '&cЭкономика (Vault) недоступна — рынок выключен.'
-  no-region: '&cРегион не найден: вы не в регионе и название не указано.'
-  sell-no-duration: '&eУ продажи нет срока — &f{sell-usage}&e. Чтобы сдать в аренду:
-    &f{rent-usage}'
-  not-owner: '&cВы не владелец региона &7{region}&c.'
-  bad-price: '&cНекорректная или слишком маленькая сумма.'
-  bad-args: '&cНекорректная сумма или время аренды.'
-  already-offer: '&eНа регион &7{region} &eуже есть активное предложение.'
-  not-found: '&cПредложение не найдено.'
-  sale-offer-made: '&aПредложение о продаже &7{region} &aотправлено &7{target}&a —
-    он увидит его в меню рынка. Цена: &7{price} {price-symbol}'
-  rent-offer-made: '&aПредложение об аренде &7{region} &aотправлено &7{target}&a.
-    Цена: &7{price} {price-symbol}'
-  sale-offer-sent: '&eВам предложено купить регион &7{region}&e за &7{price} {price-symbol}&e.
-    Инициатор: &7{initiator}'
-  rent-offer-sent: '&eВам предложено арендовать регион &7{region}&e за &7{price} {price-symbol}&e
-    на &7{time}&e. Инициатор: &7{initiator}'
-  offer-expired: '&7Срок предложения по региону &7{region} &7истёк — теперь объявление
-    публичное.'
-  offer-relisted: '&aСрок приватного предложения по региону &7{region} &aистек — объявление
-    перевыставлено публично по той же цене.'
-  offer-timeout-cancelled: '&eСрок приватного предложения по региону &7{region} &eистек
-    — объявление снято с рынка.'
-  sale-listed: '&aОбъявление о продаже &7{region} &aвыставлено на рынок. Цена: &7{price}
-    {price-symbol}&a. Любой игрок может купить.'
-  rent-listed: '&aОбъявление об аренде &7{region} &aвыставлено на рынок. Цена: &7{price}
-    {price-symbol}&a. Любой игрок может арендовать.'
-  buy-ok: '&aПокупка &7{region} &aзавершена: вы теперь владелец.'
-  tenant-ok: '&aВы арендуете &7{region}&a. Голограмма-вывеска рынка видна всем рядом
-    с регионом.'
-  no-offer: '&cНа этом регионе нет публичного объявления.'
-  no-target: '&cУказанный игрок не найден.'
-  bad-duration: '&cНекорректный срок.'
-  not-rent: '&cЭто объявление — продажа, а не аренда.'
-  listdur-set: '&aСрок объявления аренды &7{region}&a: &f{minutes}&a.'
-  period-set: '&aСрок аренды &7{region}&a: &f{time}&a.'
-  too-short: '&cСрок аренды меньше минимального (1 час, настраивается в config.yml).'
-  too-long: '&cСрок аренды больше максимального (1 год, настраивается в config.yml).'
-  rent-relisted: '&aАренда &7{region} &aзавершилась, автовозврат включён — объявление
-    снова на рынке.'
-  no-market: '&cРынок в настоящее время не работает.'
-  list-line: '&7[{type}] &f{region} &8· &7{status} &8· &7{price} {price-symbol} &8·
-    &7{who} &8· &f{id}'
-  search-prompt: '&eВведите текст для поиска в чат (пробелы не важны):'
-  search-cancel: '&8Напишите &7off&8/&7отмена&8 — убрать поиск.'
-  search-set: '&aПоиск: &f{query}'
-  search-off: '&7Поиск выключен.'
-  sort-set: 'actionbar:3!&aСортировка: &f{mode}'
-  accepted-sell: '&aСделка по региону &7{region} &aзавершена: владение передано покупателю.'
-  accepted-buy: '&aПокупка региона &7{region} &aзавершена: вы теперь владелец.'
-  accepted-rent: '&aАренда региона &7{region} &aзапущена.'
-  accepted-tenant: '&aАренда региона &7{region} &aподтверждена: вы арендатор.'
-  declined: '&eПредложение по региону &7{region} &eотклонено.'
-  cancelled: '&eПредложение по региону &7{region} &eотменено.'
-  menu-disabled: '&cМеню рынка не настроено (файл &7menus/market.yml&c).'
-  not-ready: '&cПредложение уже обработано.'
-  not-you: '&cЭто предложение не адресовано вам.'
-  no-money: '&cНедостаточно средств на счету.'
-  error-no-region: '&cРегион больше не существует — предложение отменено.'
-  error-no-target: '&cИгрок не найден — предложение не создано.'
-  sale-done-buyer: '&aВы купили регион &7{region}&a за &7{price} {price-symbol}&a.'
-  sale-done-seller: '&aРегион &7{region} &aпродан за &7{price} {price-symbol}&a.'
-  rent-started-tenant: '&aВы арендуете регион &7{region}&a. Стоимость: &7{price} {price-symbol}'
-  rent-started-owner: '&aРегион &7{region} &aсдан в аренду. Плата: &7{price} {price-symbol}'
-  rent-renew-tenant: '&aСписан платёж за аренду &7{region}&a: &7{price} {price-symbol}'
-  rent-renew-owner: '&aПоступил платёж за аренду &7{region}&a: &7{price} {price-symbol}'
-  rent-unpaid-tenant: '&cНедостаточно средств — аренда &7{region} &cпрекращена.'
-  rent-unpaid-owner: '&cАрендатор не оплатил аренду &7{region} &c— аренда прекращена.'
-  rent-ended: '&7Срок аренды региона &7{region} &7завершён.'
+  disabled: "&cРынок отключён в конфиге (market.enabled: false)."
+  economy-off: "&cЭкономика (Vault) недоступна — рынок выключен."
+  no-region: "&cРегион не найден: вы не в регионе и название не указано."
+  sell-no-duration: "&eУ продажи нет срока — &f{sell-usage}&e. Чтобы сдать в аренду: &f{rent-usage}"
+  not-owner: "&cВы не владелец региона &7{region}&c."
+  bad-price: "&cНекорректная или слишком маленькая сумма."
+  bad-args: "&cНекорректная сумма или время аренды."
+  already-offer: "&eНа регион &7{region} &eуже есть активное предложение."
+  not-found: "&cПредложение не найдено."
+  sale-offer-made: "&aПредложение о продаже &7{region} &aотправлено &7{target}&a — он увидит его в меню рынка. Цена: &7{price} {price-symbol}"
+  rent-offer-made: "&aПредложение об аренде &7{region} &aотправлено &7{target}&a. Цена: &7{price} {price-symbol}"
+  sale-offer-sent: "&eВам предложено купить регион &7{region}&e за &7{price} {price-symbol}&e. Инициатор: &7{initiator}"
+  rent-offer-sent: "&eВам предложено арендовать регион &7{region}&e за &7{price} {price-symbol}&e на &7{time}&e. Инициатор: &7{initiator}"
+  offer-expired: "&7Срок предложения по региону &7{region} &7истёк — теперь объявление публичное."
+  offer-relisted: "&aСрок приватного предложения по региону &7{region} &aистек — объявление перевыставлено публично по той же цене."
+  offer-timeout-cancelled: "&eСрок приватного предложения по региону &7{region} &eистек — объявление снято с рынка."
+  sale-listed: "&aОбъявление о продаже &7{region} &aвыставлено на рынок. Цена: &7{price} {price-symbol}&a. Любой игрок может купить."
+  rent-listed: "&aОбъявление об аренде &7{region} &aвыставлено на рынок. Цена: &7{price} {price-symbol}&a. Любой игрок может арендовать."
+  buy-ok: "&aПокупка &7{region} &aзавершена: вы теперь владелец."
+  tenant-ok: "&aВы арендуете &7{region}&a. Голограмма-вывеска рынка видна всем рядом с регионом."
+  no-offer: "&cНа этом регионе нет публичного объявления."
+  no-target: "&cУказанный игрок не найден."
+  bad-duration: "&cНекорректный срок."
+  not-rent: "&cЭто объявление — продажа, а не аренда."
+  listdur-set: "&aСрок объявления аренды &7{region}&a: &f{minutes}&a."
+  period-set: "&aСрок аренды &7{region}&a: &f{time}&a."
+  too-short: "&cСрок аренды меньше минимального (1 час, настраивается в config.yml)."
+  too-long: "&cСрок аренды больше максимального (1 год, настраивается в config.yml)."
+  rent-relisted: "&aАренда &7{region} &aзавершилась, автовозврат включён — объявление снова на рынке."
+  no-market: "&cРынок в настоящее время не работает."
+  list-line: "&7[{type}] &f{region} &8· &7{status} &8· &7{price} {price-symbol} &8· &7{who} &8· &f{id}"
+  search-prompt: "&eВведите текст для поиска в чат (пробелы не важны):"
+  search-cancel: "&8Напишите &7off&8/&7отмена&8 — убрать поиск."
+  search-set: "&aПоиск: &f{query}"
+  search-off: "&7Поиск выключен."
+  sort-set: "actionbar:3!&aСортировка: &f{mode}"
+  accepted-sell: "&aСделка по региону &7{region} &aзавершена: владение передано покупателю."
+  accepted-buy: "&aПокупка региона &7{region} &aзавершена: вы теперь владелец."
+  accepted-rent: "&aАренда региона &7{region} &aзапущена."
+  accepted-tenant: "&aАренда региона &7{region} &aподтверждена: вы арендатор."
+  declined: "&eПредложение по региону &7{region} &eотклонено."
+  cancelled: "&eПредложение по региону &7{region} &eотменено."
+  menu-disabled: "&cМеню рынка не настроено (файл &7menus/market.yml&c)."
+  not-ready: "&cПредложение уже обработано."
+  not-you: "&cЭто предложение не адресовано вам."
+  no-money: "&cНедостаточно средств на счету."
+  error-no-region: "&cРегион больше не существует — предложение отменено."
+  error-no-target: "&cИгрок не найден — предложение не создано."
+  sale-done-buyer: "&aВы купили регион &7{region}&a за &7{price} {price-symbol}&a."
+  sale-done-seller: "&aРегион &7{region} &aпродан за &7{price} {price-symbol}&a."
+  rent-started-tenant: "&aВы арендуете регион &7{region}&a. Стоимость: &7{price} {price-symbol}"
+  rent-started-owner: "&aРегион &7{region} &aсдан в аренду. Плата: &7{price} {price-symbol}"
+  rent-renew-tenant: "&aСписан платёж за аренду &7{region}&a: &7{price} {price-symbol}"
+  rent-renew-owner: "&aПоступил платёж за аренду &7{region}&a: &7{price} {price-symbol}"
+  rent-unpaid-tenant: "&cНедостаточно средств — аренда &7{region} &cпрекращена."
+  rent-unpaid-owner: "&cАрендатор не оплатил аренду &7{region} &c— аренда прекращена."
+  rent-ended: "&7Срок аренды региона &7{region} &7завершён."
 
 # Голограмма-вывеска рынка (market.market-holo): ОДНА плавающая голограмма возле
 # периметра региона, облетает границы следом за игроком и всегда смотрит на него.
@@ -364,237 +340,230 @@ market:
 # символ валюты, {nick} — покупатель/арендатор приватного предложения,
 # {time} — срок аренды, {region}.
 market-holo:
-  sale: '&a[ Рынок ] Продаёт &f{owner}&a за &f{price} {price-symbol}'
-  rent: '&b[ Рынок ] Сдаёт &f{owner}&b за &f{price} {price-symbol} &8· &f{time}'
-  sale-pending: '&a[ Рынок ] &f{owner}&a ждёт покупку от &f{nick}&a за &f{price} {price-symbol}'
-  rent-pending: '&b[ Рынок ] &f{owner}&b сдаёт игроку &f{nick}&b за &f{price} {price-symbol}
-    &8· &f{time}'
-  buy-hint: '&8Нажмите &f/region buy&8 / &f/region tenant&8, чтобы купить/арендовать'
+  sale: "&a[ Рынок ] Продаёт &f{owner}&a за &f{price} {price-symbol}"
+  rent: "&b[ Рынок ] Сдаёт &f{owner}&b за &f{price} {price-symbol} &8· &f{time}"
+  sale-pending: "&a[ Рынок ] &f{owner}&a ждёт покупку от &f{nick}&a за &f{price} {price-symbol}"
+  rent-pending: "&b[ Рынок ] &f{owner}&b сдаёт игроку &f{nick}&b за &f{price} {price-symbol} &8· &f{time}"
+  buy-hint: "&8Нажмите &f/region buy&8 / &f/region tenant&8, чтобы купить/арендовать"
 
 menu:
-  no-prev: '&7Нет предыдущего меню.'
-  teleport-owner-only: '&cТелепорт доступен только владельцам/админам.'
-  teleport-fail: '&cНе удалось телепортироваться.'
-  region-not-found: '&cРегион не найден.'
-  participants-owner-only: '&cУправление участниками доступно только владельцам.'
-  player-removed: '&aИгрок убран из региона.'
-  player-added-owner: '&aИгрок &f{player} &aдобавлен как владелец.'
-  player-added-member: '&aИгрок &f{player} &aдобавлен как участник.'
-  add-cancelled: '&7Добавление отменено.'
-  group-set: 'actionbar:2!&fФлаг &9{flag-name}&f: группа &b{group}'
-  group-set-fail: '&cФлаг &f{flag}&r: не удалось сменить группу на &f{group}&c.'
-  offer-not-found: '&cПредложение не найдено.'
-  offer-accepted: '&aПринято: &f{region}'
-  offer-declined: '&eОтклонено: &f{region}'
-  offer-cancelled: '&eОтменено: &f{region}'
-  offer-action-fail: '&cНе удалось {action}: &f{reason}'
+  no-prev: "&7Нет предыдущего меню."
+  teleport-owner-only: "&cТелепорт доступен только владельцам/админам."
+  teleport-fail: "&cНе удалось телепортироваться."
+  region-not-found: "&cРегион не найден."
+  participants-owner-only: "&cУправление участниками доступно только владельцам."
+  player-removed: "&aИгрок убран из региона."
+  player-added-owner: "&aИгрок &f{player} &aдобавлен как владелец."
+  player-added-member: "&aИгрок &f{player} &aдобавлен как участник."
+  add-cancelled: "&7Добавление отменено."
+  group-set: "actionbar:2!&fФлаг &9{flag-name}&f: группа &b{group}"
+  group-set-fail: "&cФлаг &f{flag}&r: не удалось сменить группу на &f{group}&c."
+  offer-not-found: "&cПредложение не найдено."
+  offer-accepted: "&aПринято: &f{region}"
+  offer-declined: "&eОтклонено: &f{region}"
+  offer-cancelled: "&eОтменено: &f{region}"
+  offer-action-fail: "&cНе удалось {action}: &f{reason}"
   # Имена действий {action} в offer-action-fail.
   actions:
-    buy: '&aкупить'
-    rent: '&aарендовать'
-    autorent: '&eавтовозврат'
-    accept: '&aпринять'
-    decline: '&eотклонить'
-    cancel: '&eотменить'
-    dur: '&eсрок'
-    period: '&eсрок аренды'
+    buy: "&aкупить"
+    rent: "&aарендовать"
+    autorent: "&eавтовозврат"
+    accept: "&aпринять"
+    decline: "&eотклонить"
+    cancel: "&eотменить"
+    dur: "&eсрок"
+    period: "&eсрок аренды"
   # «Не задано» для пустого значения флага (меню флагов).
-  value-not-set: '&7не задано'
+  value-not-set: "&7не задано"
   # Маркеры групп флагов в lore «ПКМ — сменить группу».
-  group-check: '&a✓ '
-  group-bullet: '&8• &7'
-  dialog-search-market-title: '&eПоиск по рынку'
-  dialog-search-flag-title: '&eПоиск флагов'
-  dialog-search-market-label: '&7Введите название региона для поиска.'
-  dialog-search-flag-label: '&7Введите название флага или его перевод.'
-  dialog-add-owner-title: '&eДобавление владельца'
-  dialog-add-member-title: '&eДобавление участника'
-  dialog-add-label: '&7Введите ник игрока, которого {action}'
-  dialog-add-action-owner: сделать владельцем региона.
-  dialog-add-action-member: добавить участником региона.
+  group-check: "&a✓ "
+  group-bullet: "&8• &7"
+  dialog-search-market-title: "&eПоиск по рынку"
+  dialog-search-flag-title: "&eПоиск флагов"
+  dialog-search-market-label: "&7Введите название региона для поиска."
+  dialog-search-flag-label: "&7Введите название флага или его перевод."
+  dialog-add-owner-title: "&eДобавление владельца"
+  dialog-add-member-title: "&eДобавление участника"
+  dialog-add-label: "&7Введите ник игрока, которого {action}"
+  dialog-add-action-owner: "сделать владельцем региона."
+  dialog-add-action-member: "добавить участником региона."
   # Главное меню (/region без аргументов), кнопка «Назад» в слоте 0.
-  main-back-name: '&eНазад|Главное меню'
-  main-back-lore: '&7Выполняется команда из config.yml.'
+  main-back-name: "&eНазад|Главное меню"
+  main-back-lore: "&7Выполняется команда из config.yml."
   # Кнопка «Вернуться в главное меню» в информационном меню региона (слот 0).
-  info-back-name: '&eВернуться в главное меню'
-  info-back-lore: '&7Открыть главное меню территорий'
-  region-search-notfound: '&cРегион по запросу &f{query} &cне найден.'
-  region-search-multiple: '&eНайдено несколько: &f{regions}'
-  region-search-found: '&aРегион &f{region} &aнайден.'
-  add-chat-prompt-owner: '&eВведите в чат ник игрока, которого добавить &bвладельцем&e.
-    Напишите &cотмена&e, чтобы отменить.'
-  add-chat-prompt-member: '&eВведите в чат ник игрока, которого добавить &eучастником&e.
-    Напишите &cотмена&e, чтобы отменить.'
-  dialog-ok: OK
-  dialog-cancel: Отмена
-  lore-price: '&7Цена: &f{price} {price-symbol}'
+  info-back-name: "&eВернуться в главное меню"
+  info-back-lore: "&7Открыть главное меню территорий"
+  region-search-notfound: "&cРегион по запросу &f{query} &cне найден."
+  region-search-multiple: "&eНайдено несколько: &f{regions}"
+  region-search-found: "&aРегион &f{region} &aнайден."
+  add-chat-prompt-owner: "&eВведите в чат ник игрока, которого добавить &bвладельцем&e. Напишите &cотмена&e, чтобы отменить."
+  add-chat-prompt-member: "&eВведите в чат ник игрока, которого добавить &eучастником&e. Напишите &cотмена&e, чтобы отменить."
+  dialog-ok: "OK"
+  dialog-cancel: "Отмена"
+  lore-price: "&7Цена: &f{price} {price-symbol}"
   # --- Рынок: одна кнопка объявления с полным описанием ---
-  market-type-sale: '&bПродажа'
-  market-type-rent: '&6Аренда'
-  lore-market-type-region: '&f{market-type} &8· &7{market-region}'
-  lore-market-lister: '&7Выставил: &f{market-lister}'
-  lore-market-price: '&7Цена: &f{market-price} {market-price-symbol}'
-  lore-market-volume: '&7Объём: &f{market-volume} &8блоков'
-  lore-market-location: '&7Месторасположение: &f{market-loc}'
-  lore-market-age: '&7Снятие с рынка через: &f{market-age}'
-  lore-market-rent-left: '&7До конца аренды: &f{market-age}'
-  lore-market-period: '&7Срок аренды: &f{market-period}'
-  lore-market-autorent: '&8Автовозврат: {market-autorent}'
-  lore-market-autorent-on: '&aвкл'
-  lore-market-autorent-off: '&7выкл'
+  market-type-sale: "&bПродажа"
+  market-type-rent: "&6Аренда"
+  lore-market-type-region: "&f{market-type} &8· &7{market-region}"
+  lore-market-lister: "&7Выставил: &f{market-lister}"
+  lore-market-price: "&7Цена: &f{market-price} {market-price-symbol}"
+  lore-market-volume: "&7Объём: &f{market-volume} &8блоков"
+  lore-market-location: "&7Месторасположение: &f{market-loc}"
+  lore-market-age: "&7Снятие с рынка через: &f{market-age}"
+  lore-market-rent-left: "&7До конца аренды: &f{market-age}"
+  lore-market-period: "&7Срок аренды: &f{market-period}"
+  lore-market-autorent: "&8Автовозврат: {market-autorent}"
+  lore-market-autorent-on: "&aвкл"
+  lore-market-autorent-off: "&7выкл"
   # Подсказки действий (вкладка «Все объявления»).
-  lore-market-click: '&9ЛКМ — купить/арендовать'
-  lore-market-mine: '&7Моё объявление • &eЛКМ — телепорт к региону'
-  lore-market-mine-no-tp: '&7Моё объявление'
+  lore-market-click: "&9ЛКМ — купить/арендовать"
+  lore-market-mine: "&7Моё объявление • &eЛКМ — телепорт к региону"
+  lore-market-mine-no-tp: "&7Моё объявление"
   # Подсказки действий (вкладка «Мои объявления»).
-  lore-market-mine-hint-autorent: '&9ЛКМ — переключить автовозврат'
-  lore-market-mine-hint-cancel: '&eПКМ — отменить объявление'
-  lore-market-mine-hint-listdur: '&eШифт+ЛКМ — срок объявления'
-  lore-market-mine-hint-period: '&eШифт+ПКМ — срок аренды'
+  lore-market-mine-hint-autorent: "&9ЛКМ — переключить автовозврат"
+  lore-market-mine-hint-cancel: "&eПКМ — отменить объявление"
+  lore-market-mine-hint-listdur: "&eШифт+ЛКМ — срок объявления"
+  lore-market-mine-hint-period: "&eШифт+ПКМ — срок аренды"
   # Кнопка-вкладка рынка: как названо то меню, в которое ПЕРЕКЛЮЧАЕМ.
-  market-tab-mine: '&6Мои объявления'
-  market-tab-all: '&6Все объявления'
+  market-tab-mine: "&6Мои объявления"
+  market-tab-all: "&6Все объявления"
   # Заголовки вкладок рынка: «Все объявления» и «Мои объявления».
-  market-title-all: '&rРынок регионов'
-  market-title-mine: '&6Мои объявления'
-  market-tab-switch-mine: '&eОткрыта вкладка «Мои объявления».'
-  market-tab-switch-all: '&eОткрыта вкладка «Все объявления».'
-  own-only: '&7Это действие доступно в ваших вкладках «Мои объявления».'
-  market-teleported: '&aТелепорт к &7{region}&a.'
-  market-teleport-disabled: '&cТелепорт к региону из объявления отключён на сервере.'
+  market-title-all: "&rРынок регионов"
+  market-title-mine: "&6Мои объявления"
+  market-tab-switch-mine: "&eОткрыта вкладка «Мои объявления»."
+  market-tab-switch-all: "&eОткрыта вкладка «Все объявления»."
+  own-only: "&7Это действие доступно в ваших вкладках «Мои объявления»."
+  market-teleported: "&aТелепорт к &7{region}&a."
+  market-teleport-disabled: "&cТелепорт к региону из объявления отключён на сервере."
   # Промпт срока аренды (арендатору), формат: 1m/1h/1d/1w/1mo/1y.
-  market-period-chat: '&eВведите срок аренды в чат (например &f1m&e = минута, &f1h&e
-    = час, &f1d&e = день, &f1w&e = неделя, &f1mo&e = месяц, &f1y&e = год):'
+  market-period-chat: "&eВведите срок аренды в чат (например &f1m&e = минута, &f1h&e = час, &f1d&e = день, &f1w&e = неделя, &f1mo&e = месяц, &f1y&e = год):"
   # Единицы времени для лора/заполнителей (настраивайте под свой формат,
   # например 1д / 1 день / 1 д / 1 ДНЕЙ). {n} заменяется на число.
-  time-empty: '&7—'
-  limit-inf: '&f∞'
-  time-join: ', '
-  time-sec: '{n} сек'
-  time-min: '{n} мин'
-  time-hour: '{n} ч'
-  time-day: '{n} д'
-  time-month: '{n} мес'
-  time-year: '{n} лет'
+  time-empty: "&7—"
+  limit-inf: "&f∞"
+  time-join: ", "
+  time-sec: "{n} сек"
+  time-min: "{n} мин"
+  time-hour: "{n} ч"
+  time-day: "{n} д"
+  time-month: "{n} мес"
+  time-year: "{n} лет"
   # Короткие единицы для компактного отображения срока («7д 3ч») — menu.action
   # промпты и голограммы рынка.
-  time-short-day: д
-  time-short-hour: ч
-  time-short-min: м
-  autorent-on: '&aАвтовозврат для &7{region} &aвключён (после аренды объявление снова
-    появится на рынке).'
-  autorent-off: '&7Автовозврат для &7{region} &7выключен (после аренды объявление
-    пропадёт).'
-  dialog-dur-title: '&eСрок объявления аренды'
-  dialog-dur-label: '&7Введите срок в минутах (например &f1440&7 = сутки).'
-  dialog-dur-chat: '&eВведите срок в минутах в чат (например &f1440&e = сутки):'
-  flag-set: 'actionbar:2!&fФлаг &9{flag-name}&f: &b{label}'
-  back-label:
-    market: '&eна рынок'
-    main: '&eв главное меню'
-    regionsearch: '&eк поиску'
-    flags: '&eк флагам'
-    myflags: '&eк моим флагам'
-    flagshop: '&eв магазин'
-    blocks: '&eк расширениям'
-    players: '&eк участникам'
-    info: '&eк инфо'
-    help: '&eк справке'
-    none: '&7назад'
-  lore-flag-shop-hint: '&7После покупки появится в меню флагов'
-  lore-buy: '&eЛКМ — купить'
-  lore-pack-area: '&7Увеличивает выделение на &f{pack-amount}&7 блоков'
-  lore-pack-region: '&7Добавляет &f{pack-amount}&7 к лимиту регионов'
-  lore-pack-repeatable: '&7Цена: &f{price} {price-symbol} &8(повторяемый)'
+  time-short-day: "д"
+  time-short-hour: "ч"
+  time-short-min: "м"
+  autorent-on: "&aАвтовозврат для &7{region} &aвключён (после аренды объявление снова появится на рынке)."
+  autorent-off: "&7Автовозврат для &7{region} &7выключен (после аренды объявление пропадёт)."
+  dialog-dur-title: "&eСрок объявления аренды"
+  dialog-dur-label: "&7Введите срок в минутах (например &f1440&7 = сутки)."
+  dialog-dur-chat: "&eВведите срок в минутах в чат (например &f1440&e = сутки):"
+  flag-set: "actionbar:2!&fФлаг &9{flag-name}&f: &b{label}"
+  back-label.market: "&eна рынок"
+  back-label.main: "&eв главное меню"
+  back-label.regionsearch: "&eк поиску"
+  back-label.flags: "&eк флагам"
+  back-label.myflags: "&eк моим флагам"
+  back-label.flagshop: "&eв магазин"
+  back-label.blocks: "&eк расширениям"
+  back-label.players: "&eк участникам"
+  back-label.info: "&eк инфо"
+  back-label.help: "&eк справке"
+  back-label.none: "&7назад"
+  lore-flag-shop-hint: "&7После покупки появится в меню флагов"
+  lore-buy: "&eЛКМ — купить"
+  lore-pack-area: "&7Увеличивает выделение на &f{pack-amount}&7 блоков"
+  lore-pack-region: "&7Добавляет &f{pack-amount}&7 к лимиту регионов"
+  lore-pack-repeatable: "&7Цена: &f{price} {price-symbol} &8(повторяемый)"
   # --- Кнопка «Моя территория» в главном меню ---
-  main-myregion-here: '&7Управление регионом — вы сейчас внутри территории'
-  main-myregion-pick: '&7Нажмите — откроется меню выбора региона'
+  main-myregion-here: "&7Управление регионом — вы сейчас внутри территории"
+  main-myregion-pick: "&7Нажмите — откроется меню выбора региона"
   # --- Поиск игроков (playersearch) ---
-  ps-group-owner: '&bВладельца'
-  ps-group-member: '&aУчастника'
-  ps-click-add: '&aЛКМ — добавить в регион (с подтверждением)'
-  ps-click-group: '&eШифт+ЛКМ — сменить группу'
-  ps-click-remove: '&cПКМ — удалить из региона (с подтверждением)'
-  ps-group-changed: 'actionbar:3!&eГруппа добавления: {group}'
-  ps-line-group: '&7Группа добавления: &f{ps-group}'
-  ps-line-balance: '&7Баланс: &f{ps-balance} {ps-balance-symbol}'
-  ps-line-regions: '&7Регионов (вл.+уч.): &f{ps-regions}&8/&f{ps-max}'
-  ps-line-clan: '&7Клан: &f{ps-clan}'
-  ps-sort-changed: 'actionbar:3!&eСортировка: &f{sort}'
-  ps-sort-az: 'По имени: A-Z'
-  ps-sort-za: 'По имени: Z-A'
-  ps-sort-balance: По балансу
-  ps-sort-regions-asc: 'Регионов: по возрастанию'
-  ps-sort-regions-desc: 'Регионов: по убыванию'
-  ps-sort-dist-far: 'Дистанция: дальше'
-  ps-sort-dist-near: 'Дистанция: ближе'
+  ps-group-owner: "&bВладельца"
+  ps-group-member: "&aУчастника"
+  ps-click-add: "&aЛКМ — добавить в регион (с подтверждением)"
+  ps-click-group: "&eШифт+ЛКМ — сменить группу"
+  ps-click-remove: "&cПКМ — удалить из региона (с подтверждением)"
+  ps-group-changed: "actionbar:3!&eГруппа добавления: {group}"
+  ps-line-group: "&7Группа добавления: &f{ps-group}"
+  ps-line-balance: "&7Баланс: &f{ps-balance} {ps-balance-symbol}"
+  ps-line-regions: "&7Регионов (вл.+уч.): &f{ps-regions}&8/&f{ps-max}"
+  ps-line-clan: "&7Клан: &f{ps-clan}"
+  ps-sort-changed: "actionbar:3!&eСортировка: &f{sort}"
+  ps-sort-az: "По имени: A-Z"
+  ps-sort-za: "По имени: Z-A"
+  ps-sort-balance: "По балансу"
+  ps-sort-regions-asc: "Регионов: по возрастанию"
+  ps-sort-regions-desc: "Регионов: по убыванию"
+  ps-sort-dist-far: "Дистанция: дальше"
+  ps-sort-dist-near: "Дистанция: ближе"
   # Названия ролей (для {role-ru} в списке участников и меню подтверждения).
-  role-owner: Владелец
-  role-member: Участник
+  role-owner: "Владелец"
+  role-member: "Участник"
   # Меню подтверждения добавления/удаления игрока (playerconfirm.yml).
-  pc-add: '&aДобавить'
-  pc-remove: '&cУдалить'
+  pc-add: "&aДобавить"
+  pc-remove: "&cУдалить"
   # --- Выбор территории (regionpicker) ---
-  rp-sort-near: Ближайшие
-  rp-sort-far: Дальние
-  rp-sort-az: 'По имени: A-Z'
-  rp-sort-za: 'По имени: Z-A'
-  rp-sort-members-asc: 'Людей: по возрастанию'
-  rp-sort-members-desc: 'Людей: по убыванию'
-  rp-sort-area-asc: 'Площадь: по возрастанию'
-  rp-sort-area-desc: 'Площадь: по убыванию'
-  rp-sort-changed: 'actionbar:3!&eСортировка: &f{sort}'
-  rp-world-line: '&7Мир: &f{rp-world}'
-  rp-type-line: '&7Тип: &f{rp-type}'
-  rp-people-line: '&7Игроков: &f{rp-people}'
-  rp-area-line: '&7Площадь: &f{rp-area} &7м²'
-  rp-dist-line: '&7Расстояние: &f{rp-dist} &7блоков'
-  rp-dist-none: '&7—'
-  rp-click: '&eКлик — информация о регионе'
+  rp-sort-near: "Ближайшие"
+  rp-sort-far: "Дальние"
+  rp-sort-az: "По имени: A-Z"
+  rp-sort-za: "По имени: Z-A"
+  rp-sort-members-asc: "Людей: по возрастанию"
+  rp-sort-members-desc: "Людей: по убыванию"
+  rp-sort-area-asc: "Площадь: по возрастанию"
+  rp-sort-area-desc: "Площадь: по убыванию"
+  rp-sort-changed: "actionbar:3!&eСортировка: &f{sort}"
+  rp-world-line: "&7Мир: &f{rp-world}"
+  rp-type-line: "&7Тип: &f{rp-type}"
+  rp-people-line: "&7Игроков: &f{rp-people}"
+  rp-area-line: "&7Площадь: &f{rp-area} &7м²"
+  rp-dist-line: "&7Расстояние: &f{rp-dist} &7блоков"
+  rp-dist-none: "&7—"
+  rp-click: "&eКлик — информация о регионе"
   # --- Рейд-кнопка в инфо-меню (пустое значение без данных о клане) ---
-  raid-empty: '&7—'
+  raid-empty: "&7—"
 
 shop:
-  none-owned: '&7У вас нет купленных флагов. Магазин: &f/region market flags'
-  flag-bought: '&aФлаг &f{flag-name} &aкуплен за &f{price} {price-symbol}&a.'
-  pack-bought: '&aПакет &f{pack-name} &aкуплен за &f{price} {price-symbol}&a.'
-  already: '&cУ вас уже есть &f{flag-name}&c.'
+  none-owned: "&7У вас нет купленных флагов. Магазин: &f/region market flags"
+  flag-bought: "&aФлаг &f{flag-name} &aкуплен за &f{price} {price-symbol}&a."
+  pack-bought: "&aПакет &f{pack-name} &aкуплен за &f{price} {price-symbol}&a."
+  already: "&cУ вас уже есть &f{flag-name}&c."
   # Кнопка купленного/исчерпавшего лимит товара (bought-display: RED_GLASS).
-  bought-name: '&c{name}'
-  bought-lore: '&7Уже куплено'
-  limit: '&cВы исчерпали лимит покупок этого товара.'
-  no-money: '&cНедостаточно средств на счету.'
-  not-found: '&cПокупка не найдена или не продаётся.'
-  no-economy: '&cЭкономика (Vault) недоступна — покупка невозможна.'
-  error: '&cНе удалось завершить покупку.'
-  menu-disabled: '&cМеню магазина не настроено.'
+  bought-name: "&c{name}"
+  bought-lore: "&7Уже куплено"
+  limit: "&cВы исчерпали лимит покупок этого товара."
+  no-money: "&cНедостаточно средств на счету."
+  not-found: "&cПокупка не найдена или не продаётся."
+  no-economy: "&cЭкономика (Vault) недоступна — покупка невозможна."
+  error: "&cНе удалось завершить покупку."
+  menu-disabled: "&cМеню магазина не настроено."
 
 raid:
-  disabled: '&cРейды отключены в конфиге (raid.enabled: false).'
-  none: '&cВы не в регионе и название не указано.'
-  ok: '&aРейд на &f{region} &aзапущен! Все нападающие должны оставаться в регионе.'
-  fail: '&cНе удалось запустить рейд: &f{reason}'
+  disabled: "&cРейды отключены в конфиге (raid.enabled: false)."
+  none: "&cВы не в регионе и название не указано."
+  ok: "&aРейд на &f{region} &aзапущен! Все нападающие должны оставаться в регионе."
+  fail: "&cНе удалось запустить рейд: &f{reason}"
   err:
-    disabled: Команда рейда недоступна.
-    no-clans: JustTeams не установлен — кланы недоступны.
-    not-in-region: '&cВы не находитесь в регионе.'
-    region-not-found: '&cРегион не найден.'
-    already: '&cРейд уже идёт.'
-    blacklisted: '&cС этим регионом рейды запрещены.'
-    own-region: '&cВы не можете рейдить свой регион.'
-    no-clan: '&cВы не состоите в клане.'
-    few-attackers: '&cСлишком мало нападающих ({count}/{min}).'
-    few-clan: '&cНападающих из вашего клана недостаточно ({count}/{min}).'
-    no-online: '&cВ клане нет онлайн-членов.'
-    low-percent: '&cВ регионе слишком малый % клана ({count}/{need}).'
-    defender-online: '&cВладелец или участник региона онлайн.'
+    disabled: "Команда рейда недоступна."
+    no-clans: "JustTeams не установлен — кланы недоступны."
+    not-in-region: "&cВы не находитесь в регионе."
+    region-not-found: "&cРегион не найден."
+    already: "&cРейд уже идёт."
+    blacklisted: "&cС этим регионом рейды запрещены."
+    own-region: "&cВы не можете рейдить свой регион."
+    no-clan: "&cВы не состоите в клане."
+    few-attackers: "&cСлишком мало нападающих ({count}/{min})."
+    few-clan: "&cНападающих из вашего клана недостаточно ({count}/{min})."
+    no-online: "&cВ клане нет онлайн-членов."
+    low-percent: "&cВ регионе слишком малый % клана ({count}/{need})."
+    defender-online: "&cВладелец или участник региона онлайн."
 
 guard:
-  blocked: '&cСервер испытывает сильную нагрузку — действие отменено. Попробуйте позже.'
+  blocked: "&cСервер испытывает сильную нагрузку — действие отменено. Попробуйте позже."
 
 select-status:
   # Цвет {value-color} боссбара/статуса, когда выделение упёрлось в лимит.
-  value-full: '&c'
+  value-full: "&c"
   # Слова «да»/«нет» для заполнителей {conflict} и {conflict-regions} в доп. инфе.
-  'true': да
-  'false': нет
+  yes: "да"
+  no: "нет"

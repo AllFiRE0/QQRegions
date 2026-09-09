@@ -375,7 +375,10 @@ public class MenuManager implements Listener {
             if (stack != null && stack.isEmpty()) {
                 history.remove(p.getUniqueId());
             }
-            open(p, "main", new HashMap<>(), 0, null, false);
+            // Главное меню открывается через openMain, а не open("main", ...):
+            // openMain заполняет контекст ({my-region-lore} и др.), иначе в
+            // кнопке «Моя территория» остаётся сырой {my-region-lore}.
+            openMain(p);
             return;
         }
         if (stack.isEmpty()) {
@@ -559,6 +562,15 @@ public class MenuManager implements Listener {
             ctx.put("market-title", mineView
                     ? plugin.lang().get("menu.market-title-mine")
                     : plugin.lang().get("menu.market-title-all"));
+        }
+        // Главное меню: если открыто по сохранённому контексту без
+        // {my-region-lore} (например @back с пустой историей и т.п.) — считаем
+        // заново, чтобы в кнопке «Моя территория» не осталось сырого заполнителя.
+        if (kind == Kind.MAIN && ctx.get("my-region-lore") == null) {
+            ProtectedRegion here = plugin.wg().current(player);
+            ctx.put("my-region-lore", here != null
+                    ? plugin.lang().get("menu.main-myregion-here")
+                    : plugin.lang().get("menu.main-myregion-pick"));
         }
         List<MenuItem> dynItems;
         Set<String> owned = plugin.shop().ownedFlags(player.getUniqueId());
@@ -886,6 +898,14 @@ public class MenuManager implements Listener {
             }
             if (c.equalsIgnoreCase("@region-delete")) {
                 confirmDeleteRegion(p, om);
+                continue;
+            }
+            if (c.equalsIgnoreCase("@select")) {
+                // «Создать территорию»: меню закрывается, чтобы игрок сразу
+                // оказался в интерактивном режиме выбора (хотбар-кнопки
+                // сессии), а не под открытым инвентарём.
+                p.closeInventory();
+                startInteractiveSelect(p);
                 continue;
             }
             if (c.equalsIgnoreCase("@ps-sort")) {
@@ -2118,6 +2138,21 @@ public class MenuManager implements Listener {
             return;
         }
         openRegionPicker(p);
+    }
+
+    /** Кнопка «Создать территорию» (@select): включить интерактивный выбор,
+     *  как /region select без аргументов (права qqregions.select не нужны в
+     *  меню — кнопка уже под qqregions.use, но проверяем на всякий случай). */
+    private void startInteractiveSelect(Player p) {
+        if (!p.hasPermission("qqregions.admin") && !p.hasPermission("qqregions.select")) {
+            plugin.lang().send(p, "general.no-permission");
+            return;
+        }
+        if (plugin.selections().startSession(p)) {
+            return;
+        }
+        plugin.selections().endSession(p);
+        plugin.lang().send(p, "select.interactive-off");
     }
 
     /** Кнопки меню выбора территории: регион/мир/тип/люди/расстояние,
