@@ -478,16 +478,19 @@ menu:
   main-myregion-here: "&7Управление территорией" # — вы сейчас внутри территории
   main-myregion-pick: "&7Открыть меню выбора территории"
   # --- Поиск игроков (playersearch) ---
-  ps-group-owner: "&7Владельца"
-  ps-group-member: "&7Участника"
-  ps-click-add: "&6ЛКМ &7— добавить в территорию"
-  ps-click-group: "&cShift &8+ &6ЛКМ &7— сменить группу"
-  ps-click-remove: "&6ПКМ &7— удалить из территории"
-  ps-group-changed: "actionbar:3!&7Группа добавления: {group}"
-  ps-line-group: "&7Группа добавления: &f{ps-group}"
+  ps-role-owner: "&eВладелец"
+  ps-role-member: "&aУчастник"
+  ps-role-none: "&7Не входит"
+  ps-line-group: "&7Группа: {ps-group}"
   ps-line-balance: "&7Баланс: &f{ps-balance} {ps-balance-symbol}"
-  ps-line-regions: "&7Территорий (вл.+уч.): &f{ps-regions}&8/&f{ps-max}"
   ps-line-clan: "&7Клан: &f{ps-clan}"
+  ps-line-regions: "&7Территории: &f{ps-regions}"
+  ps-line-owner: "- &e{ps-reg-owner} &7владелец"
+  ps-line-member: "- &a{ps-reg-member} &7участник"
+  ps-line-manage: "&7Нажмите чтобы управлять"
+  ps-line-delete: "&7Нажмите чтобы удалить"
+  # Подсказка при вводе ника в меню поиска игроков.
+  player-search-prompt: "&7Введите ник игрока (или часть ника) в чат — список отфильтруется:"
   ps-sort-changed: "actionbar:3!&7Сортировка: &f{sort}"
   ps-sort-az: "По имени: A-Z"
   ps-sort-za: "По имени: Z-A"
@@ -499,6 +502,7 @@ menu:
   # Названия ролей (для {role-ru} в списке участников и меню подтверждения).
   role-owner: "Владелец"
   role-member: "Участник"
+  role-none: "&7Не входит"
   # Меню подтверждения добавления/удаления игрока (playerconfirm.yml).
   pc-add: "&7Добавить"
   pc-remove: "&8Удалить"

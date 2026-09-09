@@ -456,6 +456,35 @@ public class MenuManager implements Listener {
         fillRaidCtx(null, region, ctx);
     }
 
+    /** Глобальные заполнители, доступные в ЛЮБОМ меню (единая система):
+     *  валюта рынка {market-price-symbol}, баланс смотрящего {balance}/
+     *  {balance-symbol} и данные клана смотрящего {raid-clan}, {raid-balance},
+     *  {raid-balance-symbol}. Ключи, которые меню/кнопки заполнили раньше
+     *  (например рейд-кнопка info-меню через fillRaidCtx), НЕ перезаписываются
+     *  (putIfAbsent). */
+    private void enrichBaseContext(Player player, Map<String, String> ctx) {
+        if (player == null) {
+            return;
+        }
+        ctx.putIfAbsent("market-price-symbol", currencySymbol());
+        ctx.putIfAbsent("balance", playerBalance(player.getUniqueId()));
+        ctx.putIfAbsent("balance-symbol", currencySymbol());
+        JustTeamsHook teams = plugin.raid().teams();
+        if (teams == null || !teams.enabled()) {
+            return;
+        }
+        JustTeamsHook.TeamRef team = teams.team(player.getUniqueId());
+        if (team == null) {
+            return;
+        }
+        ctx.putIfAbsent("raid-clan", team.name());
+        double bal = teams.balance(team);
+        if (bal >= 0) {
+            ctx.putIfAbsent("raid-balance", plugin.raid().raidMoney(bal));
+            ctx.putIfAbsent("raid-balance-symbol", plugin.raid().raidSymbol());
+        }
+    }
+
     /** Меню рынка: продажа/аренда регионов. */
     public boolean openMarket(Player player) {
         Map<String, String> ctx = new HashMap<>();
@@ -602,6 +631,7 @@ public class MenuManager implements Listener {
                 return true;                    // отложено: перерисует tick()
             }
         }
+        enrichBaseContext(player, ctx);
         // Рынок: подставлять название кнопки-вкладки («Мои объявления»/«Все объявления»)
         // и заголовок меню {market-title} — чтобы по заголовку было видно,
         // в какой вкладке игрок находится.
@@ -637,9 +667,7 @@ public class MenuManager implements Listener {
             case INFO -> dynItems = List.of();
             case REGION_SEARCH -> dynItems = regionSearchItems(menu, player, ctx);
             case PLAYER_SEARCH -> {
-                ctx.putIfAbsent("_pdgroup", "member");
                 ctx.putIfAbsent("_pdsort", "az");
-                ctx.put("ps-group", plugin.lang().get("menu.ps-group-" + ctx.get("_pdgroup")));
                 ctx.put("ps-sort-list", sortPickList("ps-sort", ctx.get("_pdsort")));
                 dynItems = playerSearchItems(menu, player, ctx);
             }
@@ -795,6 +823,7 @@ public class MenuManager implements Listener {
             String cl = c.toLowerCase(java.util.Locale.ROOT);
             if (cl.startsWith("@add:") || cl.startsWith("@market-search")
                     || cl.startsWith("@region-search") || cl.startsWith("@flag-search")
+                    || cl.startsWith("@player-search")
                     || cl.startsWith("@market:dur:")) {
                 inputCmd = true;
                 break;
@@ -889,6 +918,14 @@ public class MenuManager implements Listener {
                 confirmPlayerAction(p, om);
                 continue;
             }
+            if (c.equalsIgnoreCase("@pc-add")) {
+                playerConfirmAdd(p, om, e.getClick());
+                continue;
+            }
+            if (c.equalsIgnoreCase("@pc-remove")) {
+                playerConfirmRemove(p, om);
+                continue;
+            }
             if (c.startsWith("@add:")) {
                 startPrompt(p, om, c.substring("@add:".length()).trim());
                 continue;
@@ -935,6 +972,10 @@ public class MenuManager implements Listener {
             }
             if (c.equalsIgnoreCase("@region-search")) {
                 startSearchPrompt(p, om, "region");
+                continue;
+            }
+            if (c.equalsIgnoreCase("@player-search")) {
+                startSearchPrompt(p, om, "player");
                 continue;
             }
             if (c.startsWith("@rinfo:")) {
@@ -1297,11 +1338,15 @@ public class MenuManager implements Listener {
         }
     }
 
-    /** Кнопки списка участников (dynamic-players): владельцы, затем участники.
-     * Имя/lore берутся из конфига меню; PAPI резолвится на КОНКРЕТНОГО игрока
-     * (например %vault_eco_balance%). Владельцу шаблон задаёт команду
-     * @player-del:{player-id}:{role}; у остальных ролей — просмотр без команд.
-     * Фильтр: ctx["_filter"] = all|owners|members. */
+    /** Кнопки списка участников (dynamic-players): головы скинов по UUID.
+     *  Описание единое с меню «поиск игроков» (lang-ключи menu.ps-line-*):
+     *  имя — цвет ника по роли (&#ccbf8f владелец, &#7db389 участник), лор —
+     *  группа, клан (если JustTeams включён), баланс, территории и подсказка
+     *  удаления (только владельцу территории). Материал — config.yml
+     *  player-search: head-material / head-texture. Команду шаблона
+     *  @player-del:{player-id}:{role} задаёт владелец-шаблон, у остальных
+     *  ролей commands пустой — только просмотр.
+     *  Фильтр: ctx["_filter"] = all|owners|members. */
     private List<MenuItem> playerItems(Menu menu, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         Menu.DynamicPlayers dp = menu.dynamicPlayers();
@@ -1318,8 +1363,11 @@ public class MenuManager implements Listener {
             return out;
         }
         String filter = ctx.getOrDefault("_filter", "all").toLowerCase(java.util.Locale.ROOT);
-        MenuItem template = new MenuItem(dp.material, 1, null, dp.name, dp.lore, dp.commands,
-                "", null, null, null, false);
+        boolean clanOn = plugin.raid().teams().enabled();
+        boolean viewerOwner = "owner".equalsIgnoreCase(ctx.get("role"));
+        String headMaterial = plugin.config().playerSearchHeadMaterial();
+        String headTexture = plugin.config().playerSearchHeadTexture();
+        MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
         for (dev.qqregions.wg.Wg.Participant part : plugin.wg().participants(region)) {
             if (("members".equals(filter) && part.owner())
                     || ("owners".equals(filter) && !part.owner())) {
@@ -1333,32 +1381,45 @@ public class MenuManager implements Listener {
             pc.put("player", label);
             pc.put("player-id", part.uuid() != null ? part.uuid().toString() : label);
             pc.put("role", part.owner() ? "owner" : "member");
-            pc.put("role-ru", plugin.lang().get("menu."
-                    + (part.owner() ? "role-owner" : "role-member")));
+            pc.put("ps-group", plugin.lang().get("menu."
+                    + (part.owner() ? "ps-role-owner" : "ps-role-member")));
+            pc.put("ps-balance", playerBalance(part.uuid()));
+            pc.put("ps-balance-symbol", currencySymbol());
+            pc.put("ps-clan", playerClan(part.uuid()));
+            int[] counts = playerRegionCounts(part.uuid());
+            pc.put("ps-regions", String.valueOf(counts[0] + counts[1]));
+            pc.put("ps-reg-owner", String.valueOf(counts[0]));
+            pc.put("ps-reg-member", String.valueOf(counts[1]));
 
-            String name = template.process(plugin, op, pc, dp.name);
-            List<String> lore = null;
-            if (dp.lore != null && !dp.lore.isEmpty()) {
-                lore = new ArrayList<>();
-                for (String l : dp.lore) {
-                    lore.add(l == null ? "" : template.process(plugin, op, pc, l));
-                }
+            String name = tpl.process(plugin, op, pc,
+                    (part.owner() ? "&#ccbf8f" : "&#7db389") + label);
+            List<String> lore = new ArrayList<>();
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-group")));
+            if (clanOn) {
+                lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-clan")));
+            }
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-balance")));
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-regions")));
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-owner")));
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-member")));
+            if (viewerOwner) {
+                lore.add("");
+                lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-delete")));
             }
             List<String> cmds = null;
             if (dp.commands != null && !dp.commands.isEmpty()) {
                 cmds = new ArrayList<>();
                 for (String c : dp.commands) {
-                    cmds.add(template.process(plugin, op, pc, c));
+                    cmds.add(tpl.process(plugin, op, pc, c));
                 }
             }
-            Material mat = Material.matchMaterial(part.owner() ? dp.ownerMaterial : dp.memberMaterial);
-            if (mat == null) {
-                mat = Material.matchMaterial(dp.material);
+            MenuItem mi = new MenuItem(headMaterial, 1, null, name, lore, cmds, "");
+            if (headTexture != null && !headTexture.isEmpty()) {
+                mi.skinTexture(headTexture);
+            } else if (headMaterial.equalsIgnoreCase("PLAYER_HEAD")) {
+                mi.ownerUuid(part.uuid() == null ? null : part.uuid().toString());
             }
-            if (mat == null) {
-                mat = Material.GOLD_INGOT;
-            }
-            out.add(new MenuItem(mat.name(), 1, null, name, lore, cmds, ""));
+            out.add(mi);
         }
         return out;
     }
@@ -1962,9 +2023,10 @@ public class MenuManager implements Listener {
     // ---------- поиск игроков и выбор территории ----------
 
     /** Меню поиска игроков (playersearch.yml): все игроки сервера
-     *  (онлайн + оффлайн), головы как кнопки. ЛКМ — добавить в выбранную
-     *  группу (ctx _pdgroup: owner|member), ПКМ — убрать из региона,
-     *  Шифт+ЛКМ — сменить группу. Открывается только владельцу/админу. */
+     *  (онлайн + оффлайн), головы как кнопки. Клик по кнопке — меню
+     *  управления игроком (playerconfirm.yml): добавить участника/владельца
+     *  или удалить из региона. Открывается ТОЛЬКО через меню и только
+     *  владельцу/админу. */
     public boolean openPlayerSearch(Player p, org.bukkit.World w, ProtectedRegion r) {
         if (!p.hasPermission("qqregions.admin") && !plugin.wg().isOwner(r, p.getUniqueId())) {
             plugin.lang().send(p, "menu.participants-owner-only");
@@ -1975,14 +2037,14 @@ public class MenuManager implements Listener {
         ctx.put("world", w.getName());
         ctx.put("player", p.getName());
         ctx.put("role", "owner");
-        ctx.put("_pdgroup", "member");
         return open(p, "playersearch", ctx, 0, "owner");
     }
 
     /** Кнопки поиска игроков: сортировка по _pdsort (az|za|balance|regions±|dist±),
-     *  без себя (игрок сам себя не добавляет), головы скин через ownerUuid.
-     *  На каждой голове: выбранная группа добавления, баланс, регионы/max, клан,
-     *  подсказки кликов (ЛКМ добавить / ПКМ убрать / Шифт+ЛКМ сменить группу). */
+     *  без себя (игрок сам себя не добавляет). Материал кнопки — из config.yml
+     *  player-search (head-material / head-texture). На каждой голове: роль в
+     *  территории, клан (если JustTeams включён), баланс, количество территорий
+     *  (владелец/участник) и подсказка управления. */
     private List<MenuItem> playerSearchItems(Menu menu, Player viewer, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         String worldName = ctx.get("world");
@@ -1994,9 +2056,10 @@ public class MenuManager implements Listener {
         if (w == null || region == null) {
             return out;
         }
+        boolean clanOn = plugin.raid().teams().enabled();
+        String headMaterial = plugin.config().playerSearchHeadMaterial();
+        String headTexture = plugin.config().playerSearchHeadTexture();
         String self = ctx.get("player");
-        String group = ctx.getOrDefault("_pdgroup", "member");
-        String groupLabel = plugin.lang().get("menu.ps-group-" + group);
         List<PlayerRow> rows = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (org.bukkit.entity.Player op : Bukkit.getOnlinePlayers()) {
@@ -2041,28 +2104,46 @@ public class MenuManager implements Listener {
                     .thenComparing(r -> r.name(), String.CASE_INSENSITIVE_ORDER));
         }
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
+        // поиск по нику (ctx["_playersearch"]): regex как у поиска регионов
+        String playerQuery = ctx.get("_playersearch");
+        Pattern ppat = (playerQuery == null || playerQuery.trim().isEmpty())
+                ? null : Menu.searchPattern(playerQuery.trim());
         for (PlayerRow row : rows) {
+            if (ppat != null && !ppat.matcher(row.name()).find()) {
+                continue;
+            }
             Map<String, String> pc = new HashMap<>(ctx);
             pc.put("name", row.name());
-            pc.put("ps-group", groupLabel);
+            boolean curOwner = plugin.wg().isOwner(region, row.uuid());
+            boolean curMember = !curOwner && plugin.wg().isMember(region, row.uuid());
+            pc.put("ps-group", plugin.lang().get(curOwner ? "menu.ps-role-owner"
+                    : curMember ? "menu.ps-role-member" : "menu.ps-role-none"));
             pc.put("ps-balance", row.balanceLabel());
             pc.put("ps-balance-symbol", currencySymbol());
-            pc.put("ps-regions", String.valueOf(row.regions()));
-            pc.put("ps-max", row.maxLabel());
+            pc.put("ps-regions", String.valueOf(row.ownerRegions() + row.memberRegions()));
+            pc.put("ps-reg-owner", String.valueOf(row.ownerRegions()));
+            pc.put("ps-reg-member", String.valueOf(row.memberRegions()));
             pc.put("ps-clan", playerClan(row.uuid()));
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-group")));
+            if (clanOn) {
+                lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-clan")));
+            }
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-balance")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-regions")));
-            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-clan")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-owner")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-member")));
             lore.add("");
-            lore.add(plugin.lang().get("menu.ps-click-add"));
-            lore.add(plugin.lang().get("menu.ps-click-remove"));
-            lore.add(plugin.lang().get("menu.ps-click-group"));
-            out.add(new MenuItem("PLAYER_HEAD", 1, null,
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-manage")));
+            MenuItem mi = new MenuItem(headMaterial, 1, null,
                     tpl.process(plugin, viewer, pc, "&f" + row.name()), lore,
-                    List.of("PLRS:" + row.uuid()), "")
-                    .ownerUuid(row.uuid().toString()));
+                    List.of("PLRS:" + row.uuid()), "");
+            if (headTexture != null && !headTexture.isEmpty()) {
+                mi.skinTexture(headTexture);
+            } else if (headMaterial.equalsIgnoreCase("PLAYER_HEAD")) {
+                mi.ownerUuid(row.uuid().toString());
+            }
+            out.add(mi);
         }
         return out;
     }
@@ -2090,13 +2171,12 @@ public class MenuManager implements Listener {
         } catch (Throwable t) {
             bal = 0;
         }
-        return new PlayerRow(uuid, name, op.isOnline(), dist, bal, c[0] + c[1],
+        return new PlayerRow(uuid, name, op.isOnline(), dist, bal, c[0], c[1],
                 playerBalance(uuid), playerMaxRegions(uuid));
     }
 
-    /** Клик по «голове» игрока в меню поиска: ЛКМ — добавить в выбранную
-     *  группу (подтверждение), ПКМ — убрать из региона (подтверждение),
-     *  Шифт+ЛКМ — сменить выбранную группу добавления. */
+    /** Клик по кнопке игрока в меню поиска: открывает меню управления
+     *  (playerconfirm.yml) — добавить участника/владельца или удалить. */
     private void playerSearchClick(Player p, OpenMenu om, String spec, InventoryClickEvent e) {
         if (!p.hasPermission("qqregions.admin") && !"owner".equalsIgnoreCase(om.role)) {
             plugin.lang().send(p, "menu.participants-owner-only");
@@ -2118,27 +2198,9 @@ public class MenuManager implements Listener {
         if (nick == null) {
             nick = uuid.toString().substring(0, 8);
         }
-        org.bukkit.event.inventory.ClickType ct = e.getClick();
-        if (ct == org.bukkit.event.inventory.ClickType.SHIFT_LEFT) {
-            // смена ВЫБРАННОЙ группы добавления (владелец <-> участник), сразу,
-            // без подтверждения: роль записывается в ctx и применяется ЛКМ
-            boolean nextOwner = !"owner".equalsIgnoreCase(om.ctx.get("_pdgroup"));
-            String next = nextOwner ? "owner" : "member";
-            om.ctx.put("_pdgroup", next);
-            plugin.lang().send(p, "menu.ps-group-changed", "group",
-                    plugin.lang().get("menu.ps-group-" + next));
-            render(p, om.menu, om.ctx, om.page, om.role, om.kind);
-            return;
-        }
-        // ЛКМ — добавить, ПКМ — убрать: открываем меню подтверждения
-        // (playerconfirm.yml) с инфо-кнопкой об игроке.
-        if (e.isRightClick()) {
-            boolean asOwner = plugin.wg().isOwner(region, uuid);
-            openPlayerConfirm(p, world, region, uuid, nick, "remove", asOwner ? "owner" : "member");
-        } else {
-            boolean groupOwner = "owner".equalsIgnoreCase(om.ctx.get("_pdgroup"));
-            openPlayerConfirm(p, world, region, uuid, nick, "add", groupOwner ? "owner" : "member");
-        }
+        boolean curOwner = plugin.wg().isOwner(region, uuid);
+        openPlayerConfirm(p, world, region, uuid, nick, curOwner ? "remove" : "add",
+                curOwner ? "owner" : "member");
     }
 
     /** Число владельцев региона (для защиты «последнего владельца»). */
@@ -2408,8 +2470,12 @@ public class MenuManager implements Listener {
 
     /** Строка игрока для меню поиска игроков. */
     private record PlayerRow(UUID uuid, String name, boolean online, double dist,
-                             double balance, int regions,
+                             double balance, int ownerRegions, int memberRegions,
                              String balanceLabel, String maxLabel) {
+
+        public int regions() {
+            return ownerRegions + memberRegions;
+        }
     }
 
     // ---------- магазин флагов и расширений ----------
@@ -2727,15 +2793,19 @@ public class MenuManager implements Listener {
         openPlayerConfirm(p, world, region, uuid, nick, "remove", curOwner ? "owner" : "member");
     }
 
-    /** Открыть меню подтверждения добавления/удаления игрока (playerconfirm.yml).
-     *  op — "add"|"remove"; role — целевая роль (для add) или текущая (для remove). */
+    /** Открыть меню подтверждения добавления/удаления игрока (playerconfirm.yml):
+     *  «Добавить участника/владельца» (@pc-add) и «Удалить» (@pc-remove).
+     *  op — "add"|"remove"; role — текущая роль игрока в территории (для
+     *  шаблона и legacy-контекста). */
     private void openPlayerConfirm(Player p, org.bukkit.World world, ProtectedRegion region,
                                    UUID uuid, String nick, String op, String role) {
         if (!p.hasPermission("qqregions.admin") && !plugin.wg().isOwner(region, p.getUniqueId())) {
             plugin.lang().send(p, "menu.participants-owner-only");
             return;
         }
-        boolean owner = "owner".equalsIgnoreCase(role);
+        boolean curOwner = plugin.wg().isOwner(region, uuid);
+        boolean curMember = !curOwner && plugin.wg().isMember(region, uuid);
+        String roleKey = curOwner ? "owner" : curMember ? "member" : "none";
         int[] c = playerRegionCounts(uuid);
         Map<String, String> ctx = new HashMap<>();
         ctx.put("world", world.getName());
@@ -2746,7 +2816,7 @@ public class MenuManager implements Listener {
         ctx.put("pc-uuid", uuid.toString());
         ctx.put("_pc-role", role);
         ctx.put("pc-player", nick);
-        ctx.put("pc-role", plugin.lang().get("menu." + (owner ? "role-owner" : "role-member")));
+        ctx.put("pc-role", plugin.lang().get("menu.role-" + roleKey));
         ctx.put("pc-action", plugin.lang().get("menu.pc-" + ("add".equalsIgnoreCase(op) ? "add" : "remove")));
         ctx.put("pc-balance", playerBalance(uuid));
         ctx.put("pc-balance-symbol", currencySymbol());
@@ -2758,11 +2828,11 @@ public class MenuManager implements Listener {
         open(p, "playerconfirm", ctx, 0, "owner");
     }
 
-    /** Выполнить операцию из меню подтверждения (кнопка «Подтвердить»),
-     *  затем вернуться в предыдущее меню. Двойной клик не страшен: после
-     *  перехода инвентарь подтверждения больше не в open — клик игнорируется. */
-    private void confirmPlayerAction(Player p, OpenMenu om) {
-        String op = om.ctx.get("_pc-op");
+    /** Выполнить операцию из меню игрока (playerconfirm.yml) и вернуться в
+     *  предыдущее меню. op — "add"|"remove"; role — целевая роль для add
+     *  (для remove не используется). Двойной клик не страшен: после перехода
+     *  инвентарь подтверждения больше не в open — клик игнорируется. */
+    private void execPlayerAction(Player p, OpenMenu om, String op, String role) {
         String rawUuid = om.ctx.get("_pc-uuid");
         UUID uuid = null;
         if (rawUuid != null) {
@@ -2781,7 +2851,7 @@ public class MenuManager implements Listener {
         }
         String nick = om.ctx.getOrDefault("pc-player", uuid.toString());
         if ("add".equalsIgnoreCase(op)) {
-            boolean owner = "owner".equalsIgnoreCase(om.ctx.get("_pc-role"));
+            boolean owner = "owner".equalsIgnoreCase(role);
             plugin.wg().addPlayer(world, region, uuid, owner);
             plugin.lang().send(p, owner ? "menu.player-added-owner" : "menu.player-added-member",
                     "player", nick);
@@ -2797,6 +2867,24 @@ public class MenuManager implements Listener {
                     "target", nick, "region", region.getId());
         }
         goBack(p);
+    }
+
+    /** Legacy: выполнить операцию из контекста подтверждения (@pc-confirm). */
+    private void confirmPlayerAction(Player p, OpenMenu om) {
+        execPlayerAction(p, om, om.ctx.get("_pc-op"), om.ctx.get("_pc-role"));
+    }
+
+    /** Кнопка «Добавить» в playerconfirm: ЛКМ/ПКМ — участник,
+     *  Shift+ЛКМ/Shift+ПКМ — владелец (подтверждение — само меню). */
+    private void playerConfirmAdd(Player p, OpenMenu om, org.bukkit.event.inventory.ClickType ct) {
+        boolean owner = ct == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                || ct == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
+        execPlayerAction(p, om, "add", owner ? "owner" : "member");
+    }
+
+    /** Кнопка «Удалить» в playerconfirm: убрать игрока из территории. */
+    private void playerConfirmRemove(Player p, OpenMenu om) {
+        execPlayerAction(p, om, "remove", null);
     }
 
     /** Сколько регионов у игрока всего по мирам: [0]=владелец, [1]=участник. */
@@ -2908,7 +2996,10 @@ public class MenuManager implements Listener {
         // закрываем меню: игрок вводит запрос в чат, результат открывает
         // меню заново (applySearch). Без закрытия чат «прилипает» к инвентарю.
         p.closeInventory();
-        plugin.lang().sendMsg(p, "market.search-prompt");
+        // Поиск игрока — своя подсказка (menu.player-search-prompt), у
+        // рынка/флагов/регионов — общая (market.search-prompt).
+        plugin.lang().sendMsg(p, "player".equalsIgnoreCase(kind)
+                ? "menu.player-search-prompt" : "market.search-prompt");
         plugin.lang().sendMsg(p, "market.search-cancel");
     }
 
@@ -2962,8 +3053,17 @@ public class MenuManager implements Listener {
             applyRegionSearch(p, pr, query);
             return;
         }
-        boolean market = "market".equalsIgnoreCase(pr.kind);
-        String key = market ? "_marketsearch" : "_flagsearch";
+        String kind = pr.kind.toLowerCase(java.util.Locale.ROOT);
+        String key = switch (kind) {
+            case "market" -> "_marketsearch";
+            case "flag", "flags" -> "_flagsearch";
+            default -> "_playersearch";
+        };
+        String menuName = switch (kind) {
+            case "market" -> "market";
+            case "flag", "flags" -> "flags";
+            default -> "playersearch";
+        };
         plugin.lang().sendMsg(p, "market.search-set", "query", query);
         OpenMenu live = open.get(id);
         if (live != null) {
@@ -2973,7 +3073,7 @@ public class MenuManager implements Listener {
         } else {
             // инвентарь закрыли во время ввода — переоткрываем с фильтром
             pr.om.ctx.put(key, query);
-            open(p, market ? "market" : "flags", pr.om.ctx, 0, pr.om.role, false);
+            open(p, menuName, pr.om.ctx, 0, pr.om.role, false);
         }
     }
 

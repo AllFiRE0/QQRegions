@@ -4,6 +4,8 @@ import dev.qqregions.QQRegions;
 import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +47,9 @@ public class MenuItem {
     /** UUID игрока для PLAYER_HEAD: при сборке кнопки подставляется голова
      *  скина этого игрока (через setOwningPlayer). */
     private String ownerUuid;
+    /** Base64-текстура кастомного скина для PLAYER_HEAD (одинаковая для всех;
+     *  приоритетнее ownerUuid). */
+    private String skinTexture;
 
     /** имя флага для динамических кнопок, null для статичных */
     private final String flag;
@@ -146,6 +152,13 @@ public class MenuItem {
         return this;
     }
 
+    /** Поставить ОДИНАКОВУЮ кастомную текстуру скина головы для всех кнопок
+     *  (для PLAYER_HEAD; приоритетнее ownerUuid). */
+    public MenuItem skinTexture(String base64) {
+        this.skinTexture = base64;
+        return this;
+    }
+
     /** Собрать физический предмет с применением контекста и замен. */
     public ItemStack build(QQRegions plugin, Player player, Map<String, String> ctx) {
         // Материал тоже обрабатывает {заполнители}: например "PLAYER_HEAD:{pc-uuid}"
@@ -170,6 +183,16 @@ public class MenuItem {
                     // невалидный UUID — без скина
                 }
             }
+            // кастомная текстура головы (Base64) — для всех одинаковая
+            if (m == Material.PLAYER_HEAD && skinTexture != null && !skinTexture.isEmpty()
+                    && meta instanceof SkullMeta sm) {
+                try {
+                    applyHeadTexture(sm, skinTexture);
+                    meta = sm;
+                } catch (Throwable ignored) {
+                    // не получилось — голова без скина
+                }
+            }
             // скрыть служебные строки предметов (урон меча, эффекты зелий,
             // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,
@@ -181,7 +204,7 @@ public class MenuItem {
                     // старые версии API без setHideTooltip — просто показываем тултип
                 }
             }
-            meta.displayName(Msg.color(process(plugin, player, ctx, name == null ? "" : name)));
+            meta.displayName(noItalic(Msg.color(process(plugin, player, ctx, name == null ? "" : name))));
             List<Component> lines = new ArrayList<>();
             if (lore != null) {
                 for (String l : lore) {
@@ -196,7 +219,7 @@ public class MenuItem {
                         if (seg.isEmpty()) {
                             lines.add(Component.empty());
                         } else {
-                            lines.add(Msg.color(seg));
+                            lines.add(noItalic(Msg.color(seg)));
                         }
                     }
                 }
@@ -205,6 +228,37 @@ public class MenuItem {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /** Убрать курсив у кнопки: имя/лор игровых предметов не должна наклоняться. */
+    private static Component noItalic(Component c) {
+        return c.decoration(TextDecoration.ITALIC, TextDecoration.State.FALSE);
+    }
+
+    /** Поставить кастомный скин головы по Base64-текстуре через рефлексию
+     *  (GameProfile + Property "textures") — без привязки к версии сервера. */
+    private static void applyHeadTexture(SkullMeta meta, String base64) throws Throwable {
+        String ver = null;
+        try {
+            ver = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];
+        } catch (Throwable ignored) {
+            // новый формат имён пакетов OBC — CraftMetaSkull ищем без суффикса версии
+        }
+        Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
+        Class<?> propertyClass = Class.forName("com.mojang.authlib.properties.Property");
+        Object property = propertyClass.getConstructor(String.class, String.class, String.class)
+                .newInstance("textures", base64, null);
+        Object gameProfile = gameProfileClass.getConstructor(UUID.class, String.class)
+                .newInstance(UUID.nameUUIDFromBytes(base64.getBytes(StandardCharsets.UTF_8)), "");
+        Object props = gameProfileClass.getMethod("getProperties").invoke(gameProfile);
+        props.getClass().getMethod("put", Object.class, Object.class).invoke(props, "textures", property);
+        String craftName = ver == null
+                ? "org.bukkit.craftbukkit.inventory.CraftMetaSkull"
+                : "org.bukkit.craftbukkit." + ver + ".inventory.CraftMetaSkull";
+        java.lang.reflect.Method setProfile = Class.forName(craftName)
+                .getDeclaredMethod("setProfile", gameProfileClass);
+        setProfile.setAccessible(true);
+        setProfile.invoke(meta, gameProfile);
     }
 
     /** Process: {заполнители} контекста + %PlaceholderAPI% + replace.yml.

@@ -6,6 +6,8 @@ import com.sk89q.worldguard.protection.flags.StateFlag;
 import dev.qqregions.QQRegions;
 import dev.qqregions.util.Expressions;
 import dev.qqregions.util.Msg;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -403,7 +405,8 @@ public class Menu {
         titleCtx.put("pages", String.valueOf(maxPages));
         String titleProcessed = new MenuItem("STONE", 1, null, title, null, null, null)
                 .process(plugin, player, titleCtx, title == null ? "" : title);
-        Inventory inv = Bukkit.createInventory(null, size, Msg.color(titleProcessed));
+        Inventory inv = Bukkit.createInventory(null, size,
+                Msg.color(titleProcessed).decoration(TextDecoration.ITALIC, TextDecoration.State.FALSE));
 
         if (slotMap != null) {
             slotMap.clear();

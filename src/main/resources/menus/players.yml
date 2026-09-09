@@ -2,28 +2,26 @@
 #  QQRegions — меню игроков территории (управление участниками)
 #
 #  Список владельцев/участников заполняется кодом плагина в
-#  секцию dynamic-players (аналогично dynamic-flags):
-#  - material / owner-material / member-material — предметы кнопок
-#    (владельцы — например DIAMOND, участники — GOLD_INGOT);
-#  - name — имя кнопки ({player} = ник игрока);
-#  - lore — описание: поддерживаются {player} {role} {role-ru}
-#    и %заполнители% PlaceholderAPI, которые резолвятся на КОНКРЕТНОГО
-#    игрока, например %vault_eco_balance% вернёт баланс каждого
-#    игрока из списка (работает так же для любого PAPI-заполнителя);
-#  - commands — команда клика: у владельца шаблон содержит
-#    @player-del:{player-id}:{role} (открывает меню подтверждения
-#    с инфо об игроке перед удалением); у остальных ролей commands
-#    пустой — только просмотр.
+#  секцию dynamic-players: головы скинов по UUID игроков
+#  (материал — config.yml player-search: head-material/head-texture).
+#  Описание кнопок единое с меню «поиск игроков» и строится из
+#  lang.yml (menu.ps-line-*): имя — цвет ника по роли (владелец
+#  &#ccbf8f / участник &#7db389), лор — группа, клан (если JustTeams
+#  включён), баланс, территории и подсказка удаления (только для
+#  владельца территории). Команду @player-del:{player-id}:{role}
+#  задаёт шаблон владельца; у остальных ролей commands пустой —
+#  только просмотр.
 #
 #  Кнопки владельца:
-#    @add:owner / @add:member  — добавить (ввод ника в чат)
-#    @pf:members / @pf:owners  — фильтр списка (только участники/владельцы)
-#    @pf:all                   — показать всех
+#    «Добавить участников»       — меню поиска игрока по нику
+#    (playersearch.yml), оттуда — добавление/удаление либо по клику
+#    на голову найденного игрока, либо через меню подтверждения.
 #  Управление доступно владельцам и админам (qqregions.admin).
 #
-#  Переменные: {region} {world} {player} {role} {role-ru} {player-id}
-#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>, @add:owner|member,
-#                 @player-del:<uuid|ник>:owner|member, @pf:all|owners|members, close
+#  Переменные: {region} {world} {player} {role} {player-id}
+#              {ps-group} {ps-clan} {ps-balance} {ps-regions}
+#  Псевдокоманды: @page:prev/@page:next, @menu:<имя>,
+#                 @player-del:<uuid|ник>:owner|member
 # ============================================================
 config-version: 3
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
@@ -67,47 +65,13 @@ Menus:
 #          - "&7Открыть редактор флагов"
 #        commands:
 #          - "@menu:flags"
-      "add-owner":
-        slot: 47
-        material: EMERALD
-        name: "&b+ Владелец"
-        lore:
-          - "&7Нажмите, затем введите ник в чат"
-        commands:
-          - "@add:owner"
-      "add-member":
-        slot: 48
-        material: PLAYER_HEAD
-        name: "&e+ Участник"
-        lore:
-          - "&7Нажмите, затем введите ник в чат"
-        commands:
-          - "@add:member"
-      "del-members":
-        slot: 50
-        material: GOLD_INGOT
-        name: "&8Удалить участников"
-        lore:
-          - "&7Показать только участников"
-          - "&7клик по игроку — удалить"
-        commands:
-          - "@pf:members"
-      "del-owners":
-        slot: 51
-        material: DIAMOND
-        name: "&8Удалить владельцев"
-        lore:
-          - "&7Показать только владельцев"
-          - "&7клик по игроку — удалить"
-        commands:
-          - "@pf:owners"
       "addplayers":
         slot: 4
         material: PLAYER_HEAD
-        name: "&eДобавить игроков"
+        name: "&bДобавить участников"
         lore:
-          - "&7Открыть меню со всеми игроками сервера"
-          #- "&6ЛКМ — добавить, &6ПКМ — убрать, &cShift &8+ &6ЛКМ — сменить группу"
+          - "&7Найти игрока по нику и добавить"
+          - "&7в территорию (меню поиска игроков)"
         commands:
           - "@menu:playersearch"
       "back":
@@ -142,14 +106,19 @@ Menus:
         - 32
         - 33
         - 34
-      material: GOLD_INGOT
-      owner-material: DIAMOND
-      member-material: GOLD_INGOT
+      material: PLAYER_HEAD
+      owner-material: PLAYER_HEAD
+      member-material: PLAYER_HEAD
       name: "{player}"
+      # Описание кнопок списка строится кодом из lang.yml (menu.ps-line-*):
+      # имя — цвет ника по роли (владелец &#ccbf8f / участник &#7db389),
+      # лор — группа, клан, баланс, территории, «Нажмите чтобы удалить»
+      # (подсказка видна только владельцу территории).
       lore:
-        - "%vault_eco_balance%$"
-        - "&7Роль: &f{role-ru}"
-        - "&6ЛКМ &8— удалить (подтверждение)"
+        - "{ps-group}"
+        - "{ps-clan}"
+        - "{ps-balance}"
+        - "{ps-regions}"
       commands:
         - "@player-del:{player-id}:{role}"
     navigation:
@@ -225,13 +194,17 @@ Menus:
         - 32
         - 33
         - 34
-      material: GOLD_INGOT
-      owner-material: DIAMOND
-      member-material: GOLD_INGOT
+      material: PLAYER_HEAD
+      owner-material: PLAYER_HEAD
+      member-material: PLAYER_HEAD
       name: "{player}"
+      # Описание кнопок списка строится кодом из lang.yml (menu.ps-line-*) —
+      # см. шаблон владельца выше.
       lore:
-        - "%vault_eco_balance%$"
-        - "&7Роль: &f{role-ru}"
+        - "{ps-group}"
+        - "{ps-clan}"
+        - "{ps-balance}"
+        - "{ps-regions}"
     navigation:
       prev:
         material: ARROW
