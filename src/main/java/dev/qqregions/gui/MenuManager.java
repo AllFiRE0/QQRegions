@@ -14,9 +14,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerKickEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 
 import java.io.File;
@@ -108,6 +113,50 @@ public class MenuManager implements Listener {
             }
         }
         registerOpenCommands();
+        // Перезагрузка (/region reload) отменяет незавершённые чат-промпты:
+        // иначе «введи ник/поиск/срок» продолжает глотать чат после релоада.
+        pendingAdd.clear();
+        pendingSearch.clear();
+        pendingDur.clear();
+        pendingPeriod.clear();
+    }
+
+    /** Снять все ожидающие чат-промпты игрока (ввод ника/поиск/срок). Вызывается
+     *  при уроне, смерти, выходе/кике, смене мира и перезагрузке — иначе
+     *  «забытый» промпт продолжает глотать следующий чат игрока. */
+    public void cancelPlayerPrompts(Player p) {
+        UUID id = p.getUniqueId();
+        pendingAdd.remove(id);
+        pendingSearch.remove(id);
+        pendingDur.remove(id);
+        pendingPeriod.remove(id);
+    }
+
+    @EventHandler
+    public void onPlayerDamage(EntityDamageEvent e) {
+        if (e.getEntity() instanceof Player p) {
+            cancelPlayerPrompts(p);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent e) {
+        cancelPlayerPrompts(e.getEntity());
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent e) {
+        cancelPlayerPrompts(e.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerKick(PlayerKickEvent e) {
+        cancelPlayerPrompts(e.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent e) {
+        cancelPlayerPrompts(e.getPlayer());
     }
 
     /** Зарегистрировать open-commands из всех меню (команда = открыть меню). */

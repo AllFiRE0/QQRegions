@@ -14,7 +14,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&6Поиск территорий: &f{query}"
+    title: "&#000000Поиск территорий: &f{query}"
     size: 6
     fill:
       enabled: true
@@ -43,7 +43,8 @@ Menus:
         material: BOOK
         name: "&eСправка"
         lore:
-          - "&7Команды плагина"
+          - "&7Выделение, территория, флаги,"
+          - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"
     navigation:

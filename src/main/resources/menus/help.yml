@@ -41,9 +41,10 @@ Menus:
         name: "&fВыделение"
         lore:
           - "&7/region select — интерактивное выделение"
-          - "&7/region select pos <1|2>"
-          - "&7/region select chunk [N]"
-          - "&7/region select expand [сторона] <N>"
+          - "&7/region select pos <1|2> — выделить 1|2 точку под ногами"
+          - "&7/region select chunk [число] — выделить текущий чанк (F3 + G)"
+          - "&7/region select expand [сторона] <число> — передвинуть выделение на N блоков"
+          - "&7/region select expand <число> — передвинуть выделение на N, по взгляду"
           - "&7/region select view <ник> — выделение игрока"
       "create-delete":
         slot: 11
@@ -66,11 +67,10 @@ Menus:
         material: GLOWSTONE_DUST
         name: "&fПодсветка"
         lore:
-          - "&7/region visible [территория] [тип] — показать"
-          - "&7/region visible off — скрыть все"
-          - "&7/region visible type [тип] — тип по умолчанию"
-          - "&7/region visible self on|off — подсветка «для себя» (по флагу)"
-          - "&7/region visible true|allow|false|deny [тип] [территория] — флаг"
+          - "&7/region visible true|false [территория]"
+          - "&7  — флаг подсветки территории (владелец)"
+          - "&7/region view [территория] [particles|blocks|territory]"
+          - "&7  — временно показать подсветку"
       "market-help":
         slot: 14
         material: GOLD_INGOT

@@ -29,7 +29,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&f{pc-player}&7 — {pc-action}?"
+    title: "&#000000{pc-player}&8 — {pc-action}?"
     size: 3
     fill:
       enabled: true
@@ -39,7 +39,7 @@ Menus:
     buttons:
       "confirm":
         slot: 11
-        material: EMERALD
+        material: LIME_CONCRETE
         name: "&aПодтвердить"
         lore:
           - "&7{pc-action} &f{pc-player}&7: {region}"
@@ -54,13 +54,15 @@ Menus:
           - "&7Роль: &f{pc-role}"
           - "&7Баланс: &f{pc-balance} {pc-balance-symbol}"
           - "&7Клан: &f{pc-clan}"
-          - "&7Территорий: &f{pc-regions}&8/&f{pc-max} &8(&f{pc-reg-owner}&8 вл. + &f{pc-reg-member}&8 уч.)"
+          - "&7Территорий: &f{pc-regions}&7из &f{pc-max}"
+          - "&e‖ &f{pc-reg-owner}&8 владеления."
+          - "&a‖ &f{pc-reg-member}&8 участие."
           #- "&8Подтверждение операции с игроком"
         commands: []
       "cancel":
         slot: 15
-        material: BARRIER
-        name: "&8Отмена"
+        material: RED_TERRACOTTA
+        name: "&cОтмена"
         lore:
           - "&7Вернуться назад без изменений"
         commands:

@@ -405,11 +405,48 @@ public class Wg {
         }
         region.getOwners().addPlayer(owner.getUniqueId());
         rm.addRegion(region);
+        // Автофлаги из конфига region-flags-on-create: ставятся до первого
+        // сохранения региона (одним rm.save() внизу).
+        if (plugin.config().regionFlagsOnCreate()) {
+            applyCreateFlags(region);
+        }
         try {
             rm.save();
         } catch (StorageException e) {
             rm.removeRegion(name, RemovalStrategy.REMOVE_CHILDREN);
             throw new RegionException("create.fail", "error", e.getMessage());
+        }
+    }
+
+    /** Автофлаги при создании региона из конфига region-flags-on-create:
+     *  каждая строка — <флаг>:<значение>[:<группа>]. Группы: all (все),
+     *  members (участники и владельцы), owners, nonmembers, nonowners.
+     *  Неизвестные флаги и не State/Boolean значения пропускаются. */
+    private void applyCreateFlags(ProtectedRegion region) {
+        for (String spec : plugin.config().regionFlagsOnCreateList()) {
+            if (spec == null || spec.trim().isEmpty()) {
+                continue;
+            }
+            String[] parts = spec.split(":", 3);
+            if (parts.length < 2) {
+                continue;
+            }
+            String flagName = parts[0].trim();
+            Flag<?> f = flag(flagName);
+            if (f == null) {
+                if (plugin.config().debug()) {
+                    plugin.getLogger().warning("region-flags-on-create: флаг «" + flagName + "» не зарегистрирован — пропущен.");
+                }
+                continue;
+            }
+            if (!(f instanceof StateFlag) && !(f instanceof BooleanFlag)) {
+                if (plugin.config().debug()) {
+                    plugin.getLogger().warning("region-flags-on-create: флаг «" + flagName + "» не State/Boolean — пропущен.");
+                }
+                continue;
+            }
+            String group = parts.length >= 3 && !parts[2].trim().isEmpty() ? parts[2].trim() : "all";
+            setFlagInternal(region, f, parts[1].trim(), group);
         }
     }
 
@@ -600,7 +637,20 @@ public class Wg {
      * Эквивалентно /rg flag -g <группа> <флаг> <значение>.
      */
     public boolean setFlagValue(World world, ProtectedRegion region, Flag<?> flag, String rawValue, String group) {
-        if (region == null || world == null || flag == null) {
+        if (world == null || !setFlagInternal(region, flag, rawValue, group)) {
+            return false;
+        }
+        RegionManager rm = manager(world);
+        if (rm != null) {
+            rm.save();
+        }
+        return true;
+    }
+
+    /** Поставить значение + группу флага БЕЗ сохранения (общая часть
+     *  setFlagValue и автофлагов при создании региона). */
+    private boolean setFlagInternal(ProtectedRegion region, Flag<?> flag, String rawValue, String group) {
+        if (region == null || flag == null) {
             return false;
         }
         Object parsed;
@@ -629,10 +679,6 @@ public class Wg {
                 }
             }
             region.setFlag((Flag) flag, parsed);
-            RegionManager rm = manager(world);
-            if (rm != null) {
-                rm.save();
-            }
             return true;
         } catch (Throwable t) {
             return false;

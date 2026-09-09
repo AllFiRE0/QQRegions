@@ -43,15 +43,16 @@ Menus:
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
-          - "&7Купить ещё флаги"
+          - "&7Покупка доступных флагов"
         commands:
           - "@menu:flagshop"
       "help":
         slot: 8
         material: BOOK
-        name: "&eПомощь"
+        name: "&eСправка"
         lore:
-          - "&7Команды плагина"
+          - "&7Выделение, территория, флаги,"
+          - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"
     purchased-flags:

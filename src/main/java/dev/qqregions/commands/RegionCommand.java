@@ -198,6 +198,10 @@ public class RegionCommand {
         try {
             plugin.wg().create(sel, norm, p);
             lang(p, "create.ok", "region", norm, "world", sel.getWorld().getName(), "blocks", fmt(sel.volume()));
+            if (plugin.selections().session(p) != null) {
+                // автозакрытие интерактивного select при создании командой
+                plugin.selections().endSession(p);
+            }
         } catch (RegionException e) {
             lang(p, e.getKey(), e.getKv());
         }
@@ -428,108 +432,31 @@ public class RegionCommand {
             lang(p, "visible.disabled");
             return;
         }
-        // /region visible self [on|off] — личная подсветка «для себя» (по флагу);
-        // команда и меню показывают подсветку всегда, независимо от флага.
-        if (args.length >= 2 && args[1].equalsIgnoreCase("self")) {
-            if (args.length < 3) {
-                boolean on = plugin.highlight().isSelfEnabled(p);
-                lang(p, "visible.self-current", "state", plugin.lang().get(on ? "visible.on-word" : "visible.off-word"));
-                return;
-            }
-            String v = args[2].toLowerCase(Locale.ROOT);
-            if (v.equals("on") || v.equals("true")) {
-                plugin.highlight().setSelfEnabled(p, true);
-                lang(p, "visible.self-on");
-                return;
-            }
-            if (v.equals("off") || v.equals("false")) {
-                plugin.highlight().setSelfEnabled(p, false);
-                lang(p, "visible.self-off");
-                return;
-            }
-            lang(p, "visible.self-invalid", "value", args[2]);
+        // /region visible true|false [территория] — только владелец территории
+        // (или админ) включает/выключает флаг territory-visible — подсветку
+        // границ для всех. Сменить флаг чужой территории нельзя.
+        if (args.length < 2 || !isVisibleValue(args[1])) {
+            lang(p, "general.usage", "usage", "visible " + plugin.lang().get("usage.visible"));
             return;
         }
-        // /region visible type <particles|blocks|territory> — тип подсветки по умолчанию
-        if (args.length >= 2 && args[1].equalsIgnoreCase("type")) {
-            if (args.length < 3) {
-                lang(p, "visible.type-current", "type", plugin.highlight().typeOf(p),
-                        "types", String.join(", ", HIGHLIGHT_TYPES));
-                return;
-            }
-            String type = args[2].toLowerCase(Locale.ROOT);
-            if (!isViewType(type)) {
-                lang(p, "visible.type-invalid", "type", args[2]);
-                return;
-            }
-            plugin.highlight().setDefaultType(p, type);
-            lang(p, "visible.type-set", "type", type);
-            return;
-        }
-        // /region visible off — скрыть все подсветки
-        if (args.length >= 2 && args[1].equalsIgnoreCase("off")) {
-            plugin.highlight().hideAll(p);
-            lang(p, "visible.hidden-all");
-            return;
-        }
-        // /region visible true|allow|false|deny [тип] [регион] — задать флаг territory-visible
-        if (args.length >= 2 && isVisibleValue(args[1])) {
-            String value = args[1].toLowerCase(Locale.ROOT);
-            String type = null;
-            String regionName = null;
-            for (int i = 2; i < args.length; i++) {
-                String a = args[i];
-                if (isViewType(a)) {
-                    type = a;
-                } else if (regionName == null) {
-                    regionName = a;
-                }
-            }
-            ProtectedRegion region = resolveRegion(p, regionName);
-            if (region == null) {
-                lang(p, "visible.none");
-                return;
-            }
-            if (!plugin.wg().owns(region, p)) {
-                lang(p, "visible.not-owner", "region", region.getId());
-                return;
-            }
-            // true|false → allow|deny
-            String state = value.equals("true") ? "allow" : value.equals("false") ? "deny" : value;
-            boolean ok = plugin.wg().setFlagValue(p.getWorld(), region, plugin.wg().territoryVisibleFlag(), state);
-            if (ok) {
-                lang(p, "visible.flag-set", "region", region.getId(), "flag", "territory-visible", "value", state);
-                if (type != null) {
-                    plugin.wg().setStringFlag(p.getWorld(), region, plugin.wg().territoryTypeFlag(), type);
-                    lang(p, "visible.type-set", "type", type);
-                }
-            } else {
-                lang(p, "visible.flag-fail", "region", region.getId());
-            }
-            return;
-        }
-        ProtectedRegion region = resolveRegion(p, args.length >= 2 ? args[1] : null);
+        String value = args[1].toLowerCase(Locale.ROOT);
+        String regionName = args.length >= 3 ? args[2] : null;
+        ProtectedRegion region = resolveRegion(p, regionName);
         if (region == null) {
             lang(p, "visible.none");
             return;
         }
-        String type = plugin.highlight().typeOf(p);
-        if (args.length >= 3) {
-            String t = args[2].toLowerCase(Locale.ROOT);
-            if (!isViewType(t)) {
-                lang(p, "visible.type-invalid", "type", args[2]);
-                return;
-            }
-            type = t;
+        if (!plugin.wg().owns(region, p) && !adminPerm(p, "qqregions.admin")) {
+            lang(p, "visible.not-owner", "region", region.getId());
+            return;
         }
-        boolean shown = plugin.highlight().toggle(p, p.getWorld(), region, type);
-        if (shown) {
-            lang(p, "visible.shown",
-                    "region", region.getId(),
-                    "type", type,
-                    "seconds", String.valueOf(plugin.config().highlight().showSeconds));
+        // true|false → allow|deny
+        String state = value.equals("true") ? "allow" : value.equals("false") ? "deny" : value;
+        boolean ok = plugin.wg().setFlagValue(p.getWorld(), region, plugin.wg().territoryVisibleFlag(), state);
+        if (ok) {
+            lang(p, "visible.flag-set", "region", region.getId(), "flag", "territory-visible", "value", state);
         } else {
-            lang(p, "visible.hidden", "region", region.getId());
+            lang(p, "visible.flag-fail", "region", region.getId());
         }
     }
 
@@ -998,29 +925,11 @@ public class RegionCommand {
                 return args.length == 3 ? filtered(HIGHLIGHT_TYPES, args, 2) : List.of();
             }
             case "visible": {
-                // visible [off|type|self|true|allow|false|deny|регион] [тип|on|off] [регион]
+                // visible true|allow|false|deny [регион]
                 if (args.length == 2) {
-                    List<String> opts = new ArrayList<>(List.of("off", "type", "self", "true", "allow", "false", "deny"));
-                    opts.addAll(regions);
-                    return filtered(opts, args, 1);
+                    return filtered(List.of("true", "allow", "false", "deny"), args, 1);
                 }
-                String first = args[1].toLowerCase(Locale.ROOT);
-                if (args.length == 3) {
-                    if (first.equals("self")) {
-                        return filtered(List.of("on", "off"), args, 2);
-                    }
-                    if (first.equals("off")) {
-                        return List.of();
-                    }
-                    return filtered(HIGHLIGHT_TYPES, args, 2);
-                }
-                if (args.length == 4) {
-                    // после значения флага (true|allow|false|deny) можно указать регион
-                    boolean value = first.equals("true") || first.equals("allow")
-                            || first.equals("false") || first.equals("deny");
-                    return value ? filtered(regions, args, 3) : List.of();
-                }
-                return List.of();
+                return args.length == 3 ? filtered(regions, args, 2) : List.of();
             }
             case "sell":
             case "rent": {

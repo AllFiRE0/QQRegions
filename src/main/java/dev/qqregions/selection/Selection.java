@@ -98,6 +98,40 @@ public class Selection {
         return new Selection(world, mn, mx);
     }
 
+    /** Выделение после расширения «по взгляду» без указания стороны: 360° по
+     *  любой оси. Дальняя грань каждой оси, вдоль которой направлен взгляд
+     *  (порог ~0.30), сдвигается наружу на amount: смотрим между югом и
+     *  западом — двигается угол (обе грани), вверх/вниз — верх/низ.
+     *  Отрицательный amount втягивает соответствующую(ие) грань(и). */
+    public Selection withExpandedFacing(org.bukkit.util.Vector dir, int amount) {
+        double nx = dir.getX();
+        double ny = dir.getY();
+        double nz = dir.getZ();
+        double len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1e-4) {
+            return new Selection(world, min(), max());
+        }
+        double cx = nx / len, cy = ny / len, cz = nz / len;
+        BlockVector3 mn = min();
+        BlockVector3 mx = max();
+        if (cx >= 0.30) {
+            mx = mx.withX(mx.getBlockX() + amount);
+        } else if (cx <= -0.30) {
+            mn = mn.withX(mn.getBlockX() - amount);
+        }
+        if (cy >= 0.30) {
+            mx = mx.withY(mx.getBlockY() + amount);
+        } else if (cy <= -0.30) {
+            mn = mn.withY(mn.getBlockY() - amount);
+        }
+        if (cz >= 0.30) {
+            mx = mx.withZ(mx.getBlockZ() + amount);
+        } else if (cz <= -0.30) {
+            mn = mn.withZ(mn.getBlockZ() - amount);
+        }
+        return new Selection(world, mn, mx);
+    }
+
     /** Выделение после расширения во все стороны (или по осям). */
     public Selection withOutset(int amount, boolean horizontal, boolean vertical) {
         BlockVector3 mn = min();

@@ -12,7 +12,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&6Отмена: &f{market-region}"
+    title: "&#000000Отмена: &f{market-region}&#000000?"
     size: 3
     fill:
       enabled: true
@@ -22,17 +22,17 @@ Menus:
     buttons:
       "confirm":
         slot: 11
-        material: RED_DYE
-        name: "&8Подтвердить отмену"
+        material: RED_TERRACOTTA
+        name: "&cПодтвердить отмену"
         lore:
           - "&7Объявление &f{market-type}&7: &f{market-region}"
-          - "&7Будет снято с рынка"
+          - "&cБудет снято с рынка"
         commands:
           - "@mkt-cancel:{market-id}"
       "back":
         slot: 15
-        material: GREEN_DYE
-        name: "&eВернуться"
+        material: LIME_CONCRETE
+        name: "&2Вернуться"
         lore:
           - "&7К управлению объявлением"
         commands:

@@ -209,7 +209,7 @@ public class SelectCommand {
     // ---------- expand ----------
 
     private void expand(Player p, String[] args) {
-        ExpandDirection direction;
+        ExpandDirection direction = null;
         String amountStr;
         if (args.length >= 3) {
             direction = ExpandDirection.fromString(args[1]);
@@ -220,7 +220,6 @@ public class SelectCommand {
             amountStr = args[2];
         } else if (args.length >= 2) {
             amountStr = args[1];
-            direction = facing(p.getLocation().getYaw());
         } else {
             send(p, "general.usage", "usage", plugin.lang().get("usage.select-expand"));
             return;
@@ -232,7 +231,13 @@ public class SelectCommand {
             send(p, "select.invalid-amount", "amount", amountStr);
             return;
         }
-        apply(p, sel -> sel.withExpanded(direction, amount), "select.expanded");
+        if (direction == null) {
+            // без стороны: 360° по взгляду (в т.ч. диагональ и вверх/вниз)
+            org.bukkit.util.Vector dir = p.getLocation().getDirection();
+            apply(p, sel -> sel.withExpandedFacing(dir, amount), "select.expanded");
+        } else {
+            apply(p, sel -> sel.withExpanded(direction, amount), "select.expanded");
+        }
     }
 
     // ---------- outset ----------
@@ -411,24 +416,6 @@ public class SelectCommand {
             }
         }
         return out;
-    }
-
-    /** Направление по взгляду игрока (для expand без стороны). */
-    private static ExpandDirection facing(float yaw) {
-        float d = yaw % 360f;
-        if (d < 0) {
-            d += 360f;
-        }
-        if (d >= 315 || d < 45) {
-            return ExpandDirection.SOUTH;
-        }
-        if (d < 135) {
-            return ExpandDirection.WEST;
-        }
-        if (d < 225) {
-            return ExpandDirection.NORTH;
-        }
-        return ExpandDirection.EAST;
     }
 
     private boolean worldDisabled(Player p) {

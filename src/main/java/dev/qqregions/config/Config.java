@@ -103,6 +103,10 @@ public class Config {
     private final List<FlagGroup> flagGroups = new ArrayList<>();
     /** regions.max-regions: лимит регионов на игрока (0 = без лимита). */
     private int maxRegions;
+    /** region-flags-on-create: автофлаги, ставящиеся при создании региона
+     *  (формат строки: <флаг>:<значение>[:<группа>]). */
+    private boolean regionFlagsOnCreate = false;
+    private final List<String> regionFlagsOnCreateList = new ArrayList<>();
 
     public Config(QQRegions plugin) {
         this.plugin = plugin;
@@ -226,6 +230,10 @@ public class Config {
             }
         }
         maxRegions = Math.max(0, cfg.getInt("regions.max-regions", 0));
+
+        regionFlagsOnCreate = cfg.getBoolean("region-flags-on-create.enabled", false);
+        regionFlagsOnCreateList.clear();
+        regionFlagsOnCreateList.addAll(cfg.getStringList("region-flags-on-create.flags"));
     }
 
     private static List<String> lower(List<String> in) {
@@ -485,6 +493,16 @@ public class Config {
     /** Лимит регионов на игрока (0 = без лимита). */
     public int maxRegions() {
         return maxRegions;
+    }
+
+    /** Включена ли автоустановка флагов при создании региона. */
+    public boolean regionFlagsOnCreate() {
+        return regionFlagsOnCreate;
+    }
+
+    /** Список «флаг:значение[:группа]», ставящихся автоматически при создании региона. */
+    public List<String> regionFlagsOnCreateList() {
+        return regionFlagsOnCreateList;
     }
 
     /** Есть ли у игрока группа-шаблон прав (config.yml flag-groups), открывающая

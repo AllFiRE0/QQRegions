@@ -46,12 +46,14 @@ Menus:
         material: NAME_TAG
         name: "&7Территория: #59806f{region}"
         lore:
+          - "&7Ваша роль: &eВладелец"
           - "&7Мир: &f{world}"
-          - "&7Ваша роль: &aВладелец"
+          - "&7Приоритет: &f{priority}"
+          - " "
           #- "&7Тип: &f{type}"
           #- "&7Статус: &a{status}"
-          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
-          - "&7Приоритет: &f{priority}"
+          - "&7Площадь: &f{area} &7блоков 
+          - "&7Объём: &f{volume} &7блоков"
           - "&7Ваших территорий: &f{my-regions}&7/&f{max-regions}"
           - "&7Доступно в области: &f{max-blocks}"
       "people":
@@ -60,9 +62,9 @@ Menus:
         name: "&fИгроки территории"
         lore:
           - "&7Владельцы:"
-          - "{owners}"
+          - "&#ccbf8f{owners}"
           - "&7Участники:"
-          - "{members}"
+          - "&#7db389{members}"
       "flags":
         slot: 19
         material: REDSTONE_TORCH
@@ -165,23 +167,25 @@ Menus:
         material: NAME_TAG
         name: "&7Территория: #59806f{region}"
         lore:
+          - "&7Ваша роль: &aУчастник"
           - "&7Мир: &f{world}"
-          - "&7Тип: &f{type}"
-          - "&7Статус: &a{status}"
-          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
           - "&7Приоритет: &f{priority}"
-          - "&7Ваша роль: &eУчастник"
+          - " "
+          #- "&7Тип: &f{type}"
+          #- "&7Статус: &a{status}"
+          - "&7Площадь: &f{area} &7блоков 
+          - "&7Объём: &f{volume} &7блоков"
           - "&7Ваших территорий: &f{my-regions}&7/&f{max-regions}"
-          - "&7Максимум блоков выделения: &f{max-blocks}"
+          - "&7Доступно в области: &f{max-blocks}"
       "people":
         slot: 11
         material: PLAYER_HEAD
         name: "&fИгроки территории"
         lore:
           - "&7Владельцы:"
-          - "{owners}"
+          - "&#ccbf8f{owners}"
           - "&7Участники:"
-          - "{members}"
+          - "&#7db389{members}"
       "players":
         slot: 20
         material: PLAYER_HEAD
@@ -234,20 +238,20 @@ Menus:
         name: "&7Территория: #59806f{region}"
         lore:
           - "&7Мир: &f{world}"
-          - "&7Тип: &f{type}"
-          - "&7Статус: &a{status}"
-          - "&7Площадь: &f{area} &7блоков | Объём: &f{volume} &7блоков"
-          - "&7Приоритет: &f{priority}"
-          - "&7Ваша роль: &7Посторонний"
+          - " "
+          #- "&7Тип: &f{type}"
+          #- "&7Статус: &a{status}"
+          - "&7Площадь: &f{area} &7блоков 
+          - "&7Объём: &f{volume} &7блоков"
       "people":
         slot: 11
         material: PLAYER_HEAD
         name: "&fИгроки территории"
         lore:
           - "&7Владельцы:"
-          - "{owners}"
+          - "&#ccbf8f{owners}"
           - "&7Участники:"
-          - "{members}"
+          - "&#7db389{members}"
       "raid":
         slot: 19
         material: NETHERITE_SWORD
@@ -273,8 +277,9 @@ Menus:
       "help":
         slot: 8
         material: BOOK
-        name: "&eПомощь"
+        name: "&eСправка"
         lore:
-          - "&7Команды плагина"
+          - "&7Выделение, территория, флаги,"
+          - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"

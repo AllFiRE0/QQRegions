@@ -61,9 +61,10 @@ Menus:
       "help":
         slot: 8
         material: BOOK
-        name: "&eПомощь"
+        name: "&eСправка"
         lore:
-          - "&7Команды плагина"
+          - "&7Выделение, территория, флаги,"
+          - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"
     menu-slots:

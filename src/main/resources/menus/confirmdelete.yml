@@ -16,7 +16,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&8Удалить территорию: &f{region}"
+    title: "&#000000Удалить &f{region}&8?"
     size: 3
     fill:
       enabled: true
@@ -26,19 +26,19 @@ Menus:
     buttons:
       "confirm":
         slot: 11
-        material: RED_DYE
-        name: "&8Да, удалить"
+        material: RED_TERRACOTTA
+        name: "&c&lДа, удалить"
         lore:
-          - "&7Территория &f{region} &7будет удалена навсегда"
-          - "&7Восстановить её будет нельзя"
+          - "&7Территория &f{region} &7будет &cудалена &7навсегда"
+          - "&cВосстановить её будет нельзя"
         permission: qqregions.delete
         role-required: owner
         commands:
           - "@region-delete"
       "back":
         slot: 15
-        material: GREEN_DYE
-        name: "&eОтмена"
+        material: LIME_CONCRETE
+        name: "&2Отмена"
         lore:
           - "&7Вернуться к информации о территории"
         commands:

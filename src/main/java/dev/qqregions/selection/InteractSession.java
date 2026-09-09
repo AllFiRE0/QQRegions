@@ -497,6 +497,8 @@ public class InteractSession {
             plugin.wg().create(sel, norm, player);
             plugin.lang().send(player, "create.ok",
                     "region", norm, "world", sel.getWorld().getName(), "blocks", fmt(sel.volume()));
+            // автозакрытие интерактивного select при создании через промпт
+            plugin.selections().endSession(player);
         } catch (RegionException e) {
             plugin.lang().send(player, e.getKey(), e.getKv());
         }

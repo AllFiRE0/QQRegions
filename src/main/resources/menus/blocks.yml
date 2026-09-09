@@ -27,7 +27,7 @@ Menus:
         material: ARROW
         name: "&eВернуться в {back-target}"
         lore:
-          - "&7Вернуться в предыдущее меню"
+          #- "&7Вернуться в предыдущее меню"
         commands:
           - "@back"
       "flagshop":
@@ -35,7 +35,7 @@ Menus:
         material: REDSTONE_TORCH
         name: "&eМагазин флагов"
         lore:
-          - "&7Флаги без права"
+          - "&7Покупка доступных флагов"
         commands:
           - "@menu:flagshop"
       "myflags":
@@ -49,9 +49,10 @@ Menus:
       "help":
         slot: 8
         material: BOOK
-        name: "&eПомощь"
+        name: "&eСправка"
         lore:
-          - "&7Команды плагина"
+          - "&7Выделение, территория, флаги,"
+          - "&7подсветка, рынок, аренда, рейды"
         commands:
           - "@menu:help"
     menu-slots:
