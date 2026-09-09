@@ -8,26 +8,60 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * Магазин флагов и расширений (меню flagshop/blocks, кнопки @shop-buy).
- * Настройки — shop.yml (цены флагов, пакеты территории «+блоки» и пакеты
- * регионов «+регионы»). Покупки — data.yml, НА ИГРОКА НАВСЕГДА (действуют
- * на все его регионы): список флагов, купленные пакеты площади и число
- * купленных пакетов регионов.
+ * Настройки — shop.yml (цены флагов, пакеты территории «+блоки», пакеты
+ * регионов «+регионы» и пользовательские товары custom-items).
+ * Покупки — data.yml, НА ИГРОКА НАВСЕГДА (действуют на все его регионы):
+ * список флагов, купленные пакеты площади, число купленных пакетов
+ * регионов и число покупок пользовательских товаров.
  *
  * Списание через экономику рынка (Vault, как и /region sell). Если Vault/
  * экономики нет — покупка отвечает "no-economy".
  */
 public final class ShopManager {
+
+    /**
+     * Товар магазина (пакет площади, пакет регионов или пользовательский).
+     *
+     * @param kind          area | region | custom
+     * @param id            id пакета/товара из shop.yml
+     * @param name          название (ячейка shop.yml "name")
+     * @param material      материал кнопки (материал из shop.yml или по умолчанию)
+     * @param amount        количество (блоки/регионы/выдача)
+     * @param lore          кастомный лор (пользовательские товары)
+     * @param price         цена; 0/отрицательная — не продаётся
+     * @param maxPurchases  лимит покупок (<= 0 = безлимит/повторяемый)
+     * @param boughtDisplay RED_GLASS — красное стекло «Уже куплено», HIDE — скрыть
+     * @param priority      порядок кнопок в меню (меньше — раньше)
+     * @param commands      команды после покупки (без условий)
+     * @param conditions    условия срабатывания allow/deny команд (AND)
+     * @param allowCmds     команды при выполненных условиях
+     * @param denyCmds      команды при невыполненных условиях
+     */
+    public record ShopProduct(
+            String kind,
+            String id,
+            String name,
+            String material,
+            int amount,
+            List<String> lore,
+            double price,
+            int maxPurchases,
+            String boughtDisplay,
+            int priority,
+            List<String> commands,
+            List<String> conditions,
+            List<String> allowCmds,
+            List<String> denyCmds) {
+    }
 
     private final QQRegions plugin;
     private final File shopFile;
@@ -82,7 +116,7 @@ public final class ShopManager {
         return plugin.market().economy().enabled();
     }
 
-    // ---------- цены ----------
+    // ---------- цены флагов ----------
 
     /** Цена флага: из flags.prices или default-price (0 = не продаётся). */
     public double priceOf(String flagId) {
@@ -93,32 +127,106 @@ public final class ShopManager {
         return shop.getDouble("flags.default-price", 0);
     }
 
-    // ---------- пакеты ----------
+    // ---------- товары ----------
 
-    public record Pack(String id, String name, int amount, double price) {
+    /** Пакеты площади (id -> товар). */
+    public List<ShopProduct> areaPacks() {
+        return products("area");
     }
 
-    public List<Pack> areaPacks() {
-        return packs("area-packs");
+    /** Пакеты регионов «+регионы». */
+    public List<ShopProduct> regionPacks() {
+        return products("region");
     }
 
-    public List<Pack> regionPacks() {
-        return packs("region-packs");
+    /** Пользовательские товары (custom-items). */
+    public List<ShopProduct> customProducts() {
+        return products("custom");
     }
 
-    private List<Pack> packs(String section) {
-        List<Pack> out = new ArrayList<>();
+    /** Все товары, отсортированные по priority (равные — по типу и id). */
+    public List<ShopProduct> allProducts() {
+        List<ShopProduct> out = new ArrayList<>();
+        out.addAll(areaPacks());
+        out.addAll(regionPacks());
+        out.addAll(customProducts());
+        out.sort(Comparator
+                .comparingInt(ShopProduct::priority)
+                .thenComparing(this::kindOrder)
+                .thenComparing(p -> p.id().toLowerCase(Locale.ROOT)));
+        return out;
+    }
+
+    private int kindOrder(ShopProduct p) {
+        return switch (p.kind()) {
+            case "area" -> 0;
+            case "region" -> 1;
+            default -> 2;
+        };
+    }
+
+    /** Товар по типу иде (`area`/`region`/`custom`); null — нет такого. */
+    public ShopProduct product(String kind, String id) {
+        if (kind == null || id == null) {
+            return null;
+        }
+        for (ShopProduct p : products(kind)) {
+            if (p.id().equalsIgnoreCase(id)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    public List<ShopProduct> products(String kind) {
+        String section = switch (kind == null ? "" : kind.toLowerCase(Locale.ROOT)) {
+            case "area" -> "area-packs";
+            case "region" -> "region-packs";
+            case "custom" -> "custom-items";
+            default -> null;
+        };
+        if (section == null) {
+            return List.of();
+        }
+        List<ShopProduct> out = new ArrayList<>();
         ConfigurationSection sc = shop.getConfigurationSection(section);
         if (sc == null) {
             return out;
         }
         for (String id : sc.getKeys(false)) {
-            String base = section + "." + id + ".";
-            String name = shop.getString(base + "name", id);
-            int amount = Math.max(1, shop.getInt(base + "amount", 1));
-            out.add(new Pack(id, name, amount, shop.getDouble(base + "price", 0)));
+            out.add(readProduct(section, id));
         }
         return out;
+    }
+
+    private ShopProduct readProduct(String section, String id) {
+        String base = section + "." + id + ".";
+        String kind = "region".equals(section) ? "region"
+                : "area".equals(section) ? "area" : "custom";
+        String name = shop.getString(base + "name", id);
+        double price = shop.getDouble(base + "price", 0);
+        int amount = Math.max(1, shop.getInt(base + "amount",
+                Math.max(1, shop.getInt(base + "blocks",
+                        Math.max(1, shop.getInt(base + "regions", 1))))));
+        String material = shop.getString(base + "material",
+                "custom".equals(kind) ? "EMERALD"
+                        : "area".equals(kind) ? "GOLD_INGOT" : "EMERALD");
+        List<String> lore = shop.getStringList(base + "lore");
+        int defaultMax = "custom".equals(kind) || "area".equals(kind) ? 1 : 0;
+        int max = shop.getInt(base + "max-purchases", defaultMax);
+        String display = shop.getString(base + "bought-display", "HIDE").toUpperCase(Locale.ROOT);
+        int priority = shop.getInt(base + "priority", 0);
+        List<String> commands = shop.getStringList(base + "commands");
+        List<String> conditions = shop.getStringList(base + "conditions");
+        List<String> allow = shop.getStringList(base + "allow-cmds");
+        List<String> deny = shop.getStringList(base + "deny-cmds");
+        return new ShopProduct(kind, id, name, material, amount,
+                lore == null || lore.isEmpty() ? null : lore,
+                price, max, "RED_GLASS".equals(display) ? "RED_GLASS" : "HIDE", priority,
+                commands == null || commands.isEmpty() ? null : commands,
+                conditions == null || conditions.isEmpty() ? null : conditions,
+                allow == null || allow.isEmpty() ? null : allow,
+                deny == null || deny.isEmpty() ? null : deny);
     }
 
     // ---------- покупки игрока ----------
@@ -143,18 +251,35 @@ public final class ShopManager {
         return new HashSet<>(data.getStringList(player(uuid) + ".area-packs"));
     }
 
+    /** Число покупок игроком товара по типу и id (area: 0/1, region/custom: счётчик). */
+    public int purchasedCount(UUID uuid, String kind, String id) {
+        if (uuid == null || id == null) {
+            return 0;
+        }
+        String base = player(uuid);
+        String k = kind == null ? "" : kind.toLowerCase(Locale.ROOT);
+        switch (k) {
+            case "area":
+                return data.getStringList(base + ".area-packs").contains(id) ? 1 : 0;
+            case "region":
+                return data.getInt(base + ".region-packs." + id, 0);
+            case "custom":
+                return data.getInt(base + ".custom-items." + id, 0);
+            default:
+                return 0;
+        }
+    }
+
     /** Множитель площади: максимальные блоки среди купленных пакетов. */
     public int maxBlocksExtension(UUID uuid) {
         Set<String> owned = ownedAreaPacks(uuid);
         if (owned.isEmpty()) {
             return 0;
         }
-        String prefix = player(uuid) + ".area-packs";
         int best = 0;
-        for (String id : owned) {
-            int blocks = packAmount("area-packs", id);
-            if (blocks > best) {
-                best = blocks;
+        for (ShopProduct p : areaPacks()) {
+            if (owned.contains(p.id()) && p.amount() > best) {
+                best = p.amount();
             }
         }
         return best;
@@ -162,18 +287,17 @@ public final class ShopManager {
 
     /** Число доп. регионов от купленных пакетов «+регион». */
     public int extraRegions(UUID uuid) {
-        String base = player(uuid) + ".region-packs.";
         int total = 0;
-        for (Pack p : regionPacks()) {
-            int count = data.getInt(base + p.id(), 0);
+        for (ShopProduct p : regionPacks()) {
+            int count = data.getInt(player(uuid) + ".region-packs." + p.id(), 0);
             total += count * p.amount();
         }
         return total;
     }
 
-    private int packAmount(String section, String id) {
-        ConfigurationSection sc = shop.getConfigurationSection(section + "." + id);
-        return sc == null ? 0 : Math.max(1, sc.getInt("amount", 1));
+    /** Красное стекло «Уже куплено» для купленных флагов в магазине флагов? */
+    public boolean flagsBoughtRedGlass() {
+        return "RED_GLASS".equalsIgnoreCase(shop.getString("flags.bought-display", "HIDE"));
     }
 
     // ---------- покупка ----------
@@ -210,52 +334,42 @@ public final class ShopManager {
         return "ok";
     }
 
-    /** Код результата: ok / already / no-economy / not-found / no-money. */
-    public String buyAreaPack(UUID uuid, String packId) {
-        if (areaPacks().stream().noneMatch(p -> p.id().equalsIgnoreCase(packId))) {
+    /**
+     * Единая покупка товара (area/region/custom).
+     * Код результата: ok / limit / no-economy / not-found / no-money.
+     */
+    public String buyProduct(UUID uuid, String kind, String id) {
+        ShopProduct p = product(kind, id);
+        if (p == null) {
             return "not-found";
         }
-        if (ownedAreaPacks(uuid).contains(packId)) {
-            return "already";
-        }
-        return buyPack(uuid, "area-packs", packId);
-    }
-
-    /** Код результата: ok / no-economy / not-found / no-money (повторяемый). */
-    public String buyRegionPack(UUID uuid, String packId) {
-        if (regionPacks().stream().noneMatch(p -> p.id().equalsIgnoreCase(packId))) {
-            return "not-found";
-        }
-        return buyPack(uuid, "region-packs", packId);
-    }
-
-    private String buyPack(UUID uuid, String section, String packId) {
         if (!economyEnabled()) {
             return "no-economy";
         }
-        Pack pack = null;
-        for (Pack p : packs(section)) {
-            if (p.id().equalsIgnoreCase(packId)) {
-                pack = p;
-                break;
-            }
-        }
-        if (pack == null || pack.price() <= 0) {
+        if (p.price() <= 0) {
             return "not-found";
         }
-        if (!plugin.market().economy().has(uuid, pack.price())) {
+        int count = purchasedCount(uuid, p.kind(), p.id());
+        int max = p.maxPurchases();
+        if (max > 0 && count >= max) {
+            return count > 0 ? "limit" : "not-found";
+        }
+        if (!plugin.market().economy().has(uuid, p.price())) {
             return "no-money";
         }
-        if (!plugin.market().economy().withdraw(uuid, pack.price())) {
+        if (!plugin.market().economy().withdraw(uuid, p.price())) {
             return "no-economy";
         }
-        String base = player(uuid) + "." + section;
-        if ("area-packs".equals(section)) {
-            List<String> packs = new ArrayList<>(data.getStringList(base));
-            packs.add(pack.id());
-            data.set(base, packs);
+        String base = player(uuid);
+        if ("area".equals(p.kind())) {
+            List<String> packs = new ArrayList<>(data.getStringList(base + ".area-packs"));
+            if (!packs.contains(p.id())) {
+                packs.add(p.id());
+            }
+            data.set(base + ".area-packs", packs);
         } else {
-            data.set(base + "." + pack.id(), data.getInt(base + "." + pack.id(), 0) + 1);
+            String key = base + "." + ("region".equals(p.kind()) ? "region-packs" : "custom-items") + "." + p.id();
+            data.set(key, data.getInt(key, 0) + 1);
         }
         save();
         return "ok";

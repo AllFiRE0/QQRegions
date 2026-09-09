@@ -180,7 +180,34 @@ public class Menu {
         return openCommands;
     }
 
-    // ---------- динамические кнопки флагов ----------
+    // ---------- видимость флагов ----------
+
+    /**
+     * Может ли игрок видеть/менять флаг в шаблоне страны:
+     * админ/оп или есть право <prefix><флаг>. Принимаются оба неймспейса
+     * прав независимо от настройки префикса шаблона (для совместимости и
+     * чтобы админ, сменивший префикс в своих странах, не ломал права):
+     *   <prefix><флаг>, qqregions.flags.use.<флаг> и legacy qqregions.flags.<флаг>.
+     * Если префикс пустой — флаги видны всем (legacy-поведение).
+     */
+    public static boolean canSeeFlag(Player player, String prefix, String flag) {
+        if (player == null) {
+            return false;
+        }
+        if (player.isOp() || player.hasPermission("qqregions.admin")) {
+            return true;
+        }
+        if (prefix == null || prefix.isEmpty()) {
+            return true;
+        }
+        String key = flag == null ? "" : flag.toLowerCase(Locale.ROOT);
+        if (key.isEmpty()) {
+            return false;
+        }
+        return player.hasPermission(prefix + key)
+                || player.hasPermission("qqregions.flags.use." + key)
+                || player.hasPermission("qqregions.flags." + key);
+    }
 
     /**
      * Строит список кнопок флагов — ОДНА кнопка на флаг (устраняет дубли 5x).
@@ -192,10 +219,10 @@ public class Menu {
      * owned     — id купленных флагов (нижний регистр), null = пусто.
      *
      * Фильтрация видимости для обычного шаблона (ownedOnly=false):
-     *  - whitelist пустой  — прежнее поведение: только по праву <prefix><флаг>;
-     *  - флаг в whitelist  — бесплатный, виден всем;
-     *  - флаг в shop-ignore — скрыт из магазина, только по праву;
-     *  - остальные          — из магазина: виден если куплен ИЛИ есть право.
+     *  флаг виден владельцу (куплен) ИЛИ если по правам шаблона
+     *  (<flag-permission-prefix><флаг>) или через qqregions.flags.use.<флаг>/
+     *  qqregions.flags.<флаг>; админ видит всё. whitelist теперь НЕ даёт
+     *  видимость — флаг показывает только разрешённый правами.
      */
     public List<MenuItem> flagItems(QQRegions plugin, Player player, Map<String, String> ctx,
                                     DynamicFlags tpl, boolean ownedOnly, Set<String> owned) {
@@ -211,32 +238,18 @@ public class Menu {
         } catch (Throwable ignored) {
         }
 
-        Set<String> whitelist = plugin.config().flagsMenuWhitelist();
-        Set<String> shopIgnore = plugin.config().flagsShopIgnore();
-        boolean allFree = whitelist.isEmpty();
-        boolean admin = player.hasPermission("qqregions.admin") || player.isOp();
         for (Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
             String key = id == null ? "" : id.toLowerCase(Locale.ROOT);
             if (key.isEmpty() || tpl.ignore.contains(key)) {
                 continue;
             }
-            String perm = tpl.permissionPrefix + key;
             boolean visible;
             if (ownedOnly) {
                 visible = owned != null && owned.contains(key);
-            } else if (allFree) {
-                boolean ownedFlag = owned != null && owned.contains(key);
-                boolean permOk = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
-                visible = ownedFlag || permOk;
-            } else if (whitelist.contains(key)) {
-                visible = true;
-            } else if (shopIgnore.contains(key)) {
-                visible = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
             } else {
                 boolean ownedFlag = owned != null && owned.contains(key);
-                boolean permOk = admin || tpl.permissionPrefix.isEmpty() || player.hasPermission(perm);
-                visible = ownedFlag || permOk;
+                visible = ownedFlag || canSeeFlag(player, tpl.permissionPrefix, id);
             }
             if (!visible) {
                 continue;

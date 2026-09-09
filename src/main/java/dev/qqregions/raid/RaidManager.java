@@ -551,13 +551,20 @@ public final class RaidManager {
             return;
         }
         try {
-            if (c.toLowerCase(Locale.ROOT).startsWith("asconsole!")) {
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), c.substring("asConsole!".length()).trim());
-            } else if (c.toLowerCase(Locale.ROOT).startsWith("asplayer!")) {
+            if (dev.qqregions.util.Actions.isAction(c)) {
                 UUID first = attackers.isEmpty() ? null : attackers.iterator().next();
                 Player p = first == null ? null : Bukkit.getPlayer(first);
                 if (p != null) {
-                    p.performCommand(c.substring("asPlayer!".length()).trim());
+                    dev.qqregions.util.Actions.run(plugin, p, c);
+                } else {
+                    // онлайн-нападающего нет: только глобальные действия
+                    String lower = c.toLowerCase(Locale.ROOT);
+                    if (lower.startsWith("asconsole!")) {
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
+                                c.substring("asConsole!".length()).trim());
+                    } else if (lower.startsWith("gmessage!")) {
+                        Bukkit.broadcast(Msg.color(c.substring("gMessage!".length()).trim()));
+                    }
                 }
             }
         } catch (Throwable t) {

@@ -8,15 +8,17 @@
 #  (navigation.prev/next) — внизу.
 #
 #  Шаблоны выбираются по роли игрока в регионе (role-required):
-#    owner  — владелец: флаги по правам qqregions.flags.<флаг>
-#    member — участник: флаги по правам qqregions.flags.<флаг>
+#    owner  — владелец: флаги по правам qqregions.flags.use.<флаг>
+#    member — участник: флаги по правам qqregions.flags.use.<флаг>
 #    other  — посторонний: обычно без прав на флаги
 #  Любой шаблон с пустым role-required подходит любой роли.
 #
 #  Флаг показывается игроку только если он имеет право
-#    <flag-permission-prefix><флаг>  (например qqregions.flags.pvp).
-#  Показ и клик по флагу требуют этого права; админ (qqregions.admin)
-#  видит и может менять все флаги.
+#    <flag-permission-prefix><флаг>  (например qqregions.flags.use.pvp).
+#  Принимаются также legacy-права qqregions.flags.<флаг>. Показ и клик по
+#  флагу требуют этого права; админ (qqregions.admin) видит и может менять
+#  все флаги. Привилегии вида qqregions.flags.use.* выдавайте игрокам —
+#  флагов без права никто не увидит, whitelist видимость НЕ даёт.
 #
 #  Переменные: {region} {world} {player} {role} {flag} {flag-name} {group}
 #              {group-label} {groups-list} {flag-group} {flag-group-label}
@@ -106,7 +108,7 @@ Menus:
         - nonmembers
         - nonowners
       # игрок видит флаг только при наличии права <префикс><флаг>
-      flag-permission-prefix: "qqregions.flags."
+      flag-permission-prefix: "qqregions.flags.use."
       ignore-flags:
         - territory-type            # какие флаги не показывать (по имени)
       material: MAP
@@ -253,7 +255,7 @@ Menus:
         - owners
         - nonmembers
         - nonowners
-      flag-permission-prefix: "qqregions.flags."
+      flag-permission-prefix: "qqregions.flags.use."
       ignore-flags:
         - territory-type
       material: MAP
@@ -337,7 +339,7 @@ Menus:
         - owners
         - nonmembers
         - nonowners
-      flag-permission-prefix: "qqregions.flags."
+      flag-permission-prefix: "qqregions.flags.use."
       ignore-flags:
         - territory-type
       material: MAP
@@ -433,7 +435,7 @@ Menus:
         - owners
         - nonmembers
         - nonowners
-      flag-permission-prefix: "qqregions.flags."
+      flag-permission-prefix: "qqregions.flags.use."
       ignore-flags:
         - territory-type
       material: MAP

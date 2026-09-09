@@ -144,9 +144,9 @@ command:
 /region add owner <ник> <регион>
 ```
 
-Флаг игроку показывается только при праве `qqregions.flags.<флаг>`
-(админ видит всё). Купленный в магазине флаг показывается владельцу без
-права.
+Флаг игроку показывается только при праве `qqregions.flags.use.<флаг>`
+(админ видит всё; legacy-право `qqregions.flags.<флаг>` тоже принимается).
+Купленный в магазине флаг показывается владельцу без права.
 
 ### Шаг 4. Подсветка границ
 
@@ -301,9 +301,13 @@ command:
 `info`, `manage`, `flags`, `visible`, `market`, `raid`.
 
 Дополнительно для меню флагов используется динамическое право
-**`qqregions.flags.<флаг>`** (например `qqregions.flags.pvp`):
+**`qqregions.flags.use.<флаг>`** (например `qqregions.flags.use.pvp`):
 показывает флаг в меню и разрешает его менять. Право `qqregions.admin`
-видит/меняет все флаги.
+видит/меняет все флаги. Простой вариант — выдать привилегию
+`qqregions.flags.use.*` (например в LuckPerms группе игроков): тогда
+откроются только не-админские флаги, а флаги, предназначенные для
+администрации, без отдельного права игрок не увидит. Legacy-право
+`qqregions.flags.<флаг>` также принимается (для совместимости).
 
 > Примечание: пары `bypass.*` и `admin` полезно выдавать в LuckPerms
 > конкретным группам (см. раздел о шаблонах).
@@ -336,7 +340,7 @@ command:
 | Меню рынка | `{market-type}` `{market-region}` `{market-world}` `{market-price}` `{market-price-symbol}` `{market-who}` `{market-owner}` `{market-status}` |
 | Голограмма рынка (market-holo) | `{owner}` (ник продавца/владельца) `{price}` `{price-symbol}` `{nick}` `{time}` `{region}` |
 | Магазин флагов | `{flag-name}` `{flag}` `{price}` `{price-symbol}` |
-| Магазин расширений | `{pack-name}` `{pack-amount}` `{price}` `{price-symbol}` |
+| Магазин расширений | `{pack-name}` `{name}` `{pack-amount}` `{price}` `{price-symbol}` |
 | Меню info (рейд-кнопка) | `{raid-clan}` `{raid-balance}` `{raid-balance-symbol}` `{raid-online}` `{raid-total}` `{raid-in-region}` `{raid-needed}` |
 | Боссбар выделения | `{current}` `{max}` `{percent}` `{player}` `{value-color}` |
 | Доп. инфо-экшнбар | `{height-top}` `{height-bottom}` `{conflict}` `{conflict-regions}` `{conflict-count}` `{current}` `{max}` `{percent}` `{player}` |
@@ -447,15 +451,31 @@ WorldGuard, игроки из региона, оферты рынка, поку�
 | `@rpsort` | цикл сортировки выбора территории (близкие/дальние/A-Z/Z-A/люди±/площадь±) |
 | `@rinfo:<мир>:<регион>` | открыть info по конкретному региону |
 | `@menu:help` | открыть справку |
+| `@menu:main` | вернуться в главное меню (кнопка «Вернуться в главное меню» в info-меню, слот 0) |
+| `message!<текст>` | сообщение игроку без префикса плагина |
+| `gMessage!<текст>` | сообщение всем игрокам сервера |
+| `title:<ст>:<сст>:<фейд>!<текст>` | тайтл с таймингом в тиках (без `:…!` — по умолчанию 20/40/20) |
+| `title!<текст>` | тайтл (20/40/20) |
+| `actionbar:<тики>!<текст>` | экшнбар N тиков (без числа — 60 тиков) |
+| `sound!<звук> [громкость] [питч]` / `gSound!…` | звук игроку / всем |
 | `asConsole!<команда>` / `asPlayer!<команда>` | выполнить от консоли / игрока |
+| `delay:<тики>!<действие>` | выполнить действие с задержкой |
 | `close` | закрыть меню |
+
+Все action-типы (кроме `close`) доступны не только кнопкам меню, но и
+`commands`/`allow-cmds`/`deny-cmds` товаров магазина (`shop.yml`) и
+рейд-уведомлениям (`config.yml` → `raid.notify.*.commands`).
 
 ### 6.1 Меню информации о регионе
 
 Открывается `/region info`. Слитые инфо-кнопки: **Регион** (мир, тип,
 статус, площадь, объём, приоритет, роль + у владельца/участника лимиты
 игрока `{my-regions}/{max-regions}` и `{max-blocks}`; `∞` при отсутствии
-лимита/праве админа) и **Игроки** (владельцы + участники). У владельца
+лимита/праве админа) и **Игроки** (владельцы + участники). В слоте 0 —
+кнопка **«Вернуться в главное меню»** (`@menu:main`): в дефолтный
+`menus/info.yml` она добавляется при установке, а в кастомизированных
+файлах вставляется автоматически кодом (только если слот 0 свободен).
+У владельца
 ряд кнопок: **Флаги**, **Игроки**, **Телепорт**
 (право `qqregions.admin`), **Подсветка**, **Рынок**, **Удалить**
 (переход в меню подтверждения), и **Рейд** — только у постороннего
@@ -538,8 +558,19 @@ WorldGuard, игроки из региона, оферты рынка, поку�
 
 ### 6.6 Магазин расширений
 
-Пакеты **«+площадь»** (увеличивают `max-blocks`, один раз) и
-**«+регион»** (увеличивают лимит регионов, повторяемые).
+Кнопки строятся из `shop.yml` и сортируются по полю `priority` (меньше —
+раньше). Пакеты **«+площадь»** (увеличивают `max-blocks`, один раз) и
+**«+регион»** (увеличивают лимит регионов, повторяемые или с лимитом
+`max-purchases`), плюс пользовательские товары `custom-items` —
+единоразовая выдача прав/команд после покупки (условия, `allow-cmds`/
+`deny-cmds`, см. §7.2).
+
+У каждого товара есть **`max-purchases`** (лимит покупок; `<=0` = безлимит)
+и **`bought-display`**: `HIDE` (по умолчанию) — купленный и исчерпавший
+лимит товар исчезает, остальные кнопки сдвигаются вперёд; `RED_GLASS` —
+на его месте красное стекло «&cназвание» с лором «&7Уже куплено».
+Общий переключатель для флагов — `shop.yml` → `flags.bought-display`
+(HIDE | RED_GLASS).
 
 ![Магазин расширений](docs/screenshots/10.png)
 
@@ -624,6 +655,8 @@ economy-enabled: true
 
 flags:
   default-price: 1000
+  # Показывать ли купленные флаги красным стеклом (RED_GLASS) или скрывать (HIDE).
+  bought-display: HIDE
   prices:
     pvp: 500
     build: 800
@@ -632,15 +665,58 @@ flags:
 area-packs:
   big:
     name: "Большая территория"
-    blocks: 20000
+    blocks: 20000            # amount (читается и "amount"/"regions")
     price: 5000
+    material: GOLD_INGOT
+    priority: 0              # порядок кнопок (меньше — раньше)
+    max-purchases: 1         # лимит покупок (<=0 = повторяемый)
+    bought-display: HIDE     # RED_GLASS | HIDE
 
 region-packs:
   extra1:
     name: "+1 регион"
-    amount: 1
+    regions: 1
     price: 1000
+    priority: 10
+    max-purchases: 0         # 0 = повторяемый
+
+custom-items:                # пользовательские товары (выдача прав/команд)
+  vip:
+    name: "VIP привилегия"
+    material: NETHER_STAR
+    lore:
+      - "&7Выдаёт VIP-привилегию"
+    price: 5000
+    max-purchases: 1
+    bought-display: RED_GLASS
+    priority: 20
+    conditions:              # AND: при всех истинных -> allow-cmds, иначе deny-cmds
+      - "%vault_rank%==Default"
+    commands:                # без conditions: выполняются commands
+      - "asConsole! lp user {player} parent add vip"
+      - "message! &aПрава VIP активированы!"
+      - "sound! ENTITY_PLAYER_LEVELUP 1 1"
+    allow-cmds:              # действия при выполненных условиях
+      - "message! &aПрава выданы"
+    deny-cmds:
+      - "message! &cНельзя купить VIP дважды."
 ```
+
+**Общие поля товаров** (`area-packs` / `region-packs` / `custom-items`):
+`name`, `price` (0/отрицательная = не продаётся), `material`, `amount`
+(блоки/регионы/число для лора; у area читаются также `blocks`, у region —
+`regions`), `max-purchases`, `bought-display`, `priority`, `conditions`,
+`commands`, `allow-cmds`, `deny-cmds`, `lore` (только у custom-items).
+
+**Условия** (`conditions`) — `заполнитель оператор значение`: операторы
+`=` `!=` `>` `<` `>=` `<=` (числа), строковые `<-` (содержит), `!<-`,
+`|-` (начинается с), `!|-`, `-|` (заканчивается на), `!-|`. Заполнители
+раскрываются PlaceholderAPI для покупателя.
+
+**Действия** (`commands`/`allow-cmds`/`deny-cmds`) поддерживают все
+action-типы (см. таблицу псевдокоманд в §6): `message!`, `gMessage!`,
+`title!`/`title:…!`, `actionbar!`/`actionbar:N!`, `sound!`, `gSound!`,
+`asConsole!`, `asPlayer!`, `delay:N!`. `{player}` → ник покупателя.
 
 ### 7.3 replace.yml
 
@@ -714,6 +790,7 @@ guard:
 players.<UUID>.flags       — купленные флаги
 players.<UUID>.area-packs  — пакеты площади
 players.<UUID>.region-packs.<id> — количество «+регион»
+players.<UUID>.custom-items.<id> — количество покупок пользовательских товаров
 offers.*                   — оферты рынка и аренды
 ```
 

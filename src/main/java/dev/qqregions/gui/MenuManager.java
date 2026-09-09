@@ -275,7 +275,7 @@ public class MenuManager implements Listener {
 
     /** Чем заполняются динамические слоты меню. */
     private enum Kind {
-        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS, MAIN, REGION_SEARCH,
+        FLAGS, PLAYERS, MARKET, FLAG_SHOP, BLOCK_SHOP, MY_FLAGS, MAIN, INFO, REGION_SEARCH,
         PLAYER_SEARCH, REGION_PICKER
     }
 
@@ -344,6 +344,7 @@ public class MenuManager implements Listener {
             case "blocks" -> Kind.BLOCK_SHOP;
             case "myflags" -> Kind.MY_FLAGS;
             case "main" -> Kind.MAIN;
+            case "info" -> Kind.INFO;
             case "regionsearch" -> Kind.REGION_SEARCH;
             case "playersearch" -> Kind.PLAYER_SEARCH;
             case "regionpicker" -> Kind.REGION_PICKER;
@@ -568,6 +569,7 @@ public class MenuManager implements Listener {
             case BLOCK_SHOP -> dynItems = blockShopItems(menu, player, ctx);
             case MY_FLAGS -> dynItems = menu.purchasedItems(plugin, player, ctx, owned);
             case MAIN -> dynItems = List.of();
+            case INFO -> dynItems = List.of();
             case REGION_SEARCH -> dynItems = regionSearchItems(menu, player, ctx);
             case PLAYER_SEARCH -> {
                 ctx.putIfAbsent("_pdgroup", "member");
@@ -589,6 +591,17 @@ public class MenuManager implements Listener {
         applyBackTarget(player, ctx);
         Map<Integer, MenuItem> slotMap = new HashMap<>();
         Inventory inv = menu.build(plugin, player, ctx, safePage, maxPages, dynItems, slotMap);
+        // Кнопка «Вернуться в главное меню» в инфо-меню (слот 0). Вставляется
+        // кодом, чтобы не перезаписывать кастомизированные файлы info.yml:
+        // если в файле уже есть кнопка на слоте 0 — она остаётся как есть.
+        if (kind == Kind.INFO && inv.getItem(0) == null) {
+            MenuItem back = new MenuItem("ARROW", 1, 0,
+                    plugin.lang().get("menu.info-back-name"),
+                    List.of(plugin.lang().get("menu.info-back-lore")),
+                    List.of("@menu:main"), "");
+            inv.setItem(0, back.build(plugin, player, ctx));
+            slotMap.put(0, back);
+        }
         player.openInventory(inv);
         OpenMenu om = new OpenMenu(player, inv, menu, ctx, safePage, maxPages, role, slotMap, kind);
         om.lastRenderAt = System.currentTimeMillis();
@@ -685,17 +698,14 @@ public class MenuManager implements Listener {
                 && !p.hasPermission("qqregions.admin") && !p.hasPermission(item.permission())) {
             return;
         }
-// флаг-кнопка: требуется право <prefix><флаг> (из dynamic-flags.flag-permission-prefix).
-        // Бесплатные флаги (flags-menu.whitelist) и купленные в магазине кликаются и без права.
+// флаг-кнопка: клик требует право <prefix><флаг> или qqregions.flags.use.<флаг>/
+        // qqregions.flags.<флаг> (см. Menu.canSeeFlag). Купленные флаги кликаются без права.
         Menu.DynamicFlags dyn = om.menu.dynamicFlags();
         String flagPermPrefix = dyn == null ? null : dyn.permissionPrefix;
         if (item.isDynamic() && item.flag() != null && !item.flag().isEmpty()
-                && flagPermPrefix != null && !flagPermPrefix.isEmpty()
-                && !p.hasPermission("qqregions.admin")
-                && !p.hasPermission(flagPermPrefix + item.flag().toLowerCase(java.util.Locale.ROOT))) {
+                && !Menu.canSeeFlag(p, flagPermPrefix, item.flag())) {
             String flagKey = item.flag().toLowerCase(java.util.Locale.ROOT);
-            if (!plugin.config().flagsMenuWhitelist().contains(flagKey)
-                    && !plugin.shop().ownedFlags(p.getUniqueId()).contains(flagKey)) {
+            if (!plugin.shop().ownedFlags(p.getUniqueId()).contains(flagKey)) {
                 return;
             }
         }
@@ -776,7 +786,9 @@ public class MenuManager implements Listener {
             }
             if (c.startsWith("@menu:")) {
                 String target = c.substring("@menu:".length()).trim();
-                if ("myflags".equalsIgnoreCase(target)) {
+                if ("main".equalsIgnoreCase(target)) {
+                    openMain(p);
+                } else if ("myflags".equalsIgnoreCase(target)) {
                     openMyFlags(p);
                 } else {
                     open(p, target, om.ctx, 0, om.role);
@@ -883,7 +895,7 @@ public class MenuManager implements Listener {
                 cycleRegionSort(p, om);
                 continue;
             }
-            MenuAction.run(p, dev.qqregions.util.Papi.set(p, c));
+            MenuAction.run(plugin, p, c);
         }
     }
 
@@ -2356,8 +2368,25 @@ public class MenuManager implements Listener {
         for (com.sk89q.worldguard.protection.flags.Flag<?> flag : plugin.wg().allFlags()) {
             String id = flag.getName();
             String key = id == null ? "" : id.toLowerCase(java.util.Locale.ROOT);
-            if (key.isEmpty() || whitelist.contains(key)
-                    || shopIgnore.contains(key) || owned.contains(key)) {
+            if (key.isEmpty() || whitelist.contains(key) || shopIgnore.contains(key)) {
+                continue;
+            }
+            boolean isOwned = owned.contains(key);
+            if (isOwned) {
+                // Купленный флаг: по флагу «показывать купленные красным
+                // стеклом» (shop.yml flags.bought-display: RED_GLASS) ставим
+                // неактивную кнопку; иначе флаг просто не показываем.
+                if (plugin.shop().flagsBoughtRedGlass()) {
+                    String flagName = plugin.replace().flagName(id);
+                    Map<String, String> pc = new HashMap<>(ctx);
+                    pc.put("flag-name", flagName);
+                    pc.put("name", flagName);
+                    String name = tpl.process(plugin, player, pc,
+                            plugin.lang().get("shop.bought-name"));
+                    out.add(new MenuItem("RED_STAINED_GLASS_PANE", 1, null, name,
+                            List.of(tpl.process(plugin, player, pc,
+                                    plugin.lang().get("shop.bought-lore"))), null, ""));
+                }
                 continue;
             }
             double price = plugin.shop().priceOf(key);
@@ -2394,46 +2423,80 @@ public class MenuManager implements Listener {
         return out;
     }
 
-    /** Кнопки расширений: пакеты площади и пакеты «+регион». */
+    /** Кнопки магазина расширений: пакеты площади, пакеты «+регион» и
+     *  пользовательские товары (custom-items), отсортированные по priority.
+     *  Исчерпавшие лимит (max-purchases) при bought-display: HIDE исчезают
+     *  (остальные сдвигаются вперёд), при RED_GLASS остаются красным стеклом. */
     private List<MenuItem> blockShopItems(Menu menu, Player player, Map<String, String> ctx) {
         List<MenuItem> out = new ArrayList<>();
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
-        Set<String> ownedArea = plugin.shop().ownedAreaPacks(player.getUniqueId());
-        for (dev.qqregions.shop.ShopManager.Pack p : plugin.shop().areaPacks()) {
-            if (ownedArea.contains(p.id())) {
+        UUID uuid = player.getUniqueId();
+        String langArea = plugin.lang().get("menu.lore-pack-area");
+        String langRegion = plugin.lang().get("menu.lore-pack-region");
+        String langRegionRepeat = plugin.lang().get("menu.lore-pack-repeatable");
+        String langPrice = plugin.lang().get("menu.lore-price");
+        String langBuy = plugin.lang().get("menu.lore-buy");
+        for (dev.qqregions.shop.ShopManager.ShopProduct p : plugin.shop().allProducts()) {
+            int count = plugin.shop().purchasedCount(uuid, p.kind(), p.id());
+            boolean bought = count > 0;
+            boolean depleted = bought && p.maxPurchases() > 0 && count >= p.maxPurchases();
+            if (depleted) {
+                if ("RED_GLASS".equals(p.boughtDisplay())) {
+                    Map<String, String> pc = bakePackCtx(ctx, p);
+                    String name = tpl.process(plugin, player, pc,
+                            plugin.lang().get("shop.bought-name"));
+                    out.add(new MenuItem("RED_STAINED_GLASS_PANE", 1, null, name,
+                            List.of(tpl.process(plugin, player, pc,
+                                    plugin.lang().get("shop.bought-lore"))), null, ""));
+                }
                 continue;
             }
-            Map<String, String> pc = new HashMap<>(ctx);
-            pc.put("pack-name", p.name());
-            pc.put("pack-amount", String.valueOf(p.amount()));
-            pc.put("price", plugin.market().economy().formatAmount(p.price()));
-            pc.put("price-symbol", plugin.market().economy().symbol());
+            Map<String, String> pc = bakePackCtx(ctx, p);
             String name = tpl.process(plugin, player, pc, "&f{pack-name}");
             List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-area")));
-            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-price")));
-            lore.add(plugin.lang().get("menu.lore-buy"));
-            out.add(new MenuItem("GOLD_INGOT", 1, null, name, lore,
-                    List.of("@shop-buy:area:" + p.id()), ""));
-        }
-        for (dev.qqregions.shop.ShopManager.Pack p : plugin.shop().regionPacks()) {
-            Map<String, String> pc = new HashMap<>(ctx);
-            pc.put("pack-name", p.name());
-            pc.put("pack-amount", String.valueOf(p.amount()));
-            pc.put("price", plugin.market().economy().formatAmount(p.price()));
-            pc.put("price-symbol", plugin.market().economy().symbol());
-            String name = tpl.process(plugin, player, pc, "&f{pack-name}");
-            List<String> lore = new ArrayList<>();
-            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-region")));
-            lore.add(tpl.process(plugin, player, pc, plugin.lang().get("menu.lore-pack-repeatable")));
-            lore.add(plugin.lang().get("menu.lore-buy"));
-            out.add(new MenuItem("EMERALD", 1, null, name, lore,
-                    List.of("@shop-buy:region:" + p.id()), ""));
+            switch (p.kind()) {
+                case "area" -> {
+                    lore.add(tpl.process(plugin, player, pc, langArea));
+                    lore.add(tpl.process(plugin, player, pc, langPrice));
+                }
+                case "region" -> {
+                    lore.add(tpl.process(plugin, player, pc, langRegion));
+                    if (p.maxPurchases() > 0) {
+                        lore.add(tpl.process(plugin, player, pc, langPrice));
+                    } else {
+                        lore.add(tpl.process(plugin, player, pc, langRegionRepeat));
+                    }
+                }
+                default -> {
+                    if (p.lore() != null) {
+                        for (String l : p.lore()) {
+                            lore.add(tpl.process(plugin, player, pc, l));
+                        }
+                    }
+                    lore.add(tpl.process(plugin, player, pc, langPrice));
+                }
+            }
+            lore.add(langBuy);
+            String mat = p.material() == null || p.material().isEmpty() ? "EMERALD" : p.material();
+            out.add(new MenuItem(mat, 1, null, name, lore,
+                    List.of("@shop-buy:" + p.kind() + ":" + p.id()), ""));
         }
         return out;
     }
 
-    /** Обработчик @shop-buy:<flag|area|region>:<id>. */
+    /** Контекст кнопки товара: {pack-name} {pack-amount} {name} {price} {price-symbol}. */
+    private Map<String, String> bakePackCtx(Map<String, String> ctx,
+                                            dev.qqregions.shop.ShopManager.ShopProduct p) {
+        Map<String, String> pc = new HashMap<>(ctx);
+        pc.put("pack-name", p.name());
+        pc.put("pack-amount", String.valueOf(p.amount()));
+        pc.put("name", p.name());
+        pc.put("price", plugin.market().economy().formatAmount(p.price()));
+        pc.put("price-symbol", plugin.market().economy().symbol());
+        return pc;
+    }
+
+    /** Обработчик @shop-buy:<flag|area|region|custom>:<id>. */
     private void shopBuy(Player p, String spec) {
         String[] parts = spec.split(":", 2);
         if (parts.length < 2) {
@@ -2442,13 +2505,10 @@ public class MenuManager implements Listener {
         String kind = parts[0].trim().toLowerCase(java.util.Locale.ROOT);
         String id = parts[1].trim();
         String res;
-        switch (kind) {
-            case "flag" -> res = plugin.shop().buyFlag(p.getUniqueId(), id);
-            case "area" -> res = plugin.shop().buyAreaPack(p.getUniqueId(), id);
-            case "region" -> res = plugin.shop().buyRegionPack(p.getUniqueId(), id);
-            default -> {
-                return;
-            }
+        if ("flag".equals(kind)) {
+            res = plugin.shop().buyFlag(p.getUniqueId(), id);
+        } else {
+            res = plugin.shop().buyProduct(p.getUniqueId(), kind, id);
         }
         switch (res) {
             case "ok" -> {
@@ -2458,14 +2518,21 @@ public class MenuManager implements Listener {
                             "price", plugin.market().economy().formatAmount(plugin.shop().priceOf(id)),
                             "price-symbol", plugin.market().economy().symbol());
                 } else {
-                    plugin.lang().send(p, "shop.pack-bought",
-                            "pack-name", packName(kind, id),
-                            "price", plugin.market().economy().formatAmount(packPrice(kind, id)),
-                            "price-symbol", plugin.market().economy().symbol());
+                    dev.qqregions.shop.ShopManager.ShopProduct prod = plugin.shop().product(kind, id);
+                    if (prod == null) {
+                        plugin.lang().send(p, "shop.error");
+                    } else {
+                        plugin.lang().send(p, "shop.pack-bought",
+                                "pack-name", prod.name(),
+                                "price", plugin.market().economy().formatAmount(prod.price()),
+                                "price-symbol", plugin.market().economy().symbol());
+                        runProductActions(p, prod);
+                    }
                 }
             }
             case "already" -> plugin.lang().send(p, "shop.already",
                     "flag-name", plugin.replace().flagName(id));
+            case "limit" -> plugin.lang().send(p, "shop.limit");
             case "no-money" -> plugin.lang().send(p, "shop.no-money");
             case "not-found" -> plugin.lang().send(p, "shop.not-found");
             case "no-economy" -> plugin.lang().send(p, "shop.no-economy");
@@ -2477,26 +2544,37 @@ public class MenuManager implements Listener {
         }
     }
 
-    private String packName(String kind, String id) {
-        for (dev.qqregions.shop.ShopManager.Pack p : packList(kind)) {
-            if (p.id().equalsIgnoreCase(id)) {
-                return p.name();
+    /** Команды товара после покупки: при заданных conditions (AND) выполняются
+     *  allow-cmds, иначе deny-cmds; без условий — commands (или allow-cmds).
+     *  {player} подставляется ником игрока, все действия — через Actions. */
+    private void runProductActions(Player p, dev.qqregions.shop.ShopManager.ShopProduct prod) {
+        List<String> toRun;
+        if (prod.conditions() != null && !prod.conditions().isEmpty()) {
+            boolean ok = true;
+            for (String cond : prod.conditions()) {
+                if (!dev.qqregions.util.Expressions.matches(cond, p)) {
+                    ok = false;
+                    break;
+                }
+            }
+            toRun = ok ? prod.allowCmds() : prod.denyCmds();
+        } else if (prod.commands() != null && !prod.commands().isEmpty()) {
+            toRun = prod.commands();
+        } else {
+            toRun = prod.allowCmds();
+        }
+        if (toRun == null) {
+            return;
+        }
+        for (String c : toRun) {
+            if (c == null) {
+                continue;
+            }
+            String cooked = c.replace("{player}", p.getName()).trim();
+            if (!cooked.isEmpty()) {
+                MenuAction.run(plugin, p, cooked);
             }
         }
-        return id;
-    }
-
-    private double packPrice(String kind, String id) {
-        for (dev.qqregions.shop.ShopManager.Pack p : packList(kind)) {
-            if (p.id().equalsIgnoreCase(id)) {
-                return p.price();
-            }
-        }
-        return 0;
-    }
-
-    private List<dev.qqregions.shop.ShopManager.Pack> packList(String kind) {
-        return "region".equals(kind) ? plugin.shop().regionPacks() : plugin.shop().areaPacks();
     }
 
     /** Кнопка входа на псевдокоманды меню игроков.

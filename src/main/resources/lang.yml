@@ -5,7 +5,7 @@
 #  Допустимы: '&'-цвета, '&#RRGGBB' и заполнители {переменная}.
 # ============================================================
 
-config-version: 6
+config-version: 7
 
 prefix: "&8[&bQQRegions&8] "
 
@@ -390,6 +390,9 @@ menu:
   # Главное меню (/region без аргументов), кнопка «Назад» в слоте 0.
   main-back-name: "&eНазад|Главное меню"
   main-back-lore: "&7Выполняется команда из config.yml."
+  # Кнопка «Вернуться в главное меню» в информационном меню региона (слот 0).
+  info-back-name: "&eВернуться в главное меню"
+  info-back-lore: "&7Открыть главное меню территорий"
   region-search-notfound: "&cРегион по запросу &f{query} &cне найден."
   region-search-multiple: "&eНайдено несколько: &f{regions}"
   region-search-found: "&aРегион &f{region} &aнайден."
@@ -525,6 +528,10 @@ shop:
   flag-bought: "&aФлаг &f{flag-name} &aкуплен за &f{price} {price-symbol}&a."
   pack-bought: "&aПакет &f{pack-name} &aкуплен за &f{price} {price-symbol}&a."
   already: "&cУ вас уже есть &f{flag-name}&c."
+  # Кнопка купленного/исчерпавшего лимит товара (bought-display: RED_GLASS).
+  bought-name: "&c{name}"
+  bought-lore: "&7Уже куплено"
+  limit: "&cВы исчерпали лимит покупок этого товара."
   no-money: "&cНедостаточно средств на счету."
   not-found: "&cПокупка не найдена или не продаётся."
   no-economy: "&cЭкономика (Vault) недоступна — покупка невозможна."

@@ -33,6 +33,14 @@ Menus:
       name: " "
       tooltip: false
     buttons:
+      "home":
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в главное меню"
+        lore:
+          - "&7Открыть главное меню территорий"
+        commands:
+          - "@menu:main"
       "region":
         slot: 10
         material: NAME_TAG
@@ -144,6 +152,14 @@ Menus:
       name: " "
       tooltip: false
     buttons:
+      "home":
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в главное меню"
+        lore:
+          - "&7Открыть главное меню территорий"
+        commands:
+          - "@menu:main"
       "region":
         slot: 10
         material: NAME_TAG
@@ -204,6 +220,14 @@ Menus:
       name: " "
       tooltip: false
     buttons:
+      "home":
+        slot: 0
+        material: ARROW
+        name: "&eВернуться в главное меню"
+        lore:
+          - "&7Открыть главное меню территорий"
+        commands:
+          - "@menu:main"
       "region":
         slot: 10
         material: NAME_TAG

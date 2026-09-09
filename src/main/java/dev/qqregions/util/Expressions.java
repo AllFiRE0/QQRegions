@@ -5,11 +5,19 @@ import org.bukkit.OfflinePlayer;
 /**
  * Минимальный интерпретатор условий вида:
  *   "%placeholder%>=60", "%vault_rank%==VIP", "true", "false"
- * Сравнение чисел через >=, <=, >, <, ==, !=.
+ * Числовые операторы: >=, <=, >, <, ==, !=, = (равно).
+ * Строковые: =/== равно, != не равно, "<-" содержит, "!<-" не содержит,
+ *            "|-" начинается с, "!|-" не начинается с, "-|" заканчивается на,
+ *            "!-|" не заканчивается на.
  * Если ни один оператор не найден — непустое значение, отличное от
  * "false"/"0"/"no", считается истиной.
  */
 public final class Expressions {
+
+    /** Операторы от длинных к коротким: сначала составные, потом одиночные. */
+    private static final String[] OPS = {
+            ">=", "<=", "!<-", "!|-", "!-|", "==", "!=", "<-", "|-", "-|", ">", "<", "="
+    };
 
     private Expressions() {
     }
@@ -39,30 +47,54 @@ public final class Expressions {
         String left = parts[0].trim();
         String right = parts[1].trim();
 
-        // пробуем числа
-        try {
-            double l = Double.parseDouble(left);
-            double r = Double.parseDouble(right);
-            switch (op) {
-                case ">=": return l >= r;
-                case "<=": return l <= r;
-                case ">":  return l > r;
-                case "<":  return l < r;
-                case "==": return Math.abs(l - r) < 1e-9;
-                case "!=": return Math.abs(l - r) >= 1e-9;
-                default:   return false;
-            }
-        } catch (NumberFormatException e) {
-            switch (op) {
-                case "==": return left.equalsIgnoreCase(right);
-                case "!=": return !left.equalsIgnoreCase(right);
-                default:   return false;
-            }
+        switch (op) {
+            case ">=":
+            case "<=":
+            case ">":
+            case "<":
+            case "==":
+            case "!=":
+            case "=":
+                // пробуем числа
+                try {
+                    double l = Double.parseDouble(left);
+                    double r = Double.parseDouble(right);
+                    switch (op) {
+                        case ">=": return l >= r;
+                        case "<=": return l <= r;
+                        case ">":  return l > r;
+                        case "<":  return l < r;
+                        case "==":
+                        case "=":  return Math.abs(l - r) < 1e-9;
+                        default:   return Math.abs(l - r) >= 1e-9;   // "!="
+                    }
+                } catch (NumberFormatException e) {
+                    switch (op) {
+                        case "==":
+                        case "=":  return left.equalsIgnoreCase(right);
+                        case "!=": return !left.equalsIgnoreCase(right);
+                        default:   return false;
+                    }
+                }
+            case "<-":
+                return left.contains(right);
+            case "!<-":
+                return !left.contains(right);
+            case "|-":
+                return left.startsWith(right);
+            case "!|-":
+                return !left.startsWith(right);
+            case "-|":
+                return left.endsWith(right);
+            case "!-|":
+                return !left.endsWith(right);
+            default:
+                return false;
         }
     }
 
     private static String findOperator(String s) {
-        for (String op : new String[]{">=", "<=", "==", "!=", ">", "<"}) {
+        for (String op : OPS) {
             if (s.contains(op)) {
                 return op;
             }
