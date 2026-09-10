@@ -11,16 +11,24 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.profile.PlayerProfile;
 import org.bukkit.profile.PlayerTextures;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Кэш скинов игроков для голов PLAYER_HEAD + медленный последовательный
- * дофетч с session-сервера.
+ * дофетч с session-сервера Mojang.
  *
  * Прямой SkullMeta#setOwningPlayer(OfflinePlayer) делает HTTP-запрос к Mojang
  * на КАЖДОГО игрока на КАЖДУЮ перерисовку меню: список участников с 50+ головами
@@ -35,6 +43,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *    (по умолчанию 300; 0 = не перепроверять) при показе кнопки;
  *  - пока скин неизвестен — голова без скина (сборка меню не блокируется,
  *    следующая перерисовка подхватит скин из кэша).
+ *
+ * Дофетч идёт напрямую по HTTP к sessionserver.mojang.com (тот же endpoint,
+ * что использует setOwningPlayer): ответ парсится регуляркой, из properties
+ * забирается Base64-текстура ("value") без зависимостей от профильных API
+ * ядра (org.bukkit.profile.PlayerProfile / paper-профили) и версии Minecraft.
  */
 public final class SkullResolver implements Listener {
 
@@ -42,14 +55,31 @@ public final class SkullResolver implements Listener {
     private static final long REQUEST_GAP_MS = 1000L;
     /** Доп. пауза после рейт-лимита, мс. */
     private static final long RATE_LIMIT_GAP_MS = 30000L;
+    /** Base64-текстура («value» свойства textures) — сплошные A-Za-z0-9+/=
+     *  до закрывающей кавычки; завершающий символ не требует, т.к. длинная. */
+    private static final Pattern VALUE =
+            Pattern.compile("\"value\"\\s*:\\s*\"([A-Za-z0-9+/=]+)");
 
     private static final class Skinned {
-        final URL url;
+        final String base64;
         final long at;
 
-        Skinned(URL url, long at) {
-            this.url = url;
+        Skinned(String base64, long at) {
+            this.base64 = base64;
             this.at = at;
+        }
+    }
+
+    /** Итог запроса к session-серверу. */
+    private static final class Fetched {
+        final String base64;   // Base64-текстура ("" — профиль без скина; null — ошибка)
+        final boolean rateLimited;
+        final boolean ok;      // ответ получен (200)
+
+        Fetched(String base64, boolean rateLimited, boolean ok) {
+            this.base64 = base64;
+            this.rateLimited = rateLimited;
+            this.ok = ok;
         }
     }
 
@@ -75,14 +105,15 @@ public final class SkullResolver implements Listener {
         if (online != null) {
             URL url = texturesOf(online.getPlayerProfile());
             if (url != null) {
-                skins.put(uuid, new Skinned(url, System.currentTimeMillis()));
-                setHead(meta, uuid, url);
+                String b64 = urlToBase64(url);
+                skins.put(uuid, new Skinned(b64, System.currentTimeMillis()));
+                setHead(meta, b64);
                 return;
             }
         }
         Skinned sk = skins.get(uuid);
         if (sk != null) {
-            setHead(meta, uuid, sk.url);
+            setHead(meta, sk.base64);
             long maxAge = plugin.config().playerSearchTextureRefreshMs();
             if (maxAge > 0 && System.currentTimeMillis() - sk.at >= maxAge) {
                 // скин мог устареть — перепроверить, не снимая старый
@@ -90,7 +121,7 @@ public final class SkullResolver implements Listener {
             }
             return;
         }
-        setHead(meta, uuid, null);
+        setHead(meta, null);
         enqueue(uuid, false);
     }
 
@@ -99,18 +130,21 @@ public final class SkullResolver implements Listener {
         return tx == null ? null : tx.getSkin();
     }
 
-    private void setHead(SkullMeta meta, UUID uuid, URL url) {
-        if (url == null) {
+    private void setHead(SkullMeta meta, String base64) {
+        if (base64 == null || base64.isEmpty()) {
             return; // default-голова; настоящий скин придёт из кэша на следующей перерисовке
         }
         try {
-            String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
-            String base64 = java.util.Base64.getEncoder()
-                    .encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             MenuItem.applyHeadTexture(meta, base64);
         } catch (Throwable ignored) {
             // старая версия — просто голова
         }
+    }
+
+    /** URL скина из профиля → Base64-текстура (формат JSON "value"). */
+    private static String urlToBase64(URL url) {
+        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+        return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
     }
 
     private void enqueue(UUID uuid, boolean allowRefresh) {
@@ -139,47 +173,94 @@ public final class SkullResolver implements Listener {
         }
         fetching = true;
         lastRequest = now;
-        final PlayerProfile profile = Bukkit.createProfile(uuid);
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            boolean ok = false;
-            boolean limited = false;
+            Fetched f = fetchTexture(uuid);
             try {
-                ok = profile.complete();
-            } catch (Throwable t) {
-                String m = String.valueOf(t.getMessage());
-                limited = m.contains("429") || m.contains("status=")
-                        || m.contains("HTTP_ERROR");
-            }
-            final boolean fixed = ok;
-            final boolean rateLimited = limited;
-            try {
-                Bukkit.getScheduler().runTask(plugin,
-                        () -> finish(uuid, profile, fixed, rateLimited));
+                Bukkit.getScheduler().runTask(plugin, () -> finish(uuid, f));
             } catch (Throwable ignored) {
                 // плагин уже выгружается — сброс в finish() не обязателен
             }
         });
     }
 
-    private void finish(UUID uuid, PlayerProfile profile, boolean fixed, boolean rateLimited) {
-        fetching = false;
-        if (fixed) {
-            URL url = null;
-            try {
-                PlayerTextures tx = profile.getTextures();
-                url = tx == null ? null : tx.getSkin();
-            } catch (Throwable ignored) {
+    /** Запрос к sessionserver.mojang.com (поток вне main). */
+    private static Fetched fetchTexture(UUID uuid) {
+        String hex = uuid.toString().replace("-", "");
+        HttpURLConnection conn = null;
+        try {
+            URL u = new URL("https://sessionserver.mojang.com/session/minecraft/profile/"
+                    + hex);
+            conn = (HttpURLConnection) u.openConnection();
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.setRequestProperty("User-Agent", "QQRegions skull-resolver");
+            conn.setInstanceFollowRedirects(true);
+            int code = conn.getResponseCode();
+            if (code == 429) {
+                return new Fetched(null, true, false);
             }
+            if (code != 200) {
+                return new Fetched(null, false, false);
+            }
+            try (InputStream in = conn.getInputStream()) {
+                String body = new String(readAll(in), StandardCharsets.UTF_8);
+                String b64 = textureValueOf(body);
+                return new Fetched(b64 == null ? "" : b64, false, true);
+            }
+        } catch (Throwable ignored) {
+            return new Fetched(null, false, false);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    private static byte[] readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
+    }
+
+    /** "value" свойства textures из JSON ответа sessionserver (без JSON-библиотеки).
+     *  Значение — Base64 длиной до нескольких тысяч символов, поэтому окно поиска
+     *  с запасом, а паттерн захватывает до кавычки/запятой. */
+    private static String textureValueOf(String body) {
+        int cursor = 0;
+        while (cursor < body.length()) {
+            int idx = body.indexOf("\"textures\"", cursor);
+            if (idx < 0) {
+                return null;
+            }
+            int start = Math.max(0, idx - 100);
+            int end = Math.min(body.length(), idx + 8000);
+            Matcher m = VALUE.matcher(body.substring(start, end));
+            if (m.find()) {
+                return m.group(1);
+            }
+            cursor = idx + 10;
+        }
+        return null;
+    }
+
+    private void finish(UUID uuid, Fetched f) {
+        fetching = false;
+        if (f.ok && f.base64 != null && !f.base64.isEmpty()) {
             pending.poll();
             lastRequest = System.currentTimeMillis();
-            if (url != null) {
-                skins.put(uuid, new Skinned(url, System.currentTimeMillis()));
-                failed.remove(uuid);
-            } else if (!skins.containsKey(uuid)) {
-                // скина нет и старого кэша тоже — не зацикливаемся
+            skins.put(uuid, new Skinned(f.base64, System.currentTimeMillis()));
+            failed.remove(uuid);
+        } else if (f.ok) {
+            // ответ получен, но скина нет (профиль без текстур) — не зацикливаемся
+            pending.poll();
+            if (!skins.containsKey(uuid)) {
                 failed.add(uuid);
             }
-        } else if (rateLimited) {
+        } else if (f.rateLimited) {
             // 429 — жёсткая пауза, потом повтор (UUID остаётся в очереди)
             lastRequest = System.currentTimeMillis() + RATE_LIMIT_GAP_MS;
         } else {

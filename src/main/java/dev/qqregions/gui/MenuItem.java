@@ -45,7 +45,7 @@ public class MenuItem {
      *  (например у фона из стекла). По умолчанию тултип показывается. */
     private boolean tooltip = true;
     /** UUID игрока для PLAYER_HEAD: при сборке кнопки подставляется голова
-     *  скина этого игрока (через setOwningPlayer). */
+     *  скина этого игрока (через SkullResolver — кэш, без спама к Mojang). */
     private String ownerUuid;
     /** Base64-текстура кастомного скина для PLAYER_HEAD (одинаковая для всех;
      *  приоритетнее ownerUuid). */
