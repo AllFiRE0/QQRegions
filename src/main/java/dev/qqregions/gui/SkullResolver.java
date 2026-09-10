@@ -100,14 +100,16 @@ public final class SkullResolver implements Listener {
     }
 
     private void setHead(SkullMeta meta, UUID uuid, URL url) {
+        if (url == null) {
+            return; // default-голова; настоящий скин придёт из кэша на следующей перерисовке
+        }
         try {
-            PlayerProfile profile = Bukkit.createProfile(uuid);
-            if (url != null) {
-                profile.getTextures().setSkin(url);
-            }
-            meta.setPlayerProfile(profile);
+            String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+            String base64 = java.util.Base64.getEncoder()
+                    .encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MenuItem.applyHeadTexture(meta, base64);
         } catch (Throwable ignored) {
-            // старая версия без setPlayerProfile/прочие — просто голова
+            // старая версия — просто голова
         }
     }
 
@@ -142,7 +144,7 @@ public final class SkullResolver implements Listener {
             boolean ok = false;
             boolean limited = false;
             try {
-                ok = profile.complete(true);
+                ok = profile.complete();
             } catch (Throwable t) {
                 String m = String.valueOf(t.getMessage());
                 limited = m.contains("429") || m.contains("status=")

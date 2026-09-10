@@ -1345,8 +1345,9 @@ public class MenuManager implements Listener {
      *  Описание единое с меню «поиск игроков» (lang-ключи menu.ps-line-*):
      *  имя — цвет ника по роли (&#ccbf8f владелец, &#7db389 участник), лор —
      *  группа, клан (если JustTeams включён), баланс, территории и подсказка
-     *  удаления (только владельцу территории). Материал — config.yml
-     *  player-search: head-material / head-texture. Команду шаблона
+     *  удаления (только владельцу территории). Материал кнопки — из меню
+     *  (dynamic-players: material/owner-material/member-material, по умолчанию
+     *  PLAYER_HEAD — голова участника по UUID). Команду шаблона
      *  @player-del:{player-id}:{role} задаёт владелец-шаблон, у остальных
      *  ролей commands пустой — только просмотр.
      *  Фильтр: ctx["_filter"] = all|owners|members. */
@@ -1368,8 +1369,6 @@ public class MenuManager implements Listener {
         String filter = ctx.getOrDefault("_filter", "all").toLowerCase(java.util.Locale.ROOT);
         boolean clanOn = plugin.raid().teams().enabled();
         boolean viewerOwner = "owner".equalsIgnoreCase(ctx.get("role"));
-        String headMaterial = plugin.config().playerSearchHeadMaterial();
-        String headTexture = plugin.config().playerSearchHeadTexture();
         MenuItem tpl = new MenuItem("STONE", 1, null, "", null, null, "");
         for (dev.qqregions.wg.Wg.Participant part : plugin.wg().participants(region)) {
             if (("members".equals(filter) && part.owner())
@@ -1416,10 +1415,20 @@ public class MenuManager implements Listener {
                     cmds.add(tpl.process(plugin, op, pc, c));
                 }
             }
-            MenuItem mi = new MenuItem(headMaterial, 1, null, name, lore, cmds, "");
-            if (headTexture != null && !headTexture.isEmpty()) {
-                mi.skinTexture(headTexture);
-            } else if (headMaterial.equalsIgnoreCase("PLAYER_HEAD")) {
+            // материал кнопки — из меню (dynamic-players: material / owner-material /
+            // member-material), с подстановкой {player-id}/{player} и PAPI;
+            // "PLAYER_HEAD" без id = голова ЭТОГО участника (ownerUuid).
+            String mat = (part.owner()
+                    ? (dp.ownerMaterial != null && !dp.ownerMaterial.isEmpty()
+                            ? dp.ownerMaterial : dp.material)
+                    : (dp.memberMaterial != null && !dp.memberMaterial.isEmpty()
+                            ? dp.memberMaterial : dp.material));
+            if (mat == null || mat.isEmpty()) {
+                mat = "PLAYER_HEAD";
+            }
+            String resolved = tpl.process(plugin, op, pc, mat);
+            MenuItem mi = new MenuItem(resolved, 1, null, name, lore, cmds, "");
+            if (resolved.equalsIgnoreCase("PLAYER_HEAD")) {
                 mi.ownerUuid(part.uuid() == null ? null : part.uuid().toString());
             }
             out.add(mi);
@@ -2044,8 +2053,8 @@ public class MenuManager implements Listener {
     }
 
     /** Кнопки поиска игроков: сортировка по _pdsort (az|za|balance|regions±|dist±),
-     *  без себя (игрок сам себя не добавляет). Материал кнопки — из config.yml
-     *  player-search (head-material / head-texture). На каждой голове: роль в
+     *  без себя (игрок сам себя не добавляет). Материал кнопки — PLAYER_HEAD
+     *  (голова со скином игрока по UUID). На каждой голове: роль в
      *  территории, клан (если JustTeams включён), баланс, количество территорий
      *  (владелец/участник) и подсказка управления. */
     private List<MenuItem> playerSearchItems(Menu menu, Player viewer, Map<String, String> ctx) {
@@ -2060,8 +2069,6 @@ public class MenuManager implements Listener {
             return out;
         }
         boolean clanOn = plugin.raid().teams().enabled();
-        String headMaterial = plugin.config().playerSearchHeadMaterial();
-        String headTexture = plugin.config().playerSearchHeadTexture();
         String self = ctx.get("player");
         List<PlayerRow> rows = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
@@ -2138,14 +2145,10 @@ public class MenuManager implements Listener {
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-member")));
             lore.add("");
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-manage")));
-            MenuItem mi = new MenuItem(headMaterial, 1, null,
+            MenuItem mi = new MenuItem("PLAYER_HEAD", 1, null,
                     tpl.process(plugin, viewer, pc, "&f" + row.name()), lore,
                     List.of("PLRS:" + row.uuid()), "");
-            if (headTexture != null && !headTexture.isEmpty()) {
-                mi.skinTexture(headTexture);
-            } else if (headMaterial.equalsIgnoreCase("PLAYER_HEAD")) {
-                mi.ownerUuid(row.uuid().toString());
-            }
+            mi.ownerUuid(row.uuid().toString());
             out.add(mi);
         }
         return out;

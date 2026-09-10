@@ -3,7 +3,8 @@
 #
 #  Список владельцев/участников заполняется кодом плагина в
 #  секцию dynamic-players: головы скинов по UUID игроков
-#  (материал — config.yml player-search: head-material/head-texture).
+#  (material/owner-material/member-material — см. MENU_EDITOR.md,
+#  материал кнопок: PLAYER_HEAD и другие, включая head-*/basehead-*).
 #  Описание кнопок единое с меню «поиск игроков» и строится из
 #  lang.yml (menu.ps-line-*): имя — цвет ника по роли (владелец
 #  &#ccbf8f / участник &#7db389), лор — группа, клан (если JustTeams

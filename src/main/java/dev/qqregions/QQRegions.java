@@ -79,7 +79,7 @@ public final class QQRegions extends JavaPlugin {
         this.shop = new ShopManager(this);
         this.marketHolos = new MarketHolos(this);
         this.skulls = new dev.qqregions.gui.SkullResolver(this);
-        Bukkit.getPluginManager().registerEvents(plugin.skulls(), this);
+        Bukkit.getPluginManager().registerEvents(skulls, this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);

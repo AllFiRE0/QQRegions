@@ -107,11 +107,6 @@ public class Config {
      *  (формат строки: <флаг>:<значение>[:<группа>]). */
     private boolean regionFlagsOnCreate = false;
     private final List<String> regionFlagsOnCreateList = new ArrayList<>();
-    /** player-search.head-material: материал кнопок «Поиск игроков» (PLAYER_HEAD — голова). */
-    private String playerSearchHeadMaterial = "PLAYER_HEAD";
-    /** player-search.head-texture: Base64-текстура ОДИНАКОВОЙ головы для всех
-     *  кнопок (пусто — скин каждого игрока). */
-    private String playerSearchHeadTexture = "";
     /** player-search.texture-refresh-seconds: как часто перепроверять скин
      *  оффлайн-игрока у Mojang (0 = не перепроверять; по умолчанию 300 с). */
     private long playerSearchTextureRefreshMs = 300L * 1000L;
@@ -243,8 +238,6 @@ public class Config {
         regionFlagsOnCreateList.clear();
         regionFlagsOnCreateList.addAll(cfg.getStringList("region-flags-on-create.flags"));
 
-        playerSearchHeadMaterial = cfg.getString("player-search.head-material", "PLAYER_HEAD");
-        playerSearchHeadTexture = cfg.getString("player-search.head-texture", "");
         playerSearchTextureRefreshMs =
                 Math.max(0L, cfg.getLong("player-search.texture-refresh-seconds", 300L) * 1000L);
     }
@@ -516,17 +509,6 @@ public class Config {
     /** Список «флаг:значение[:группа]», ставящихся автоматически при создании региона. */
     public List<String> regionFlagsOnCreateList() {
         return regionFlagsOnCreateList;
-    }
-
-    /** Материал кнопок «Поиск игроков» (PLAYER_HEAD — голова со скином игрока). */
-    public String playerSearchHeadMaterial() {
-        return playerSearchHeadMaterial;
-    }
-
-    /** Base64-текстура одинаковой кастомной головы для всех кнопок
-     *  (пусто — скин каждого игрока). */
-    public String playerSearchHeadTexture() {
-        return playerSearchHeadTexture;
     }
 
     /** Как часто перепроверять скин оффлайн-игрока у Mojang, мс (0 = не

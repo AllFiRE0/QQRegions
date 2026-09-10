@@ -5,7 +5,6 @@ import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
@@ -19,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Locale;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -159,77 +159,208 @@ public class MenuItem {
         return this;
     }
 
-    /** Собрать физический предмет с применением контекста и замен. */
+    /** Собрать физический предмет с применением контекста и замен.
+     *
+     *  material поддерживает синтаксис DeluxeMenus:
+     *  - обычное имя (STONE, water_bottle, air);
+     *  - головы: head-<ник>, basehead-<base64 Value field>, texture-<id от
+     *    textures.minecraft.net>, hdb-<ID HeadDatabase>, PLAYER_HEAD:<uuid>,
+     *    PLAYER_HEAD (uuid через ownerUuid для динамических кнопок);
+     *  - placeholder-<заполнитель> (префикс-форма, {..}/%..% и так обрабатываются);
+     *  - живой предмет игрока: main_hand, off_hand, armor_helmet/chestplate/
+     *    leggings/boots (показывается как есть, без имени/лора кнопки). */
     public ItemStack build(QQRegions plugin, Player player, Map<String, String> ctx) {
-        // Материал тоже обрабатывает {заполнители}: например "PLAYER_HEAD:{pc-uuid}"
-        // в статичной кнопке подставит голову с игроком скином ("PLAYER_HEAD:<UUID>").
-        String raw = material == null ? "" : process(plugin, player, ctx, material);
+        String raw = material == null ? "" : process(plugin, player, ctx, material).trim();
+        String key = raw.toLowerCase(Locale.ROOT);
+
+        // «живой» предмет руки/слота брони игрока — как в DeluxeMenus
+        if (key.equals("main_hand") || key.equals("off_hand") || key.startsWith("armor_")) {
+            return liveItem(player, key);
+        }
+        if (key.startsWith("placeholder-")) {
+            raw = raw.substring("placeholder-".length()).trim();
+            key = raw.toLowerCase(Locale.ROOT);
+        }
+
+        // головы (синтаксис DeluxeMenus)
+        if (key.startsWith("head-")) {
+            return buildHead(plugin, player, ctx, uuidForName(raw.substring(5).trim()), null);
+        }
+        if (key.startsWith("basehead-")) {
+            return buildHead(plugin, player, ctx, null, raw.substring(9).trim());
+        }
+        if (key.startsWith("texture-")) {
+            return buildHead(plugin, player, ctx, null, textureIdToBase64(raw.substring(8).trim()));
+        }
+        if (key.startsWith("hdb-")) {
+            return buildHead(plugin, player, ctx, null, hdbBase64(plugin, raw.substring(4).trim()));
+        }
+
+        // собственная форма "PLAYER_HEAD:<uuid>" и обычный PLAYER_HEAD:
+        // UUID берётся из строки либо из ownerUuid (динамические кнопки).
         String ownerUu = ownerUuid;
-        int headColon = raw.toLowerCase(java.util.Locale.ROOT).indexOf("player_head:");
-        if (headColon == 0) {
+        if (key.startsWith("player_head:")) {
             ownerUu = raw.substring("player_head:".length()).trim();
             raw = "PLAYER_HEAD";
+            key = "player_head";
         }
-        Material m = Material.matchMaterial(raw);
-        ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            // голова игрока: подставить скин по UUID (PLAYER_HEAD). Скин берётся из
-            // кэша SkullResolver (онлайн — сразу, оффлайн — один раз с паузой),
-            // чтобы не спамить session-сервер Mojang (рек-лимит 429).
-            if (ownerUu != null && m == Material.PLAYER_HEAD && meta instanceof SkullMeta sm) {
+        if (key.equals("player_head")) {
+            UUID uuid = null;
+            if (ownerUu != null && !ownerUu.isEmpty()) {
                 try {
-                    plugin.skulls().applyHead(sm, UUID.fromString(ownerUu));
-                    meta = sm;
+                    uuid = UUID.fromString(ownerUu);
                 } catch (Throwable ignored) {
                     // невалидный UUID — без скина
                 }
             }
-            // кастомная текстура головы (Base64) — для всех одинаковая
-            if (m == Material.PLAYER_HEAD && skinTexture != null && !skinTexture.isEmpty()
-                    && meta instanceof SkullMeta sm) {
+            return buildHead(plugin, player, ctx, uuid,
+                    skinTexture == null || skinTexture.isEmpty() ? null : skinTexture);
+        }
+
+        Material m = Material.matchMaterial(raw);
+        ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            decorate(item, meta, plugin, player, ctx);
+        }
+        return item;
+    }
+
+    /** Одинаковая сборка любой кнопки-головы: скин по UUID (резолвер/кэш),
+     *  поверх — кастомная Base64-текстура (при заданной), затем имя/лор. */
+    private ItemStack buildHead(QQRegions plugin, Player player, Map<String, String> ctx,
+                                UUID uuid, String base64) {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD, Math.max(1, Math.min(64, amount)));
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            if (uuid != null && meta instanceof SkullMeta sm) {
                 try {
-                    applyHeadTexture(sm, skinTexture);
-                    meta = sm;
+                    plugin.skulls().applyHead(sm, uuid);
+                } catch (Throwable ignored) {
+                    // невалидный UUID — без скина
+                }
+            }
+            if (base64 != null && !base64.isEmpty() && meta instanceof SkullMeta sm) {
+                try {
+                    applyHeadTexture(sm, base64);
                 } catch (Throwable ignored) {
                     // не получилось — голова без скина
                 }
             }
-            // скрыть служебные строки предметов (урон меча, эффекты зелий,
-            // подкраску, узоры брони и т.п.) — оставить только имя и наш lore.
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,
-                    ItemFlag.HIDE_ARMOR_TRIM, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
-            if (!tooltip) {
-                try {
-                    meta.setHideTooltip(true);
-                } catch (Throwable ignored) {
-                    // старые версии API без setHideTooltip — просто показываем тултип
-                }
-            }
-            meta.displayName(noItalic(Msg.color(process(plugin, player, ctx, name == null ? "" : name))));
-            List<Component> lines = new ArrayList<>();
-            if (lore != null) {
-                for (String l : lore) {
-                    if (l == null || l.isEmpty()) {
-                        lines.add(Component.empty());
-                        continue;
-                    }
-                    // после Papi/replace в строке могут остаться \n (например
-                    // {groups-list}); каждую физическую строку красим отдельно
-                    String processed = process(plugin, player, ctx, l);
-                    for (String seg : processed.split("\n", -1)) {
-                        if (seg.isEmpty()) {
-                            lines.add(Component.empty());
-                        } else {
-                            lines.add(noItalic(Msg.color(seg)));
-                        }
-                    }
-                }
-            }
-            meta.lore(lines);
-            item.setItemMeta(meta);
+            decorate(item, meta, plugin, player, ctx);
         }
         return item;
+    }
+
+    /** Имя/лор/флаги кнопки поверх уже готового meta (сам скин головы
+     *  подставляется раньше — в buildHead, см. SkullResolver). */
+    private void decorate(ItemStack item, ItemMeta meta, QQRegions plugin,
+                          Player player, Map<String, String> ctx) {
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_DYE,
+                ItemFlag.HIDE_ARMOR_TRIM, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+        if (!tooltip) {
+            try {
+                meta.setHideTooltip(true);
+            } catch (Throwable ignored) {
+                // старые версии API без setHideTooltip — просто показываем тултип
+            }
+        }
+        meta.displayName(noItalic(Msg.color(process(plugin, player, ctx, name == null ? "" : name))));
+        List<Component> lines = new ArrayList<>();
+        if (lore != null) {
+            for (String l : lore) {
+                if (l == null || l.isEmpty()) {
+                    lines.add(Component.empty());
+                    continue;
+                }
+                // после Papi/replace в строке могут остаться \n (например
+                // {groups-list}); каждую физическую строку красим отдельно
+                String processed = process(plugin, player, ctx, l);
+                for (String seg : processed.split("\n", -1)) {
+                    if (seg.isEmpty()) {
+                        lines.add(Component.empty());
+                    } else {
+                        lines.add(noItalic(Msg.color(seg)));
+                    }
+                }
+            }
+        }
+        meta.lore(lines);
+        item.setItemMeta(meta);
+    }
+
+    /** Предмет, который сейчас у игрока в указанном слоте (main_hand/off_hand/
+     *  armor_*); пусто — air. Показывается как есть, без имени/лора кнопки. */
+    private static ItemStack liveItem(Player player, String which) {
+        ItemStack it;
+        switch (which) {
+            case "main_hand":
+                it = player.getInventory().getItemInMainHand();
+                break;
+            case "off_hand":
+                it = player.getInventory().getItemInOffHand();
+                break;
+            case "armor_helmet":
+                it = player.getInventory().getHelmet();
+                break;
+            case "armor_chestplate":
+                it = player.getInventory().getChestplate();
+                break;
+            case "armor_leggings":
+                it = player.getInventory().getLeggings();
+                break;
+            case "armor_boots":
+                it = player.getInventory().getBoots();
+                break;
+            default:
+                it = null;
+                break;
+        }
+        return it == null || it.getType() == Material.AIR
+                ? new ItemStack(Material.AIR) : it.clone();
+    }
+
+    /** head-<ник>: UUID игрока по нику (или уже готовый UUID). */
+    private static UUID uuidForName(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(name);
+        } catch (Throwable ignored) {
+            // не UUID — ищем по нику
+        }
+        try {
+            OfflinePlayer op = Bukkit.getOfflinePlayer(name);
+            return op == null ? null : op.getUniqueId();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** texture-<id>: из id после textures.minecraft.net/texture/ собрать
+     *  Base64-текстуру текстуры скина (формат Value field). */
+    private static String textureIdToBase64(String id) {
+        String url = "https://textures.minecraft.net/texture/" + id;
+        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
+        return java.util.Base64.getEncoder()
+                .encodeToString(json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** hdb-<id>: Base64-текстура головы из HeadDatabase (мягкая зависимость). */
+    private static String hdbBase64(QQRegions plugin, String id) {
+        try {
+            org.bukkit.plugin.Plugin hdb = Bukkit.getPluginManager().getPlugin("HeadDatabase");
+            if (hdb == null) {
+                return null;
+            }
+            Class<?> apiClass = Class.forName("me.arcaniax.hdb.api.HeadDatabaseAPI");
+            Object api = apiClass.getConstructor().newInstance();
+            Object base64 = apiClass.getMethod("getBase64", String.class).invoke(api, id);
+            return base64 == null ? null : String.valueOf(base64);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     /** Убрать курсив у кнопки: имя/лор игровых предметов не должна наклоняться. */
@@ -239,7 +370,7 @@ public class MenuItem {
 
     /** Поставить кастомный скин головы по Base64-текстуре через рефлексию
      *  (GameProfile + Property "textures") — без привязки к версии сервера. */
-    private static void applyHeadTexture(SkullMeta meta, String base64) throws Throwable {
+    public static void applyHeadTexture(SkullMeta meta, String base64) throws Throwable {
         String ver = null;
         try {
             ver = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];
