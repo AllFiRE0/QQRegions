@@ -14,7 +14,7 @@
 #  N секунд (вместо чата, префикс плагина не добавляется).
 # ============================================================
 
-config-version: 7
+config-version: 8
 
 prefix: "&8[&7QQRegions&8] "
 
@@ -485,6 +485,7 @@ menu:
   ps-line-balance: "&7Баланс: &f{ps-balance} {ps-balance-symbol}"
   ps-line-clan: "&7Клан: &f{ps-clan}"
   ps-line-regions: "&7Территории: &f{ps-regions}"
+  ps-line-max: "&7Максимум: &f{ps-max}"
   ps-line-owner: "- &e{ps-reg-owner} &7владелец"
   ps-line-member: "- &a{ps-reg-member} &7участник"
   ps-line-manage: "&7Нажмите чтобы управлять"

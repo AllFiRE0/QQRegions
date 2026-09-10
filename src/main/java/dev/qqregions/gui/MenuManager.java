@@ -922,7 +922,7 @@ public class MenuManager implements Listener {
                 continue;
             }
             if (c.equalsIgnoreCase("@pc-add")) {
-                playerConfirmAdd(p, om, e.getClick());
+                playerConfirmAction(p, om, e.getClick());
                 continue;
             }
             if (c.equalsIgnoreCase("@pc-remove")) {
@@ -1392,6 +1392,7 @@ public class MenuManager implements Listener {
             pc.put("ps-regions", String.valueOf(counts[0] + counts[1]));
             pc.put("ps-reg-owner", String.valueOf(counts[0]));
             pc.put("ps-reg-member", String.valueOf(counts[1]));
+            pc.put("ps-max", playerMaxRegions(part.uuid()));
 
             String name = tpl.process(plugin, op, pc,
                     (part.owner() ? "&#ccbf8f" : "&#7db389") + label);
@@ -1402,6 +1403,7 @@ public class MenuManager implements Listener {
             }
             lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-balance")));
             lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-regions")));
+            lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-max")));
             lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-owner")));
             lore.add(tpl.process(plugin, op, pc, plugin.lang().get("menu.ps-line-member")));
             if (viewerOwner) {
@@ -2133,6 +2135,7 @@ public class MenuManager implements Listener {
             pc.put("ps-regions", String.valueOf(row.ownerRegions() + row.memberRegions()));
             pc.put("ps-reg-owner", String.valueOf(row.ownerRegions()));
             pc.put("ps-reg-member", String.valueOf(row.memberRegions()));
+            pc.put("ps-max", playerMaxRegions(row.uuid()));
             pc.put("ps-clan", playerClan(row.uuid()));
             List<String> lore = new ArrayList<>();
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-group")));
@@ -2141,6 +2144,7 @@ public class MenuManager implements Listener {
             }
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-balance")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-regions")));
+            lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-max")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-owner")));
             lore.add(tpl.process(plugin, viewer, pc, plugin.lang().get("menu.ps-line-member")));
             lore.add("");
@@ -2835,9 +2839,10 @@ public class MenuManager implements Listener {
     }
 
     /** Выполнить операцию из меню игрока (playerconfirm.yml) и вернуться в
-     *  предыдущее меню. op — "add"|"remove"; role — целевая роль для add
-     *  (для remove не используется). Двойной клик не страшен: после перехода
-     *  инвентарь подтверждения больше не в open — клик игнорируется. */
+     *  предыдущее меню. op — "add"|"remove"; role — целевая роль (для add —
+     *  кого добавить, для remove — кого убрать; НЕ текущая роль игрока).
+     *  Двойной клик не страшен: после перехода инвентарь подтверждения
+     *  больше не в open — клик игнорируется. */
     private void execPlayerAction(Player p, OpenMenu om, String op, String role) {
         String rawUuid = om.ctx.get("_pc-uuid");
         UUID uuid = null;
@@ -2862,14 +2867,15 @@ public class MenuManager implements Listener {
             plugin.lang().send(p, owner ? "menu.player-added-owner" : "menu.player-added-member",
                     "player", nick);
         } else {
+            boolean targetOwner = "owner".equalsIgnoreCase(role);
             boolean curOwner = plugin.wg().isOwner(region, uuid);
-            if (curOwner && ownerCount(region) <= 1) {
+            if (targetOwner && curOwner && ownerCount(region) <= 1) {
                 plugin.lang().send(p, "remove.last-owner");
                 goBack(p);
                 return;
             }
-            plugin.wg().removePlayer(world, region, uuid, curOwner);
-            plugin.lang().send(p, curOwner ? "remove.ok-owner" : "remove.ok-member",
+            plugin.wg().removePlayer(world, region, uuid, targetOwner);
+            plugin.lang().send(p, targetOwner ? "remove.ok-owner" : "remove.ok-member",
                     "target", nick, "region", region.getId());
         }
         goBack(p);
@@ -2880,17 +2886,34 @@ public class MenuManager implements Listener {
         execPlayerAction(p, om, om.ctx.get("_pc-op"), om.ctx.get("_pc-role"));
     }
 
-    /** Кнопка «Добавить» в playerconfirm: ЛКМ/ПКМ — участник,
-     *  Shift+ЛКМ/Shift+ПКМ — владелец (подтверждение — само меню). */
-    private void playerConfirmAdd(Player p, OpenMenu om, org.bukkit.event.inventory.ClickType ct) {
-        boolean owner = ct == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
-                || ct == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT;
-        execPlayerAction(p, om, "add", owner ? "owner" : "member");
+    /** Кнопка «Добавить игрока» в playerconfirm: ЛКМ — участник, ПКМ —
+     *  владелец, Shift+ЛКМ — убрать участника, Shift+ПКМ — убрать владельца
+     *  (подтверждение — сам выбор действия в этом меню). */
+    private void playerConfirmAction(Player p, OpenMenu om, org.bukkit.event.inventory.ClickType ct) {
+        switch (ct) {
+            case RIGHT -> execPlayerAction(p, om, "add", "owner");
+            case SHIFT_LEFT -> execPlayerAction(p, om, "remove", "member");
+            case SHIFT_RIGHT -> execPlayerAction(p, om, "remove", "owner");
+            default -> execPlayerAction(p, om, "add", "member");
+        }
     }
 
-    /** Кнопка «Удалить» в playerconfirm: убрать игрока из территории. */
+    /** Legacy-кнопка «Удалить» (@pc-remove, без кнопки в дефолтном playerconfirm):
+     *  убрать игрока по ЕГО текущей роли (у владельца — защита последнего). */
     private void playerConfirmRemove(Player p, OpenMenu om) {
-        execPlayerAction(p, om, "remove", null);
+        org.bukkit.World world = worldFrom(om.ctx);
+        ProtectedRegion region = world == null ? null : plugin.wg().byName(world, om.ctx.get("region"));
+        UUID uuid = null;
+        String rawUuid = om.ctx.get("_pc-uuid");
+        if (rawUuid != null) {
+            try {
+                uuid = UUID.fromString(rawUuid);
+            } catch (IllegalArgumentException ex) {
+                uuid = null;
+            }
+        }
+        boolean curOwner = region != null && uuid != null && plugin.wg().isOwner(region, uuid);
+        execPlayerAction(p, om, "remove", curOwner ? "owner" : "member");
     }
 
     /** Сколько регионов у игрока всего по мирам: [0]=владелец, [1]=участник. */

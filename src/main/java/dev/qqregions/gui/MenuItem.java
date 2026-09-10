@@ -1,5 +1,7 @@
 package dev.qqregions.gui;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
 import dev.qqregions.QQRegions;
 import dev.qqregions.util.Msg;
 import dev.qqregions.util.Papi;
@@ -241,11 +243,7 @@ public class MenuItem {
                 }
             }
             if (base64 != null && !base64.isEmpty() && meta instanceof SkullMeta sm) {
-                try {
-                    applyHeadTexture(sm, base64);
-                } catch (Throwable ignored) {
-                    // не получилось — голова без скина
-                }
+                applyHeadTexture(sm, uuid, base64);
             }
             decorate(item, meta, plugin, player, ctx);
         }
@@ -368,9 +366,36 @@ public class MenuItem {
         return c.decoration(TextDecoration.ITALIC, TextDecoration.State.FALSE);
     }
 
+    /** Поставить кастомный скин головы по Base64-текстуре. Основной путь —
+     *  paper-профиль (есть на Paper/Leaf): createProfile(uuid) + setProperty(
+     *  "textures", base64) + SkullMeta#setPlayerProfile — без OBC и без
+     *  org.bukkit.profile.* (уродливый промежуточный API, куда достать живой
+     *  профиль нельзя). uuid == null (basehead-/texture-/hdb-) — берём
+     *  стабильный фиктивный id по хэшу base64. При неудаче — рефлексия
+     *  (GameProfile + Property "textures"). Не бросает. */
+    public static void applyHeadTexture(SkullMeta meta, UUID uuid, String base64) {
+        if (base64 == null || base64.isEmpty()) {
+            return;
+        }
+        try {
+            PlayerProfile profile = Bukkit.createProfile(
+                    uuid == null ? UUID.nameUUIDFromBytes(base64.getBytes(StandardCharsets.UTF_8)) : uuid);
+            profile.setProperty(new ProfileProperty("textures", base64, null));
+            meta.setPlayerProfile(profile);
+            return;
+        } catch (Throwable ignored) {
+            // профиль не собрался — пробуем рефлексию ниже
+        }
+        try {
+            applyViaOBC(meta, base64);
+        } catch (Throwable ignored) {
+        }
+    }
+
     /** Поставить кастомный скин головы по Base64-текстуре через рефлексию
-     *  (GameProfile + Property "textures") — без привязки к версии сервера. */
-    public static void applyHeadTexture(SkullMeta meta, String base64) throws Throwable {
+     *  (GameProfile + Property "textures") — запасной путь без привязки к
+     *  версии сервера, используется, если paper-профиль собрать не вышло. */
+    private static void applyViaOBC(SkullMeta meta, String base64) throws Throwable {
         String ver = null;
         try {
             ver = Bukkit.getServer().getClass().getPackage().getName().split("\\.")[3];

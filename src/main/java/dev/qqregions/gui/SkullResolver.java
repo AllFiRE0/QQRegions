@@ -1,5 +1,6 @@
 package dev.qqregions.gui;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import dev.qqregions.QQRegions;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -8,8 +9,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.meta.SkullMeta;
-import org.bukkit.profile.PlayerProfile;
-import org.bukkit.profile.PlayerTextures;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,7 +17,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
-import java.util.Base64;
 import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
@@ -46,8 +44,10 @@ import java.util.regex.Pattern;
  *
  * Дофетч идёт напрямую по HTTP к sessionserver.mojang.com (тот же endpoint,
  * что использует setOwningPlayer): ответ парсится регуляркой, из properties
- * забирается Base64-текстура ("value") без зависимостей от профильных API
- * ядра (org.bukkit.profile.PlayerProfile / paper-профили) и версии Minecraft.
+ * забирается Base64-текстура ("value") без зависимостей от профильных API.
+ * Установка скина на голову — paper-профиль (MenuItem.applyHeadTexture):
+ * createProfile(uuid) + setProperty("textures", base64) + setPlayerProfile,
+ * рефлексия OBC — только запасной вариант.
  */
 public final class SkullResolver implements Listener {
 
@@ -103,17 +103,16 @@ public final class SkullResolver implements Listener {
     public void applyHead(SkullMeta meta, UUID uuid) {
         Player online = Bukkit.getPlayer(uuid);
         if (online != null) {
-            URL url = texturesOf(online.getPlayerProfile());
-            if (url != null) {
-                String b64 = urlToBase64(url);
+            String b64 = texturesOf(online.getPlayerProfile());
+            if (b64 != null) {
                 skins.put(uuid, new Skinned(b64, System.currentTimeMillis()));
-                setHead(meta, b64);
+                setHead(meta, uuid, b64);
                 return;
             }
         }
         Skinned sk = skins.get(uuid);
         if (sk != null) {
-            setHead(meta, sk.base64);
+            setHead(meta, uuid, sk.base64);
             long maxAge = plugin.config().playerSearchTextureRefreshMs();
             if (maxAge > 0 && System.currentTimeMillis() - sk.at >= maxAge) {
                 // скин мог устареть — перепроверить, не снимая старый
@@ -121,30 +120,25 @@ public final class SkullResolver implements Listener {
             }
             return;
         }
-        setHead(meta, null);
+        setHead(meta, uuid, null);
         enqueue(uuid, false);
     }
 
-    private static URL texturesOf(PlayerProfile profile) {
-        PlayerTextures tx = profile.getTextures();
-        return tx == null ? null : tx.getSkin();
+    /** Base64-текстура из живого paper-профиля игрока (свойство "textures"). */
+    private static String texturesOf(PlayerProfile profile) {
+        try {
+            com.destroystokyo.paper.profile.ProfileProperty tx = profile.getProperties().get("textures");
+            return tx == null ? null : tx.getValue();
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
-    private void setHead(SkullMeta meta, String base64) {
+    private void setHead(SkullMeta meta, UUID uuid, String base64) {
         if (base64 == null || base64.isEmpty()) {
             return; // default-голова; настоящий скин придёт из кэша на следующей перерисовке
         }
-        try {
-            MenuItem.applyHeadTexture(meta, base64);
-        } catch (Throwable ignored) {
-            // старая версия — просто голова
-        }
-    }
-
-    /** URL скина из профиля → Base64-текстура (формат JSON "value"). */
-    private static String urlToBase64(URL url) {
-        String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + url + "\"}}}";
-        return Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
+        MenuItem.applyHeadTexture(meta, uuid, base64);
     }
 
     private void enqueue(UUID uuid, boolean allowRefresh) {

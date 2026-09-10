@@ -40,7 +40,7 @@
 #  {groups-list} — подсказка со списком групп, текущая выделена.
 #  Переводы групп и значений — в replace.yml (блоки flag-groups/flag-values).
 # ============================================================
-config-version: 3
+config-version: 4
 update_interval: 20   # перерисовка меню каждые N тиков; 0 = выключить автообновление
 
 Menus:
@@ -119,7 +119,6 @@ Menus:
       name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
-        - "&7Группа: {groups-list}"
         - "&6ЛКМ — вкл/выкл/по умолчанию"
         - "&6ПКМ — сменить группу"
       states:
@@ -267,7 +266,6 @@ Menus:
       name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
-        - "&7Группа: {groups-list}"
         - "&6ЛКМ — вкл/выкл/по умолчанию"
         - "&6ПКМ — сменить группу"
       states:
@@ -352,7 +350,6 @@ Menus:
       name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
-        - "&7Группа: {groups-list}"
         - "&6ЛКМ — вкл/выкл/по умолчанию"
         - "&6ПКМ — сменить группу"
       states:
@@ -449,7 +446,6 @@ Menus:
       name: "&f{flag-name} &8· {group-label}"
       lore:
         - "&7Значение: &f{flag-value-label}"
-        - "&7Группа: {groups-list}"
         - "&6ЛКМ — вкл/выкл/по умолчанию"
         - "&6ПКМ — сменить группу"
       states:
