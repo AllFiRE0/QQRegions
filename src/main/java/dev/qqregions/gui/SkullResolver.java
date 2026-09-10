@@ -1,6 +1,7 @@
 package dev.qqregions.gui;
 
 import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
 import dev.qqregions.QQRegions;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -124,14 +125,20 @@ public final class SkullResolver implements Listener {
         enqueue(uuid, false);
     }
 
-    /** Base64-текстура из живого paper-профиля игрока (свойство "textures"). */
+    /** Base64-текстура из живого paper-профиля игрока (свойство "textures").
+     *  В Leaf getProperties() возвращает МНОЖЕСТВО ProfileProperty, а не Map —
+     *  ищем по имени. */
     private static String texturesOf(PlayerProfile profile) {
         try {
-            com.destroystokyo.paper.profile.ProfileProperty tx = profile.getProperties().get("textures");
-            return tx == null ? null : tx.getValue();
+            for (ProfileProperty p : profile.getProperties()) {
+                if ("textures".equals(p.getName())) {
+                    return p.getValue();
+                }
+            }
         } catch (Throwable ignored) {
             return null;
         }
+        return null;
     }
 
     private void setHead(SkullMeta meta, UUID uuid, String base64) {
