@@ -724,6 +724,9 @@ public class MenuManager implements Listener {
     }
 
     public void tick() {
+        // дофетч скинов для голов (SkullResolver): один запрос за раз, с паузой,
+        // работает и без открытых меню — кэш тёплый к моменту открытия
+        plugin.skulls().poll();
         if (open.isEmpty()) {
             return;
         }

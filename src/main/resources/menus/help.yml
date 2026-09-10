@@ -11,7 +11,7 @@ Menus:
     priority: 5
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Помощь по территориям"
+    title: "&#000000Справка по территориям"
     size: 6
     fill:
       enabled: true
@@ -91,7 +91,7 @@ Menus:
     priority: 1
     permission-group: ""
     placeholder-group: ""
-    title: "&#000000Помощь"
+    title: "&#000000Справка"
     size: 6
     fill:
       enabled: true

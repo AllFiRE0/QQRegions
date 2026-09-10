@@ -43,6 +43,7 @@ public final class QQRegions extends JavaPlugin {
     private RaidManager raid;
     private ShopManager shop;
     private MarketHolos marketHolos;
+    private dev.qqregions.gui.SkullResolver skulls;
 
     public static QQRegions get() {
         return instance;
@@ -77,6 +78,8 @@ public final class QQRegions extends JavaPlugin {
         this.raid = new RaidManager(this);
         this.shop = new ShopManager(this);
         this.marketHolos = new MarketHolos(this);
+        this.skulls = new dev.qqregions.gui.SkullResolver(this);
+        Bukkit.getPluginManager().registerEvents(plugin.skulls(), this);
         Bukkit.getPluginManager().registerEvents(interactListener, this);
         Bukkit.getPluginManager().registerEvents(selections, this);
         Bukkit.getPluginManager().registerEvents(menus, this);
@@ -136,6 +139,9 @@ public final class QQRegions extends JavaPlugin {
         if (marketHolos != null) {
             marketHolos.clearAll();
         }
+        if (skulls != null) {
+            skulls.clear();
+        }
         if (commands != null) {
             commands.unregister();
         }
@@ -193,6 +199,11 @@ public final class QQRegions extends JavaPlugin {
 
     public MarketHolos marketHolos() {
         return marketHolos;
+    }
+
+    /** Кэш скинов для голов PLAYER_HEAD (см. SkullResolver). */
+    public dev.qqregions.gui.SkullResolver skulls() {
+        return skulls;
     }
 
     /** Подробный лог в консоль, если в config.yml включён debug: true. */

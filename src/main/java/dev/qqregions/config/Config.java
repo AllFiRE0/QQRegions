@@ -112,6 +112,9 @@ public class Config {
     /** player-search.head-texture: Base64-текстура ОДИНАКОВОЙ головы для всех
      *  кнопок (пусто — скин каждого игрока). */
     private String playerSearchHeadTexture = "";
+    /** player-search.texture-refresh-seconds: как часто перепроверять скин
+     *  оффлайн-игрока у Mojang (0 = не перепроверять; по умолчанию 300 с). */
+    private long playerSearchTextureRefreshMs = 300L * 1000L;
 
     public Config(QQRegions plugin) {
         this.plugin = plugin;
@@ -242,6 +245,8 @@ public class Config {
 
         playerSearchHeadMaterial = cfg.getString("player-search.head-material", "PLAYER_HEAD");
         playerSearchHeadTexture = cfg.getString("player-search.head-texture", "");
+        playerSearchTextureRefreshMs =
+                Math.max(0L, cfg.getLong("player-search.texture-refresh-seconds", 300L) * 1000L);
     }
 
     private static List<String> lower(List<String> in) {
@@ -522,6 +527,12 @@ public class Config {
      *  (пусто — скин каждого игрока). */
     public String playerSearchHeadTexture() {
         return playerSearchHeadTexture;
+    }
+
+    /** Как часто перепроверять скин оффлайн-игрока у Mojang, мс (0 = не
+     *  перепроверять). Обновление ЛОРА кнопок от этого не зависит. */
+    public long playerSearchTextureRefreshMs() {
+        return playerSearchTextureRefreshMs;
     }
 
     /** Есть ли у игрока группа-шаблон прав (config.yml flag-groups), открывающая

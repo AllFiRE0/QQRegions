@@ -174,10 +174,12 @@ public class MenuItem {
         ItemStack item = new ItemStack(m == null ? Material.STONE : m, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            // голова игрока: подставить скин по UUID (PLAYER_HEAD)
+            // голова игрока: подставить скин по UUID (PLAYER_HEAD). Скин берётся из
+            // кэша SkullResolver (онлайн — сразу, оффлайн — один раз с паузой),
+            // чтобы не спамить session-сервер Mojang (рек-лимит 429).
             if (ownerUu != null && m == Material.PLAYER_HEAD && meta instanceof SkullMeta sm) {
                 try {
-                    sm.setOwningPlayer(Bukkit.getOfflinePlayer(UUID.fromString(ownerUu)));
+                    plugin.skulls().applyHead(sm, UUID.fromString(ownerUu));
                     meta = sm;
                 } catch (Throwable ignored) {
                     // невалидный UUID — без скина
