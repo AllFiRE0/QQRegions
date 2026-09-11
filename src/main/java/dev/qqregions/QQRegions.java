@@ -85,6 +85,15 @@ public final class QQRegions extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(menus, this);
         Bukkit.getPluginManager().registerEvents(highlight, this);
 
+        // Одноразовая зачистка осиротевших блок-дисплеев подсветки из старых
+        // сборок (сохранялись в чанки и наслаивались после рестарта).
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            int removed = highlight.cleanupLegacy();
+            if (removed > 0) {
+                getLogger().info("QQRegions: убрано осиротевших блоков подсветки: " + removed);
+            }
+        }, 40L);
+
         marketHolos.refresh();
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {

@@ -207,6 +207,7 @@ visible:
   flag-set: "{qqregions_prefix}&7Флаг &f{flag}&7 территории #59806f{region} &7установлен: &f{value}"
   flag-fail: "{qqregions_prefix}&8Не удалось установить флаг подсветки."
   not-owner: "{qqregions_prefix}&8Вы не владелец территории #59806f{region}&8 — флаг подсветки менять нельзя."
+  cleanup: "{qqregions_prefix}&7Удалено осиротевших блоков подсветки: &f{count}&7."
 
 help:
   header: "&8===== &7QQRegions &7v{version} &8====="

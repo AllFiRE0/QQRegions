@@ -432,6 +432,14 @@ public class RegionCommand {
             lang(p, "visible.disabled");
             return;
         }
+        // /region visible cleanup — удалить осиротевшие блок-дисплеи подсветки
+        // из старых сборок (сохранялись в чанк и наслаивались после рестарта).
+        if (args.length >= 2 && (args[1].equalsIgnoreCase("cleanup")
+                || args[1].equalsIgnoreCase("clean"))) {
+            int removed = plugin.highlight().cleanupLegacy();
+            lang(p, "visible.cleanup", "count", String.valueOf(removed));
+            return;
+        }
         // /region visible true|false [территория] — только владелец территории
         // (или админ) включает/выключает флаг territory-visible — подсветку
         // границ для всех. Сменить флаг чужой территории нельзя.

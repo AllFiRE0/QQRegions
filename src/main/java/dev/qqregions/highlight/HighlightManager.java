@@ -7,8 +7,10 @@ import dev.qqregions.config.Config;
 import dev.qqregions.util.BoxOutline;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.BlockDisplay;
@@ -18,6 +20,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -737,6 +740,13 @@ public class HighlightManager implements Listener {
                 d.setGlowColorOverride(glow);
             }
             d.setInvulnerable(true);
+            // Не сохранять дисплеи в чанк: иначе при выгрузке чанка во время
+            // показа подсветки сущность пишется в файл чанка и остаётся
+            // «зависшей» после рестарта сервера / конца показа — снять её
+            // можно только /kill. Тег нужен для sweepChunk().
+            d.setPersistent(false);
+            d.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "highlight-display"), PersistentDataType.BYTE, (byte) 1);
             return d;
         } catch (Throwable t) {
             plugin.dbg("spawnDisplay error: " + t.getMessage());
@@ -997,6 +1007,11 @@ public class HighlightManager implements Listener {
         flagShown.remove(uid);
     }
 
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        removePlayer(e.getPlayer().getUniqueId());
+    }
+
     /** Полная очистка всех (выключение плагина / highlight.enabled=false). */
     public void clearAll() {
         for (Map<String, List<Entity>> perPlayer : blockViews.values()) {
@@ -1014,14 +1029,87 @@ public class HighlightManager implements Listener {
         terrainCache.clear();
     }
 
-    @EventHandler
-    public void onQuit(PlayerQuitEvent e) {
-        removePlayer(e.getPlayer().getUniqueId());
+    /** Зачистка осиротевших дисплеев подсветки регионов из загружаемого чанка:
+     *  если дисплей уже был сохранён в файл чанка и остался без живого владельца
+     *  (старые сборки, выгрузка в момент гибели сессии), после перезагрузки
+     *  чанка он всплывает и висит вечно. Мы помечаем дисплеи тегом при спавне,
+     *  поэтому при загрузке чанка все тегированные удаляем; активные подсветки
+     *  пересоздадут свои на следующем тике. */
+    public static void sweepChunk(QQRegions plugin, Chunk chunk) {
+        NamespacedKey key = new NamespacedKey(plugin, "highlight-display");
+        for (Entity e : chunk.getEntities()) {
+            if (e instanceof BlockDisplay
+                    && e.getPersistentDataContainer().has(key)) {
+                e.remove();
+            }
+        }
     }
 
-    /** Загрузился чанк — кэш территории мира устарел (могут появиться новые столбцы). */
+    /** Очистить ОСИРОТЕВШИЕ дисплеи подсветки БЕЗ тега (созданные старыми
+     *  сборками до появления тегирования + setPersistent(false)): такие
+     *  сущности сохранялись в файл чанка и при перезагрузке сервера всплывают
+     *  заново, наслаиваясь (пользователь видел «кучу белых стёкол» вокруг
+     *  спавна). Удаляем СТРОГО ограниченный набор сущностей, чтобы НЕ задеть
+     *  чужие блок-дисплеи других плагинов:
+     *   1) только BlockDisplay БЕЗ нашего тега (теговые — новые — пропускаем);
+     *   2) материал блока — один из материалов, используемых подсветкой в
+     *      текущем конфиге (BLOCKS + забор всех ролей);
+     *   3) геометрия «наша»: хотя бы ОДНА ось масштаба < 1.0. Штакетины забора
+     *      (width/thickness = 0.3, height = 1.0) и кубики BLOCKS (block-scale
+     *      = 0.35) всегда масштабированы; полноразмерные дисплеи (1,1,1) —
+     *      чужие или игровые, их НЕ удаляем.
+     *  Так старые стёкла подсветки вычищаются, а дисплеи других плагинов
+     *  (даже стеклянные, но полноразмерные) остаются нетронутыми. */
+    public int cleanupLegacy() {
+        Config.HighlightOptions h = plugin.config().highlight();
+        java.util.Set<Material> materials = new java.util.HashSet<>();
+        materials.add(h.block);
+        if (h.fence != null) {
+            materials.add(h.fence.material);
+            materials.add(h.fence.foreign.material);
+            materials.add(h.fence.member.material);
+            materials.add(h.fence.owner.material);
+        }
+        NamespacedKey key = new NamespacedKey(plugin, "highlight-display");
+        int removed = 0;
+        for (World w : Bukkit.getWorlds()) {
+            for (Chunk c : w.getLoadedChunks()) {
+                for (Entity e : c.getEntities()) {
+                    if (!(e instanceof BlockDisplay d)) {
+                        continue;
+                    }
+                    if (d.getPersistentDataContainer().has(key)) {
+                        continue;
+                    }
+                    if (!materials.contains(d.getBlock().getMaterial())) {
+                        continue;
+                    }
+                    // Геометрия: пропускаем полноразмерные дисплеи (все оси >= 1.0).
+                    // Масштаб может отличаться от 1.0 и у чужих, поэтому дополнительно
+                    // не очищаем, если масштаб прочитать не удалось.
+                    boolean scaled = false;
+                    try {
+                        org.bukkit.util.Transformation t = d.getTransformation();
+                        org.joml.Vector3f s = t.getScale();
+                        scaled = s.x < 1.0f || s.y < 1.0f || s.z < 1.0f;
+                    } catch (Throwable ignore) {
+                        // scale недоступен — оставляем сущность нетронутой
+                    }
+                    if (scaled) {
+                        d.remove();
+                        removed++;
+                    }
+                }
+            }
+        }
+        return removed;
+    }
+
+    /** Загрузился чанк — кэш территории мира устарел (могут появиться новые
+     *  столбцы) и вычищаются осиротевшие тегированные дисплеи подсветки. */
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent e) {
+        sweepChunk(plugin, e.getChunk());
         if (terrainCache.isEmpty()) {
             return;
         }
