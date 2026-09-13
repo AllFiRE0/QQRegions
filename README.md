@@ -1,4 +1,5 @@
 # QQRegions — Вики
+[[Русский](README.md) | English](README.en.md)
 
 > Мощное управление регионами поверх **WorldGuard** для серверов **Paper / Leaf (api 26.2)**.
 
