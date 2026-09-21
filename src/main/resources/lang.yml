@@ -16,7 +16,7 @@
 
 config-version: 8
 
-prefix: "&8[&7QQRegions&8] "
+prefix: "&6▏ "
 
 general:
   only-player: "{qqregions_prefix}&8Эта команда доступна только игрокам."
@@ -68,7 +68,7 @@ select:
   # Чтобы включить — раскомментируй строку ниже и напиши свой текст.
   interactive-select-mode: ""
   #interactive-select-mode: "{qqregions_prefix}&7Режим выделения области. Активная точка: &f{point}&7."
-  interactive-help: ""
+  interactive-help: "&#bd8c8c ознакомьтесь с названиями и описанием кнопок!"
   #interactive-help: "&7&6ПКМ&8&6ЛКМ — (&fсоздать&7, &fточка 1&7, &fточка 2&7, &fвыделить&7, &fсброс&7, &fотмена&7)."
   interactive-off: "{qqregions_prefix}&7Режим выделения выключен."
   interactive-on-fail: "{qqregions_prefix}&8Не удалось сохранить инвентарь — сессия не запущена."
@@ -80,12 +80,12 @@ select:
   button-create-lore:
     - "&7Создать территорию из текущего выделения."
     - ""
-    - "&fПравила имени:"
-    - "&7латиница, цифры, &f_ &7и &f-&7,"
+    - "&fПравила для названия территории:"
+    - "&7английский, цифры, &f_ &7и &f-&7,"
     - "&7от &f3 &7до &f32 &7символов."
     - ""
     - "&6ЛКМ&8/&6ПКМ &7— ввести название в чат."
-  button-point-1: "#b34b00Точка 1"
+  button-point-1: "#b34b00Установить первую точку"
   button-point-1-lore:
     - "#b34b00Установить точку 1 (верхнюю)."
     - ""
@@ -95,9 +95,9 @@ select:
     - "&7иначе — позиция игрока."
     - ""
     - "&6ЛКМ&8/&6ПКМ &7кнопкой в руке — установить."
-  button-point-2: "#004d1fТочка 2"
+  button-point-2: "#004d1fУстановить вторую точку"
   button-point-2-lore:
-    - "#004d1fУстановить точку 2 (нижнюю)."
+    - "#004d1fУстанавливает точку 2 (нижнюю)."
     - ""
     - "&7Зелёная кнопка — нижняя граница."
     - ""
@@ -105,18 +105,24 @@ select:
     - "&7иначе — позиция игрока."
     - ""
     - "&6ЛКМ&8/&6ПКМ &7кнопкой в руке — установить."
-  button-select: "<gradient:#ffe600:#ffb300>Выделить область</gradient>"
+  button-select: "<gradient:#ffe600:#ffb300>Выделение колесом мыши</gradient>"
   button-select-lore:
-    - "&7Колесо мыши или клавиши &f4/6 &7—"
-    - "&7двигать активную точку по взгляду."
-    - "&6ЛКМ &7пустой рукой — сменить точку,"
-    - "&cShift &8+ &6ЛКМ &7— подтвердить."
+    - "&7Выделите область для территории с помощью"
+    - "&7колеса мыши или клавишами &f4&8|&f6."
+    - "&6ЛКМ &7пустой рукой — сменить точку"
+    - "&7выделения на &61 &7или &22&7."
+    - "&cShift &8+ &6ЛКМ &7— подтвердить"
+    - "&7выделение обеих точек и перейти"
+    - "&7к вводу названия или отмены всего процесса."
     - ""
-    - "&7Оранжевая точка — верхняя граница,"
-    - "&7зелёная — нижняя."
+    - "&6Оранжевая точка &7— верхняя точка"
+    - "&2Зелёная &7— нижняя точка"
+    - ""
+    - "&8Смотрите в нужную сторону и перемещайте"
+    - "&8выбраную точку колесом мыши"
   button-reset: "<gradient:#ffa500:#ff6a00>Сброс выделения</gradient>"
   button-reset-lore:
-    - "&7Сбросить выделение к нулю."
+    - "&7Сбросить выделеную область."
     - ""
     - "&6ЛКМ&8/&6ПКМ &7— сбросить."
   button-cancel: "<gradient:#ff5555:#ff0000>Отмена</gradient>"
@@ -131,12 +137,12 @@ select:
     - "&7Активная точка: #b34b00точка 1&7."
     - ""
     - "&6ЛКМ &7чтобы сменить на #004d1fточку 2&7."
-    - "&6КМ &f4&7 и &f6&7 — двигать."
+    - "&6Колесо мыши &7— двигать точку"
   point-pane-2-lore:
     - "&7Активная точка: #004d1fточка 2&7."
     - ""
     - "&6ЛКМ &7чтобы сменить на #b34b00точку 1&7."
-    - "&6КМ &f4&7 и &f6&7 — двигать."
+    - "&6Колесо мыши &7— двигать точку"
   view-set: "{qqregions_prefix}&7Просмотр выделения игрока #b3b07d{target}&7. &6ЛКМ/&6ПКМ — сменить, колесо — двигать."
   view-offline: "{qqregions_prefix}&8Игрок #b3b07d{target} &8не в сети."
   view-self: "{qqregions_prefix}&8Нельзя просматривать собственное выделение."
@@ -157,6 +163,7 @@ create:
   cancel-words:
     - "cancel"
     - "отмена"
+    - "выход"
 
 delete:
   ok: "{qqregions_prefix}&7Территория #59806f{region} &7удалёна."
@@ -210,7 +217,7 @@ visible:
   cleanup: "{qqregions_prefix}&7Удалено осиротевших блоков подсветки: &f{count}&7."
 
 help:
-  header: "&8===== &7QQRegions &7v{version} &8====="
+  header: "&8===== &7Территории &8====="
   line: "&f{cmd}&8: &7{desc}"
   commands:
     - usage: "select"
@@ -266,7 +273,7 @@ help:
     - usage: "market"
       desc: "Открыть меню рынка"
     - usage: "reload"
-      desc: "Перезагрузить конфигурацию"
+      desc: "Доступ только администратору."
 
 market:
   disabled: "{qqregions_prefix}&8Рынок отключён в конфиге (market.enabled: false)."
@@ -333,8 +340,8 @@ market:
 # символ валюты, {nick} — покупатель/арендатор приватного предложения,
 # {time} — срок аренды, {region}.
 market-holo:
-  sale: "&7[ Рынок ] Продаёт #b3b07d{owner}&7 за &f{price} {price-symbol}"
-  rent: "&7[ Рынок ] Сдаёт #b3b07d{owner}&7 за &f{price} {price-symbol} &8· &f{time}"
+  sale: "#b3b07d{owner}&7 продает за &f{price} {price-symbol}"
+  rent: "#b3b07d{owner}&7 сдаёт в аренду за &f{price} {price-symbol} &8на &f{time}"
   sale-pending: "&7[ Рынок ] #b3b07d{owner}&7 ждёт покупку от #b3b07d{nick}&7 за &f{price} {price-symbol}"
   rent-pending: "&7[ Рынок ] #b3b07d{owner}&7 сдаёт игроку #b3b07d{nick}&7 за &f{price} {price-symbol} &8· &f{time}"
   buy-hint: "&8Нажмите &f/region buy&8 / &f/region tenant&8, чтобы купить/арендовать"
@@ -375,12 +382,12 @@ menu:
   dialog-search-market-title: "&7Поиск по рынку"
   dialog-search-flag-title: "&7Поиск флагов"
   dialog-search-market-label: "&7Введите название территории для поиска."
-  dialog-search-flag-label: "&7Введите название флага или его перевод."
+  dialog-search-flag-label: "&7Введите название флага."
   dialog-add-owner-title: "&7Добавление владельца"
   dialog-add-member-title: "&7Добавление участника"
-  dialog-add-label: "&7Введите ник игрока, которого {action}"
-  dialog-add-action-owner: "сделать владельцем территории."
-  dialog-add-action-member: "добавить участником территории."
+  dialog-add-label: "&7Введите ник, кого {action}"
+  dialog-add-action-owner: "нужно добавить во владельцы территории."
+  dialog-add-action-member: "нужно добавить как участника территории."
   # Главное меню (/region без аргументов), кнопка «Назад» в слоте 0.
   main-back-name: "&7Назад|Главное меню"
   main-back-lore: "&7Выполняется команда из config.yml."
@@ -427,11 +434,11 @@ menu:
   market-tab-switch-mine: "actionbar:2!&7Открыта вкладка «Мои объявления»."
   market-tab-switch-all: "actionbar:2!&7Открыта вкладка «Все объявления»."
   # Режимы сортировки предложений рынка (кнопка «Сортировка», @sort).
-  market-sort-name-az: "По названию A-Z"
-  market-sort-name-za: "По названию Z-A"
-  market-sort-price-asc: "Цена по возрастанию"
-  market-sort-price-desc: "Цена по убыванию"
-  market-sort-default: "По умолчанию"
+  market-sort-name-az: "По названию: &fA&8-&7Z"
+  market-sort-name-za: "По названию: &7Z&8-&fA"
+  market-sort-price-asc: "Цена по &fвозрастанию"
+  market-sort-price-desc: "Цена по &7убыванию"
+  market-sort-default: "&8По умолчанию"
   own-only: "{qqregions_prefix}&7Это действие доступно в ваших вкладках «Мои объявления»."
   market-teleported: "{qqregions_prefix}&7Телепорт к #59806f{region}&7."
   market-teleport-disabled: "{qqregions_prefix}&8Телепорт к территории из объявления отключён на сервере."
@@ -494,13 +501,13 @@ menu:
   # Подсказка при вводе ника в меню поиска игроков.
   player-search-prompt: "&7Введите ник игрока (или часть ника) в чат — список отфильтруется:"
   ps-sort-changed: "actionbar:3!&7Сортировка: &f{sort}"
-  ps-sort-az: "По имени: A-Z"
-  ps-sort-za: "По имени: Z-A"
+  ps-sort-az: "По имени: &fA&8-&7Z"
+  ps-sort-za: "По имени: &7Z&8-&fA"
   ps-sort-balance: "По балансу"
-  ps-sort-regions-asc: "Территорий: по возрастанию"
-  ps-sort-regions-desc: "Территорий: по убыванию"
-  ps-sort-dist-far: "Дистанция: дальше"
-  ps-sort-dist-near: "Дистанция: ближе"
+  ps-sort-regions-asc: "Территорий: &fпо возрастанию"
+  ps-sort-regions-desc: "Территорий: &7по убыванию"
+  ps-sort-dist-far: "Дистанция: &fдальше"
+  ps-sort-dist-near: "Дистанция: &7ближе"
   # Названия ролей (для {role-ru} в списке участников и меню подтверждения).
   role-owner: "Владелец"
   role-member: "Участник"
@@ -511,12 +518,12 @@ menu:
   # --- Выбор территории (regionpicker) ---
   rp-sort-near: "Ближайшие"
   rp-sort-far: "Дальние"
-  rp-sort-az: "По названию: &fA&8-&cZ"
-  rp-sort-za: "По названию: &cZ&8-&fA"
+  rp-sort-az: "По названию: &fA&8-&7Z"
+  rp-sort-za: "По названию: &7Z&8-&fA"
   rp-sort-members-asc: "Людей: &fпо возрастанию"
-  rp-sort-members-desc: "Людей: &cпо убыванию"
+  rp-sort-members-desc: "Людей: &7по убыванию"
   rp-sort-area-asc: "Площадь: &fпо возрастанию"
-  rp-sort-area-desc: "Площадь: &cпо убыванию"
+  rp-sort-area-desc: "Площадь: &7по убыванию"
   rp-sort-changed: "actionbar:3!&7Сортировка: &f{sort}"
   rp-world-line: "&7Мир: &f{rp-world}"
   rp-type-line: "&7Тип: &f{rp-type}"
@@ -524,7 +531,7 @@ menu:
   rp-area-line: "&7Площадь: &f{rp-area} &7м²"
   rp-dist-line: "&7Расстояние: &f{rp-dist} &7блоков"
   rp-dist-none: "&7—"
-  rp-click: "&7Клик — информация о территории"
+  rp-click: "&6ЛКМ &7— информация о территории"
   # --- Рейд-кнопка в инфо-меню (пустое значение без данных о клане) ---
   raid-empty: "&7—"
 
