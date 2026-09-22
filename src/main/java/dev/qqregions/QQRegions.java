@@ -97,9 +97,14 @@ public final class QQRegions extends JavaPlugin {
         marketHolos.refresh();
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            Papi.setEnabled(true);
-            new QQExpansion(this).register();
-            getLogger().info("PlaceholderAPI подключён: доступны %qqregions_*% заполнители.");
+            if (config.placeholdersEnabled()) {
+                Papi.setEnabled(true);
+                new QQExpansion(this).register();
+                getLogger().info("PlaceholderAPI подключён: доступны %qqregions_*% заполнители.");
+            } else {
+                getLogger().info("PlaceholderAPI установлен, но placeholders.enabled=false в config.yml — "
+                        + "расширение %qqregions_*% не зарегистрировано.");
+            }
         } else {
             getLogger().info("PlaceholderAPI не найден: внешние заполнители недоступны.");
         }

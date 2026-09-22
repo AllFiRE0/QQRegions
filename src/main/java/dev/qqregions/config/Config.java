@@ -111,6 +111,12 @@ public class Config {
      *  оффлайн-игрока у Mojang (0 = не перепроверять; по умолчанию 300 с). */
     private long playerSearchTextureRefreshMs = 300L * 1000L;
 
+    private boolean placeholdersEnabled = true;
+    private String ownersSeparator = ", ";
+    private String membersSeparator = ", ";
+    private String ownedSeparator = ", ";
+    private String memberedSeparator = ", ";
+
     public Config(QQRegions plugin) {
         this.plugin = plugin;
         reload();
@@ -138,6 +144,13 @@ public class Config {
 
         namePattern = Pattern.compile(cfg.getString("region-name.regex", "[A-Za-zА-Яа-я0-9_-]{3,32}"));
         forceLowercase = cfg.getBoolean("region-name.force-lowercase", true);
+
+        ConfigurationSection ph = cfg.getConfigurationSection("placeholders");
+        placeholdersEnabled = ph == null || ph.getBoolean("enabled", true);
+        ownersSeparator = ph == null ? ", " : ph.getString("owners-separator", ", ");
+        membersSeparator = ph == null ? ", " : ph.getString("members-separator", ", ");
+        ownedSeparator = ph == null ? ", " : ph.getString("owned-separator", ", ");
+        memberedSeparator = ph == null ? ", " : ph.getString("membered-separator", ", ");
 
         templates.clear();
         ConfigurationSection sec = cfg.getConfigurationSection("selection-templates");
@@ -268,6 +281,26 @@ public class Config {
 
     public boolean isBannedRegion(String name) {
         return bannedRegions.contains(name.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    public boolean placeholdersEnabled() {
+        return placeholdersEnabled;
+    }
+
+    public String ownersSeparator() {
+        return ownersSeparator;
+    }
+
+    public String membersSeparator() {
+        return membersSeparator;
+    }
+
+    public String ownedSeparator() {
+        return ownedSeparator;
+    }
+
+    public String memberedSeparator() {
+        return memberedSeparator;
     }
 
     public Set<String> bannedRegions() {

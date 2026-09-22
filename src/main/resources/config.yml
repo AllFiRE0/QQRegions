@@ -11,7 +11,7 @@
 # выше, чем в вашем файле, config.yml пересоздаётся из новых дефолтов
 # автоматически (старый файл остаётся как config.yml.old). Значения ниже
 # — уже настроенный дефолт, повторно вводить их не нужно.
-config-version: 11
+config-version: 12
 
 # ------------------------------------------------------------
 # Команда и алиасы. Первичное имя берётся из plugin.yml, алиасы
@@ -54,6 +54,23 @@ restrictions:
     - "arena"
     - "pvp_arena"
     - "mine"
+
+# ------------------------------------------------------------
+# PlaceholderAPI интеграция (раздел %qqregions_*%).
+# enabled: false — отключает регистрацию расширения, все плейсхолдеры
+# QQRegions перестают резолвиться (остаётся неподставленный текст).
+# Разделители списков, которые строит расширение:
+#   owners-separator   — владельцы текущего региона (%qqregions_region_owners%)
+#   members-separator  — участники текущего региона (%qqregions_region_members%)
+#   owned-separator    — регионы игрока (%qqregions_player_owned_regions%)
+#   membered-separator — регионы-участия (%qqregions_player_membered_regions%)
+# ------------------------------------------------------------
+placeholders:
+  enabled: true
+  owners-separator: ", "
+  members-separator: ", "
+  owned-separator: ", "
+  membered-separator: ", "
 
 # ------------------------------------------------------------
 # Название территории
